@@ -1,0 +1,40 @@
+{
+  "provider": "Poly Haven",
+  "resolution": "1k",
+  "notes": [
+    "diff (albedo) is color data (sRGB).",
+    "nor_gl / rough / ao are non-color data (linear)."
+  ],
+  "textures": {
+    "asphalt_05": {
+      "category": "road",
+      "maps": {
+        "diffuse": "asphalt_05/asphalt_05_diff_1k.jpg",
+        "normal_gl": "asphalt_05/asphalt_05_nor_gl_1k.png",
+        "arm": "asphalt_05/asphalt_05_arm_1k.jpg",
+        "roughness": "asphalt_05/asphalt_05_rough_1k.jpg",
+        "ao": "asphalt_05/asphalt_05_ao_1k.jpg"
+      }
+    },
+    "concrete_pavement": {
+      "category": "sidewalk",
+      "maps": {
+        "diffuse": "concrete_pavement/concrete_pavement_diff_1k.jpg",
+        "normal_gl": "concrete_pavement/concrete_pavement_nor_gl_1k.png",
+        "arm": "concrete_pavement/concrete_pavement_arm_1k.jpg",
+        "roughness": "concrete_pavement/concrete_pavement_rough_1k.jpg",
+        "ao": "concrete_pavement/concrete_pavement_ao_1k.jpg"
+      }
+    },
+    "concrete_tile_facade": {
+      "category": "building-facade",
+      "maps": {
+        "diffuse": "concrete_tile_facade/concrete_tile_facade_diff_1k.jpg",
+        "normal_gl": "concrete_tile_facade/concrete_tile_facade_nor_gl_1k.png",
+        "arm": "concrete_tile_facade/concrete_tile_facade_arm_1k.jpg",
+        "roughness": "concrete_tile_facade/concrete_tile_facade_rough_1k.jpg",
+        "ao": "concrete_tile_facade/concrete_tile_facade_ao_1k.jpg"
+      }
+    }
+  }
+}

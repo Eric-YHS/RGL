@@ -1,11 +1,13 @@
 import * as THREE from "three";
+import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
 import type { ExperimentConfig, ExperimentState, LightColor } from "../experiment/types";
-import {
-  createAsphaltTexture,
-  createBuildingFacadeTexture,
-  createGrassTexture,
-  createSidewalkTexture
-} from "./proceduralTextures";
+import { createGrassTexture } from "./proceduralTextures";
 
 type LampVisual = {
   bulb: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
@@ -28,12 +30,17 @@ export class World3D {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.PerspectiveCamera;
+  private readonly composer: EffectComposer;
+  private readonly ssaoPass: SSAOPass;
+  private readonly bloomPass: UnrealBloomPass;
+  private readonly fxaaPass: ShaderPass;
   private readonly haloTexture: THREE.Texture;
   private readonly ownedTextures: THREE.Texture[] = [];
   private readonly atmosphereColor: THREE.Color;
-  private sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null = null;
-  private skyMaterial: THREE.ShaderMaterial | null = null;
+  private readonly fogMode: boolean;
   private envTarget: THREE.WebGLRenderTarget | null = null;
+  private dpr: number = 1;
+  private disposed: boolean = false;
 
   private readonly spacing: number = 56;
   private readonly routeLength: number;
@@ -48,36 +55,35 @@ export class World3D {
   constructor(canvas: HTMLCanvasElement, config: ExperimentConfig) {
     this.config = config;
     this.routeLength = this.config.numLights * this.spacing;
+    this.fogMode = this.config.revealMode === "sequential";
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
-      alpha: true,
+      antialias: false,
+      alpha: false,
       powerPreference: "high-performance"
     });
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    this.dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    this.renderer.setPixelRatio(this.dpr);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = this.fogMode ? 1.08 : 0.85;
 
     this.scene = new THREE.Scene();
-    this.atmosphereColor = new THREE.Color(0x9fc2dc);
+    // Fog mode uses a warm neutral haze for a natural soft-fog look.
+    this.atmosphereColor = new THREE.Color(this.fogMode ? 0xd6dde6 : 0x9fc2dc);
     this.scene.background = this.atmosphereColor;
     this.haloTexture = this.createGlowTexture();
     this.ownedTextures.push(this.haloTexture);
 
-    if (this.config.revealMode === "sequential") {
-      this.scene.fog = new THREE.FogExp2(this.atmosphereColor, 0.023);
-    } else {
-      this.scene.fog = null;
-    }
+    // 使用线性雾，让近处清晰，远处平滑过渡到雾色
+    this.scene.fog = this.fogMode ? new THREE.Fog(this.atmosphereColor, 20, 250) : null;
 
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 520);
     this.camera.position.set(0, 14, -18);
     this.cameraTarget.set(0, 1.2, 8);
     this.camera.lookAt(this.cameraTarget);
 
-    this.setupSky();
     this.setupEnvironment();
     this.setupLights();
     this.setupGround();
@@ -88,11 +94,30 @@ export class World3D {
     this.scene.add(this.avatar);
     this.setupTrafficLights();
 
+    // Post-processing (写实：SSAO + Bloom + FXAA)
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.setPixelRatio(this.dpr);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+
+    this.ssaoPass = new SSAOPass(this.scene, this.camera, 1, 1);
+    this.ssaoPass.output = 0; // Default
+    this.ssaoPass.kernelRadius = this.fogMode ? 0.9 : 1.6;
+    this.ssaoPass.minDistance = 0.01;
+    this.ssaoPass.maxDistance = this.fogMode ? 0.045 : 0.08;
+    this.composer.addPass(this.ssaoPass);
+
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.2, 0.95);
+    this.composer.addPass(this.bloomPass);
+
+    this.fxaaPass = new ShaderPass(FXAAShader);
+    this.composer.addPass(this.fxaaPass);
+
     this.resize();
     window.addEventListener("resize", this.resize);
   }
 
   dispose(): void {
+    this.disposed = true;
     window.removeEventListener("resize", this.resize);
 
     const geometries = new Set<THREE.BufferGeometry>();
@@ -116,6 +141,10 @@ export class World3D {
     this.ownedTextures.forEach((t) => t.dispose());
 
     this.envTarget?.dispose();
+    this.ssaoPass.dispose();
+    this.bloomPass.dispose();
+    this.fxaaPass.dispose();
+    this.composer.dispose();
     this.renderer.dispose();
   }
 
@@ -133,7 +162,7 @@ export class World3D {
     const rightArm = this.avatar.getObjectByName("rightArm");
     const leftLeg = this.avatar.getObjectByName("leftLeg");
     const rightLeg = this.avatar.getObjectByName("rightLeg");
-    
+
     if (moving) {
       const swing = Math.sin(nowMs / 1000 * 8.5) * 0.6;
       if (leftArm) leftArm.rotation.x = swing;
@@ -159,12 +188,6 @@ export class World3D {
     this.cameraTarget.lerp(this.desiredCameraTarget, 0.1);
     this.camera.lookAt(this.cameraTarget);
 
-    // Sky follows camera to avoid "end of dome"
-    if (this.sky) {
-      this.sky.position.copy(this.camera.position);
-      if (this.skyMaterial) this.skyMaterial.uniforms.uTime.value = nowMs / 1000;
-    }
-
     // Traffic lights
     for (const tl of this.trafficLights) {
       tl.group.visible = true;
@@ -174,7 +197,7 @@ export class World3D {
       this.setLampGroup(tl.green, "green", color, nowMs, tl.index * 2 + 1, visibility01);
     }
 
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   }
 
   private readonly resize = (): void => {
@@ -182,108 +205,72 @@ export class World3D {
     const parent = canvas.parentElement;
     const width = parent ? parent.clientWidth : window.innerWidth;
     const height = parent ? parent.clientHeight : window.innerHeight;
+
+    // Post-processing 开销较大，限制 DPR 保持帧率稳定
+    this.dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    this.renderer.setPixelRatio(this.dpr);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+
+    this.composer.setPixelRatio(this.dpr);
+    this.composer.setSize(width, height);
+
+    // SSAO 单独降分辨率（性价比高）
+    const ssaoScale = 0.75;
+    this.ssaoPass.setSize(
+      Math.max(1, Math.round(width * this.dpr * ssaoScale)),
+      Math.max(1, Math.round(height * this.dpr * ssaoScale))
+    );
+
+    const invW = 1 / Math.max(1, Math.round(width * this.dpr));
+    const invH = 1 / Math.max(1, Math.round(height * this.dpr));
+    (this.fxaaPass.material as THREE.ShaderMaterial).uniforms["resolution"].value.set(invW, invH);
   };
 
-  private setupSky(): void {
-    const geo = new THREE.SphereGeometry(480, 48, 24);
-    const uniforms = {
-      uTime: { value: 0 },
-      uTopColor: { value: new THREE.Color(0x4c8ec5) },
-      uBottomColor: {
-        value: this.atmosphereColor.clone().lerp(new THREE.Color(0xffffff), 0.28)
-      },
-      uSunDir: { value: new THREE.Vector3(0.25, 0.65, -0.38).normalize() }
-    };
-
-    const mat = new THREE.ShaderMaterial({
-      uniforms,
-      vertexShader: `
-        varying vec3 vDir;
-        void main() {
-          vDir = normalize(position);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float uTime;
-        uniform vec3 uTopColor;
-        uniform vec3 uBottomColor;
-        uniform vec3 uSunDir;
-        varying vec3 vDir;
-
-        float hash(vec2 p) {
-          // cheap hash
-          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-        }
-
-        float noise(vec2 p) {
-          vec2 i = floor(p);
-          vec2 f = fract(p);
-          float a = hash(i);
-          float b = hash(i + vec2(1.0, 0.0));
-          float c = hash(i + vec2(0.0, 1.0));
-          float d = hash(i + vec2(1.0, 1.0));
-          vec2 u = f * f * (3.0 - 2.0 * f);
-          return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-        }
-
-        float fbm(vec2 p) {
-          float v = 0.0;
-          float a = 0.5;
-          for (int i = 0; i < 5; i++) {
-            v += a * noise(p);
-            p *= 2.0;
-            a *= 0.5;
-          }
-          return v;
-        }
-
-        void main() {
-          float h01 = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
-          float skyT = pow(smoothstep(0.0, 1.0, h01), 1.25);
-          vec3 col = mix(uBottomColor, uTopColor, skyT);
-
-          // Sun glow
-          vec3 sd = normalize(uSunDir);
-          float sunAmt = max(dot(normalize(vDir), sd), 0.0);
-          col += vec3(1.0, 0.92, 0.78) * pow(sunAmt, 520.0) * 2.2;
-          col += vec3(1.0, 0.72, 0.38) * pow(sunAmt, 14.0) * 0.18;
-
-          // Soft clouds (seamless by using direction)
-          vec2 p = vDir.xz * 3.4 + vec2(uTime * 0.015, uTime * 0.007);
-          float n = fbm(p);
-          float c = smoothstep(0.56, 0.78, n) * smoothstep(0.15, 0.62, h01);
-          col = mix(col, vec3(1.0), c * 0.32);
-
-          gl_FragColor = vec4(col, 1.0);
-        }
-      `,
-      side: THREE.BackSide,
-      depthWrite: false,
-      fog: false,
-      dithering: true
-    });
-
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.renderOrder = -10;
-    this.scene.add(mesh);
-    this.sky = mesh;
-    this.skyMaterial = mat;
-  }
-
   private setupEnvironment(): void {
-    const env = this.createEquirectEnvironmentTexture();
-    env.mapping = THREE.EquirectangularReflectionMapping;
-
+    // Fallback IBL（避免 HDRI 未加载完成前环境反射全黑）
+    const fallback = this.createEquirectEnvironmentTexture();
+    fallback.mapping = THREE.EquirectangularReflectionMapping;
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.envTarget = pmrem.fromEquirectangular(env);
+    this.envTarget = pmrem.fromEquirectangular(fallback);
     this.scene.environment = this.envTarget.texture;
-
-    env.dispose();
+    fallback.dispose();
     pmrem.dispose();
+
+    // HDRI IBL + 背景（写实质感的关键）
+    const hdriUrl = "/hdri/daytime.hdr";
+    new RGBELoader().load(
+      hdriUrl,
+      (tex) => {
+        if (this.disposed) {
+          tex.dispose();
+          return;
+        }
+
+        tex.mapping = THREE.EquirectangularReflectionMapping;
+        if (!this.fogMode) {
+          this.scene.background = tex;
+          // 降低非雾天模式下 HDRI 背景的亮度，防止天空过曝
+          this.scene.backgroundIntensity = 0.6;
+        } else {
+          // 雾天模式下，保持纯色背景以匹配雾的颜色，避免远景物体与天空颜色断层
+          this.scene.background = this.atmosphereColor;
+        }
+        this.ownedTextures.push(tex);
+
+        const pmrem2 = new THREE.PMREMGenerator(this.renderer);
+        const nextEnv = pmrem2.fromEquirectangular(tex);
+        this.envTarget?.dispose();
+        this.envTarget = nextEnv;
+        this.scene.environment = nextEnv.texture;
+        pmrem2.dispose();
+      },
+      undefined,
+      (err) => {
+        console.warn(`[World3D] HDRI 加载失败: ${hdriUrl}`, err);
+      }
+    );
   }
 
   private createEquirectEnvironmentTexture(): THREE.CanvasTexture {
@@ -327,21 +314,21 @@ export class World3D {
   }
 
   private setupLights(): void {
-    const hemi = new THREE.HemisphereLight(0xc8ddf0, 0x5a7a96, 1.2);
+    const hemi = new THREE.HemisphereLight(0xc8ddf0, 0x5a7a96, this.fogMode ? 0.95 : 0.65);
     hemi.position.set(0, 80, 0);
     this.scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xfff4e0, 1.8);
+    const sun = new THREE.DirectionalLight(0xfff4e0, this.fogMode ? 1.25 : 1.1);
     sun.position.set(24, 42, -18);
     sun.castShadow = false;
     this.scene.add(sun);
 
-    const fill = new THREE.DirectionalLight(0x9ec5e8, 0.6);
+    const fill = new THREE.DirectionalLight(0x9ec5e8, this.fogMode ? 0.38 : 0.25);
     fill.position.set(-30, 28, 30);
     this.scene.add(fill);
 
     // 清晨天空环境光
-    const ambient = new THREE.AmbientLight(this.atmosphereColor, 0.28);
+    const ambient = new THREE.AmbientLight(this.atmosphereColor, this.fogMode ? 0.22 : 0.1);
     this.scene.add(ambient);
   }
 
@@ -359,15 +346,43 @@ export class World3D {
     grassTex.repeat.set(140 / 10, (length + 120) / 10);
     this.ownedTextures.push(grassTex);
 
-    const asphaltTex = createAsphaltTexture({ seed: 11 });
-    asphaltTex.anisotropy = aniso;
-    asphaltTex.repeat.set(roadWidth / 6, length / 6);
-    this.ownedTextures.push(asphaltTex);
+    const loader = new THREE.TextureLoader();
 
-    const sidewalkTex = createSidewalkTexture({ seed: 12 });
-    sidewalkTex.anisotropy = aniso;
-    sidewalkTex.repeat.set(sidewalkWidth / 2.2, length / 2.2);
-    this.ownedTextures.push(sidewalkTex);
+    // Road (Poly Haven, 1K)
+    const asphaltDiff = loader.load("/textures/polyhaven/asphalt_05/asphalt_05_diff_1k.jpg");
+    asphaltDiff.colorSpace = THREE.SRGBColorSpace;
+    const asphaltNormal = loader.load("/textures/polyhaven/asphalt_05/asphalt_05_nor_gl_1k.png");
+    asphaltNormal.colorSpace = THREE.NoColorSpace;
+    const asphaltArm = loader.load("/textures/polyhaven/asphalt_05/asphalt_05_arm_1k.jpg");
+    asphaltArm.colorSpace = THREE.NoColorSpace;
+    for (const t of [asphaltDiff, asphaltNormal, asphaltArm]) {
+      t.anisotropy = aniso;
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(roadWidth / 6, length / 6);
+    }
+    this.ownedTextures.push(asphaltDiff, asphaltNormal, asphaltArm);
+
+    // Sidewalk (Poly Haven, 1K)
+    const pavementDiff = loader.load(
+      "/textures/polyhaven/concrete_pavement/concrete_pavement_diff_1k.jpg"
+    );
+    pavementDiff.colorSpace = THREE.SRGBColorSpace;
+    const pavementNormal = loader.load(
+      "/textures/polyhaven/concrete_pavement/concrete_pavement_nor_gl_1k.png"
+    );
+    pavementNormal.colorSpace = THREE.NoColorSpace;
+    const pavementArm = loader.load(
+      "/textures/polyhaven/concrete_pavement/concrete_pavement_arm_1k.jpg"
+    );
+    pavementArm.colorSpace = THREE.NoColorSpace;
+    for (const t of [pavementDiff, pavementNormal, pavementArm]) {
+      t.anisotropy = aniso;
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(sidewalkWidth / 2.2, length / 2.2);
+    }
+    this.ownedTextures.push(pavementDiff, pavementNormal, pavementArm);
 
     // Grass / ground
     const ground = new THREE.Mesh(
@@ -384,27 +399,42 @@ export class World3D {
     this.scene.add(ground);
 
     // Road
-    const road = new THREE.Mesh(
-      new THREE.PlaneGeometry(roadWidth, length),
-      new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        map: asphaltTex,
-        roughness: 0.95,
-        metalness: 0.05
-      })
-    );
+    const roadGeo = new THREE.PlaneGeometry(roadWidth, length);
+    roadGeo.setAttribute("uv2", roadGeo.attributes.uv);
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: asphaltDiff,
+      normalMap: asphaltNormal,
+      aoMap: asphaltArm,
+      roughnessMap: asphaltArm,
+      metalnessMap: asphaltArm,
+      roughness: 1.0,
+      metalness: 0.0,
+      envMapIntensity: 0.55
+    });
+    roadMat.normalScale.setScalar(0.85);
+    roadMat.aoMapIntensity = 0.65;
+    const road = new THREE.Mesh(roadGeo, roadMat);
     road.rotation.x = -Math.PI / 2;
     road.position.set(0, 0.0, centerZ);
     this.scene.add(road);
 
     // Sidewalks
     const sidewalkGeo = new THREE.PlaneGeometry(sidewalkWidth, length);
+    sidewalkGeo.setAttribute("uv2", sidewalkGeo.attributes.uv);
     const sidewalkMat = new THREE.MeshStandardMaterial({
-      color: 0xd7dbe0,
-      map: sidewalkTex,
-      roughness: 0.95,
-      metalness: 0.01
+      color: 0xffffff,
+      map: pavementDiff,
+      normalMap: pavementNormal,
+      aoMap: pavementArm,
+      roughnessMap: pavementArm,
+      metalnessMap: pavementArm,
+      roughness: 1.0,
+      metalness: 0.0,
+      envMapIntensity: 0.38
     });
+    sidewalkMat.normalScale.setScalar(0.7);
+    sidewalkMat.aoMapIntensity = 0.7;
     const sidewalkL = new THREE.Mesh(sidewalkGeo, sidewalkMat);
     sidewalkL.rotation.x = -Math.PI / 2;
     sidewalkL.position.set(-(roadHalf + sidewalkWidth / 2), 0.008, centerZ);
@@ -596,17 +626,44 @@ export class World3D {
 
   private setupBuildings(): void {
     const geo = new THREE.BoxGeometry(1, 1, 1);
-    const facadeTex = createBuildingFacadeTexture({ size: 256, seed: 21 });
-    facadeTex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-    this.ownedTextures.push(facadeTex);
+    geo.setAttribute("uv2", geo.attributes.uv);
+
+    const aniso = this.renderer.capabilities.getMaxAnisotropy();
+    const loader = new THREE.TextureLoader();
+
+    // Building facade (Poly Haven, 1K)
+    const facadeDiff = loader.load(
+      "/textures/polyhaven/concrete_tile_facade/concrete_tile_facade_diff_1k.jpg"
+    );
+    facadeDiff.colorSpace = THREE.SRGBColorSpace;
+    const facadeNormal = loader.load(
+      "/textures/polyhaven/concrete_tile_facade/concrete_tile_facade_nor_gl_1k.png"
+    );
+    facadeNormal.colorSpace = THREE.NoColorSpace;
+    const facadeArm = loader.load(
+      "/textures/polyhaven/concrete_tile_facade/concrete_tile_facade_arm_1k.jpg"
+    );
+    facadeArm.colorSpace = THREE.NoColorSpace;
+    for (const t of [facadeDiff, facadeNormal, facadeArm]) {
+      t.anisotropy = aniso;
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(2.0, 4.0);
+    }
+    this.ownedTextures.push(facadeDiff, facadeNormal, facadeArm);
+
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      map: facadeTex,
-      roughness: 0.96,
-      metalness: 0.02,
-      envMapIntensity: 0.25,
+      map: facadeDiff,
+      normalMap: facadeNormal,
+      roughnessMap: facadeArm,
+      metalnessMap: facadeArm,
+      roughness: 1.0,
+      metalness: 0.0,
+      envMapIntensity: 0.35,
       vertexColors: true
     });
+    mat.normalScale.setScalar(0.55);
 
     // windows (暖色发光，避免“建筑全黑”)
     const windowGeo = new THREE.PlaneGeometry(1, 1);
@@ -653,7 +710,7 @@ export class World3D {
       const w = 2.2 + random() * 6;
       const d = 2.2 + random() * 7;
       const h = 3 + random() * 22;
-      
+
       // Keep an empty "street band" near the road (sidewalk + props), so the street feels readable.
       const minX = roadHalf + sidewalkWidth + streetReserve + w / 2;
       const x = side * (minX + random() * 26);
@@ -709,7 +766,7 @@ export class World3D {
       // windows on the front/back facades
       const colsZ = Math.min(5, Math.max(2, Math.floor(w / 2)));
       const marginX = 0.35;
-      
+
       // Front facade (+Z)
       const facadeZFront = z + d / 2 + 0.06;
       qWin.setFromAxisAngle(yAxis, 0);
