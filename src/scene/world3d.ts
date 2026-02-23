@@ -46,6 +46,8 @@ export class World3D {
 
   private readonly spacing: number = 56;
   private readonly routeLength: number;
+  private readonly roadStartZ: number;
+  private readonly roadEndZ: number;
 
   private readonly avatar: THREE.Group;
   private readonly trafficLights: TrafficLightMesh[] = [];
@@ -57,6 +59,8 @@ export class World3D {
   constructor(canvas: HTMLCanvasElement, config: ExperimentConfig) {
     this.config = config;
     this.routeLength = this.config.numLights * this.spacing;
+    this.roadStartZ = -110;
+    this.roadEndZ = this.routeLength + 260;
     const isSequential = this.config.revealMode === "sequential";
 
     this.renderer = new THREE.WebGLRenderer({
@@ -85,7 +89,7 @@ export class World3D {
     this.scene.fog = isSequential ? new THREE.FogExp2(this.atmosphereColor, 0.04) : null;
 
     const cameraNear = 0.2;
-    const cameraFar = Math.max(360, this.routeLength + 170);
+    const cameraFar = Math.max(420, this.roadEndZ + 100);
     this.camera = new THREE.PerspectiveCamera(55, 1, cameraNear, cameraFar);
     this.camera.position.set(0, 14, -18);
     this.cameraTarget.set(0, 1.2, 8);
@@ -400,8 +404,8 @@ export class World3D {
     const roadWidth = 14;
     const roadHalf = roadWidth / 2;
     const sidewalkWidth = 3.4;
-    const length = this.routeLength + 220;
-    const centerZ = this.routeLength / 2;
+    const length = this.roadEndZ - this.roadStartZ;
+    const centerZ = (this.roadStartZ + this.roadEndZ) / 2;
 
     const aniso = this.renderer.capabilities.getMaxAnisotropy();
 
@@ -566,13 +570,15 @@ export class World3D {
       polygonOffsetUnits: -2
     });
 
-    const dashCount = Math.ceil((this.routeLength + 200) / 3.2);
+    const dashStep = 3.2;
+    const dashStartZ = Math.max(this.roadStartZ + 0.5, -40);
+    const dashEndZ = this.roadEndZ - 1.5;
+    const dashCount = Math.max(1, Math.floor((dashEndZ - dashStartZ) / dashStep) + 1);
     const dashes = new THREE.InstancedMesh(lineGeo, lineMat, dashCount);
     const m = new THREE.Matrix4();
     let idx = 0;
-    const startZ = -40;
     for (let i = 0; i < dashCount; i++) {
-      const z = startZ + i * 3.2;
+      const z = dashStartZ + i * dashStep;
       m.makeRotationX(-Math.PI / 2);
       m.setPosition(0, 0.02, z);
       dashes.setMatrixAt(idx, m);
