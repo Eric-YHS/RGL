@@ -9,6 +9,20 @@ import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
 import type { ExperimentConfig, ExperimentState, LightColor } from "../experiment/types";
 import { createGrassTexture } from "./proceduralTextures";
 
+const QUALITY = {
+  dprCap: 2,
+  msaaSamples: 4,
+  ssaoEnabled: true,
+  ssaoScale: 0.75,
+  bloomEnabled: true
+} as const;
+
+const REVEAL_NEAR_DIST = 24;
+const REVEAL_FAR_DIST = 82;
+const REVEAL_NEAR_DIST_SQ = REVEAL_NEAR_DIST * REVEAL_NEAR_DIST;
+const REVEAL_FAR_DIST_SQ = REVEAL_FAR_DIST * REVEAL_FAR_DIST;
+const FLOAT_EPSILON = 1e-4;
+
 type LampVisual = {
   bulb: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
   glow: THREE.PointLight;
@@ -16,6 +30,11 @@ type LampVisual = {
   haloBaseScale: number;
   onColor: number;
   offColor: number;
+  lastBulbHex: number;
+  lastBulbOpacity: number;
+  lastGlowIntensity: number;
+  lastHaloOpacity: number;
+  lastHaloScale: number;
 };
 
 type TrafficLightMesh = {
@@ -50,6 +69,10 @@ export class World3D {
   private readonly roadEndZ: number;
 
   private readonly avatar: THREE.Group;
+  private readonly leftArm: THREE.Group;
+  private readonly rightArm: THREE.Group;
+  private readonly leftLeg: THREE.Group;
+  private readonly rightLeg: THREE.Group;
   private readonly trafficLights: TrafficLightMesh[] = [];
 
   private readonly cameraTarget = new THREE.Vector3();
@@ -69,7 +92,7 @@ export class World3D {
       alpha: false,
       powerPreference: "high-performance"
     });
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = Math.min(QUALITY.dprCap, window.devicePixelRatio || 1);
     this.renderer.setPixelRatio(this.dpr);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -88,8 +111,9 @@ export class World3D {
     // FogExp2：无硬性的 far 截断，避免“信号灯突然跳出来”，渐显更自然。
     this.scene.fog = isSequential ? new THREE.FogExp2(this.atmosphereColor, 0.04) : null;
 
-    const cameraNear = 0.2;
-    const cameraFar = Math.max(420, this.roadEndZ + 100);
+    // Narrower near/far ratio improves depth precision and reduces distant edge shimmer.
+    const cameraNear = 0.8;
+    const cameraFar = Math.max(380, this.roadEndZ + 60);
     this.camera = new THREE.PerspectiveCamera(55, 1, cameraNear, cameraFar);
     this.camera.position.set(0, 14, -18);
     this.cameraTarget.set(0, 1.2, 8);
@@ -100,7 +124,12 @@ export class World3D {
     this.setupGround();
     this.setupStreetscape();
     this.setupBuildings();
-    this.avatar = this.createAvatar();
+    const avatarRig = this.createAvatar();
+    this.avatar = avatarRig.avatar;
+    this.leftArm = avatarRig.leftArm;
+    this.rightArm = avatarRig.rightArm;
+    this.leftLeg = avatarRig.leftLeg;
+    this.rightLeg = avatarRig.rightLeg;
     this.avatar.scale.setScalar(1.25);
     this.scene.add(this.avatar);
     this.setupTrafficLights();
@@ -113,13 +142,14 @@ export class World3D {
       { type: THREE.HalfFloatType }
     );
     if (this.renderer.capabilities.isWebGL2) {
-      composerTarget.samples = Math.min(4, this.renderer.capabilities.maxSamples);
+      composerTarget.samples = Math.min(QUALITY.msaaSamples, this.renderer.capabilities.maxSamples);
     }
     this.composer = new EffectComposer(this.renderer, composerTarget);
     this.composer.setPixelRatio(this.dpr);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
     this.ssaoPass = new SSAOPass(this.scene, this.camera, 1, 1);
+    this.ssaoPass.enabled = QUALITY.ssaoEnabled;
     this.ssaoPass.output = 0; // Default
     // SSAO 太强会把大面积立面压成“黑剪影”，这里保持克制；两种呈现一致
     this.ssaoPass.kernelRadius = 0.95;
@@ -129,12 +159,15 @@ export class World3D {
     this.composer.addPass(this.ssaoPass);
 
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.2, 1.02);
+    this.bloomPass.enabled = QUALITY.bloomEnabled;
     this.composer.addPass(this.bloomPass);
 
     this.fxaaPass = new ShaderPass(FXAAShader);
     this.composer.addPass(this.fxaaPass);
 
     this.resize();
+    // 预编译材质/着色器，减少首次运动时的卡顿尖峰。
+    this.renderer.compile(this.scene, this.camera);
     window.addEventListener("resize", this.resize);
   }
 
@@ -208,22 +241,17 @@ export class World3D {
     this.avatar.rotation.y = 0;
 
     // Animate avatar limbs
-    const leftArm = this.avatar.getObjectByName("leftArm");
-    const rightArm = this.avatar.getObjectByName("rightArm");
-    const leftLeg = this.avatar.getObjectByName("leftLeg");
-    const rightLeg = this.avatar.getObjectByName("rightLeg");
-
     if (moving) {
       const swing = Math.sin(nowMs / 1000 * 8.5) * 0.6;
-      if (leftArm) leftArm.rotation.x = swing;
-      if (rightArm) rightArm.rotation.x = -swing;
-      if (leftLeg) leftLeg.rotation.x = -swing;
-      if (rightLeg) rightLeg.rotation.x = swing;
+      this.leftArm.rotation.x = swing;
+      this.rightArm.rotation.x = -swing;
+      this.leftLeg.rotation.x = -swing;
+      this.rightLeg.rotation.x = swing;
     } else {
-      if (leftArm) leftArm.rotation.x = 0;
-      if (rightArm) rightArm.rotation.x = 0;
-      if (leftLeg) leftLeg.rotation.x = 0;
-      if (rightLeg) rightLeg.rotation.x = 0;
+      this.leftArm.rotation.x = 0;
+      this.rightArm.rotation.x = 0;
+      this.leftLeg.rotation.x = 0;
+      this.rightLeg.rotation.x = 0;
     }
 
     // Camera (导航式跟随)
@@ -255,8 +283,8 @@ export class World3D {
         if (gated) {
           targetReveal01 = 0;
         } else {
-          const dist = this.camera.position.distanceTo(tl.group.position);
-          targetReveal01 = this.revealFromDistance(dist);
+          const distSq = this.camera.position.distanceToSquared(tl.group.position);
+          targetReveal01 = this.revealFromDistanceSquared(distSq);
         }
       }
       tl.reveal01 =
@@ -280,7 +308,7 @@ export class World3D {
     const height = parent ? parent.clientHeight : window.innerHeight;
 
     // Post-processing 开销较大，限制 DPR 保持帧率稳定
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = Math.min(QUALITY.dprCap, window.devicePixelRatio || 1);
     this.renderer.setPixelRatio(this.dpr);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
@@ -290,7 +318,7 @@ export class World3D {
     this.composer.setSize(width, height);
 
     // SSAO 单独降分辨率（性价比高）
-    const ssaoScale = 0.75;
+    const ssaoScale = QUALITY.ssaoScale;
     this.ssaoPass.setSize(
       Math.max(1, Math.round(width * this.dpr * ssaoScale)),
       Math.max(1, Math.round(height * this.dpr * ssaoScale))
@@ -404,6 +432,9 @@ export class World3D {
     const roadWidth = 14;
     const roadHalf = roadWidth / 2;
     const sidewalkWidth = 3.4;
+    // Slight overlap avoids sub-pixel seams between adjacent meshes at long distance.
+    const roadEdgeOverlap = 0.08;
+    const curbRoadOverlap = 0.02;
     const length = this.roadEndZ - this.roadStartZ;
     const centerZ = (this.roadStartZ + this.roadEndZ) / 2;
 
@@ -468,7 +499,7 @@ export class World3D {
     this.scene.add(ground);
 
     // Road
-    const roadGeo = new THREE.PlaneGeometry(roadWidth, length);
+    const roadGeo = new THREE.PlaneGeometry(roadWidth + roadEdgeOverlap * 2, length);
     roadGeo.setAttribute("uv2", roadGeo.attributes.uv);
     const roadMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
@@ -523,12 +554,12 @@ export class World3D {
     });
     const curbL = new THREE.Mesh(curbGeo, curbMat);
     curbL.rotation.x = -Math.PI / 2;
-    curbL.position.set(-(roadHalf + 0.16), 0.006, centerZ);
+    curbL.position.set(-(roadHalf + 0.16 - curbRoadOverlap), 0.006, centerZ);
     this.scene.add(curbL);
 
     const curbR = new THREE.Mesh(curbGeo, curbMat);
     curbR.rotation.x = -Math.PI / 2;
-    curbR.position.set(roadHalf + 0.16, 0.006, centerZ);
+    curbR.position.set(roadHalf + 0.16 - curbRoadOverlap, 0.006, centerZ);
     this.scene.add(curbR);
 
     // Edge lines
@@ -537,7 +568,10 @@ export class World3D {
     const edgeMat = new THREE.MeshStandardMaterial({
       color: 0xe6e2d8,
       roughness: 0.95,
-      metalness: 0
+      metalness: 0,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
     const edgeL = new THREE.Mesh(edgeGeo, edgeMat);
     edgeL.rotation.x = -Math.PI / 2;
@@ -826,16 +860,13 @@ export class World3D {
     const count = Math.min(220, Math.max(60, this.config.numLights * 28));
     const maxSegments = count * 3;
     const segments = new THREE.InstancedMesh(geo, mat, maxSegments);
-    segments.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
     const roofGeo = new THREE.BoxGeometry(1, 1, 1);
     const maxRoofUnits = count * 5;
     const roofUnits = new THREE.InstancedMesh(roofGeo, roofMat, maxRoofUnits);
-    roofUnits.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
     const maxWindows = count * 80;
     const windows = new THREE.InstancedMesh(windowGeo, windowMat, maxWindows);
-    windows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
     const baseWinColor = new THREE.Color();
     const winColor = new THREE.Color();
@@ -1106,7 +1137,13 @@ export class World3D {
     this.scene.add(windows);
   }
 
-  private createAvatar(): THREE.Group {
+  private createAvatar(): {
+    avatar: THREE.Group;
+    leftArm: THREE.Group;
+    rightArm: THREE.Group;
+    leftLeg: THREE.Group;
+    rightLeg: THREE.Group;
+  } {
     const g = new THREE.Group();
 
     const skinMat = new THREE.MeshStandardMaterial({
@@ -1233,7 +1270,13 @@ export class World3D {
     shadow.position.set(0, 0.001, 0);
     g.add(shadow);
 
-    return g;
+    return {
+      avatar: g,
+      leftArm,
+      rightArm,
+      leftLeg,
+      rightLeg
+    };
   }
 
   private setupTrafficLights(): void {
@@ -1441,7 +1484,19 @@ export class World3D {
     halo.scale.set(s, s, 1);
     group.add(halo);
 
-    return { bulb, glow, halo, haloBaseScale: s, onColor, offColor };
+    return {
+      bulb,
+      glow,
+      halo,
+      haloBaseScale: s,
+      onColor,
+      offColor,
+      lastBulbHex: -1,
+      lastBulbOpacity: Number.NaN,
+      lastGlowIntensity: Number.NaN,
+      lastHaloOpacity: Number.NaN,
+      lastHaloScale: Number.NaN
+    };
   }
 
   private setLampGroup(
@@ -1457,12 +1512,44 @@ export class World3D {
     const t = nowMs / 1000;
     const pulse = on ? 0.06 + 0.06 * Math.sin(t * 6.2 + seed) : 0;
     for (const lamp of group) {
-      lamp.bulb.material.color.setHex(on ? lamp.onColor : lamp.offColor);
-      lamp.bulb.material.opacity = THREE.MathUtils.clamp(v, 0, 1);
-      lamp.glow.intensity = (on ? 4.2 + pulse * 3 : 0) * v;
-      lamp.halo.material.opacity = (on ? 0.88 + pulse : 0) * v;
+      const nextBulbHex = on ? lamp.onColor : lamp.offColor;
+      if (lamp.lastBulbHex !== nextBulbHex) {
+        lamp.bulb.material.color.setHex(nextBulbHex);
+        lamp.lastBulbHex = nextBulbHex;
+      }
+
+      const nextBulbOpacity = v;
+      if (
+        !Number.isFinite(lamp.lastBulbOpacity) ||
+        Math.abs(lamp.lastBulbOpacity - nextBulbOpacity) > FLOAT_EPSILON
+      ) {
+        lamp.bulb.material.opacity = nextBulbOpacity;
+        lamp.lastBulbOpacity = nextBulbOpacity;
+      }
+
+      const nextGlowIntensity = (on ? 4.2 + pulse * 3 : 0) * v;
+      if (
+        !Number.isFinite(lamp.lastGlowIntensity) ||
+        Math.abs(lamp.lastGlowIntensity - nextGlowIntensity) > FLOAT_EPSILON
+      ) {
+        lamp.glow.intensity = nextGlowIntensity;
+        lamp.lastGlowIntensity = nextGlowIntensity;
+      }
+
+      const nextHaloOpacity = (on ? 0.88 + pulse : 0) * v;
+      if (
+        !Number.isFinite(lamp.lastHaloOpacity) ||
+        Math.abs(lamp.lastHaloOpacity - nextHaloOpacity) > FLOAT_EPSILON
+      ) {
+        lamp.halo.material.opacity = nextHaloOpacity;
+        lamp.lastHaloOpacity = nextHaloOpacity;
+      }
+
       const scale = on ? lamp.haloBaseScale * (1.18 + pulse * 1.2) : lamp.haloBaseScale;
-      lamp.halo.scale.set(scale, scale, 1);
+      if (!Number.isFinite(lamp.lastHaloScale) || Math.abs(lamp.lastHaloScale - scale) > FLOAT_EPSILON) {
+        lamp.halo.scale.set(scale, scale, 1);
+        lamp.lastHaloScale = scale;
+      }
     }
   }
 
@@ -1473,16 +1560,27 @@ export class World3D {
     if (this.config.revealMode !== "sequential") return;
     const v = THREE.MathUtils.clamp(visibility01, 0, 1);
     for (const item of fadeMaterials) {
-      item.mat.opacity = item.baseOpacity * v;
-      item.mat.depthWrite = item.baseOpacity >= 0.999 ? v > 0.9 : false;
+      const baseOpaque = item.baseOpacity >= 0.999;
+      const canUseOpaquePipeline = baseOpaque && v >= 0.999;
+      const nextOpacity = canUseOpaquePipeline ? item.baseOpacity : item.baseOpacity * v;
+      const nextDepthWrite = baseOpaque ? v > 0.9 : false;
+      const nextTransparent = canUseOpaquePipeline ? false : true;
+
+      if (Math.abs(item.mat.opacity - nextOpacity) > FLOAT_EPSILON) item.mat.opacity = nextOpacity;
+      if (item.mat.depthWrite !== nextDepthWrite) item.mat.depthWrite = nextDepthWrite;
+      if (item.mat.transparent !== nextTransparent) {
+        item.mat.transparent = nextTransparent;
+        item.mat.needsUpdate = true;
+      }
     }
   }
 
-  private revealFromDistance(distance: number): number {
-    const nearDist = 24;
-    const farDist = 82;
-    const denom = Math.max(1e-6, farDist - nearDist);
-    const x = THREE.MathUtils.clamp((farDist - distance) / denom, 0, 1);
+  private revealFromDistanceSquared(distanceSq: number): number {
+    if (distanceSq <= REVEAL_NEAR_DIST_SQ) return 1;
+    if (distanceSq >= REVEAL_FAR_DIST_SQ) return 0;
+    const distance = Math.sqrt(distanceSq);
+    const denom = Math.max(1e-6, REVEAL_FAR_DIST - REVEAL_NEAR_DIST);
+    const x = THREE.MathUtils.clamp((REVEAL_FAR_DIST - distance) / denom, 0, 1);
     const eased = x * x * (3 - 2 * x);
     const geomGamma = 2.2;
     return Math.pow(eased, geomGamma);

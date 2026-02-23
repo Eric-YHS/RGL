@@ -5,12 +5,18 @@ import { ExperimentEngine } from "./experiment/engine";
 import { ExperimentLogger } from "./experiment/logger";
 import { formatMoney, formatSeconds } from "./experiment/utils";
 import { World3D } from "./scene/world3d";
-import * as XLSX from "xlsx";
 
 type RunKind = "practice" | "formal";
 
 const params = new URLSearchParams(window.location.search);
 const participantId = (params.get("pid") ?? "").trim();
+
+type XlsxModule = typeof import("xlsx");
+let xlsxPromise: Promise<XlsxModule> | null = null;
+function getXlsx(): Promise<XlsxModule> {
+  if (!xlsxPromise) xlsxPromise = import("xlsx");
+  return xlsxPromise;
+}
 
 function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig {
   return {
@@ -105,7 +111,7 @@ let runKind: RunKind = "practice";
 let currentConfig: ExperimentConfig = practiceConfig;
 let logger: ExperimentLogger = createLogger(currentConfig, runKind);
 let engine: ExperimentEngine = new ExperimentEngine(currentConfig, logger);
-let world: World3D = new World3D(els.canvas, currentConfig);
+let world: World3D | null = null;
 
 function updateTopHints(): void {
   els.runHint.textContent = runKind === "practice" ? "练习" : "正式实验";
@@ -130,7 +136,7 @@ function switchRun(next: RunKind): void {
   currentConfig = next === "practice" ? practiceConfig : formalConfig;
   logger = createLogger(currentConfig, runKind);
   engine = new ExperimentEngine(currentConfig, logger);
-  world.dispose();
+  world?.dispose();
   world = new World3D(els.canvas, currentConfig);
   lastPhase = engine.state.phase;
   finishGate = false;
@@ -388,11 +394,14 @@ function showFormalResults(): void {
     closeModal();
   });
   document.querySelector<HTMLButtonElement>("#btnDownloadXlsx")?.addEventListener("click", () => {
-    downloadXlsx();
+    void downloadXlsx().catch((err) => {
+      console.error("[downloadXlsx] failed", err);
+    });
   });
 }
 
-function downloadXlsx(): void {
+async function downloadXlsx(): Promise<void> {
+  const XLSX = await getXlsx();
   const wb = XLSX.utils.book_new();
   const wsWalk = XLSX.utils.aoa_to_sheet(logger.toWalkPressSheetAoa());
   const wsViolation = XLSX.utils.aoa_to_sheet(logger.toViolationSheetAoa());
@@ -423,7 +432,7 @@ function downloadBlobFile(filename: string, content: BlobPart, mime: string): vo
 }
 
 els.btnStart.addEventListener("click", () => {
-  if (engine.state.phase !== "idle") return;
+  if (!world || engine.state.phase !== "idle") return;
   closeModal();
   engine.start(performance.now());
 });
@@ -442,8 +451,23 @@ window.addEventListener("keydown", (e) => {
 });
 
 const minimapCtx = els.minimap.getContext("2d");
+const minimapBase = document.createElement("canvas");
+const minimapBaseCtx = minimapBase.getContext("2d");
+let minimapBaseKey = "";
 let lastPhase: typeof engine.state.phase = engine.state.phase;
 let finishGate = false;
+
+const hudCache = {
+  btnWalkDisabled: null as boolean | null,
+  btnStartDisabled: null as boolean | null,
+  posText: "",
+  timeText: "",
+  moneyText: "",
+  lightText: "",
+  moneyUrgent: null as boolean | null,
+  lightRed: null as boolean | null,
+  lightGreen: null as boolean | null
+};
 
 updateTopHints();
 updateMinimapVisibility();
@@ -451,49 +475,76 @@ showRevealModeSelect();
 
 function updateHud(): void {
   const s = engine.state;
-
-  els.btnWalk.disabled = s.phase === "idle" || s.phase === "finished";
-  els.btnStart.disabled = s.phase !== "idle";
-
-  if (s.phase === "idle") {
-    els.posText.textContent = "—";
-    els.timeText.textContent = formatSeconds(0, 1);
-    els.moneyText.textContent = formatMoney(currentConfig.startMoney);
-    els.moneyText.classList.remove("urgent");
-    els.lightText.textContent = "—";
-    return;
+  const nextWalkDisabled = s.phase === "idle" || s.phase === "finished";
+  const nextStartDisabled = s.phase !== "idle";
+  if (hudCache.btnWalkDisabled !== nextWalkDisabled) {
+    els.btnWalk.disabled = nextWalkDisabled;
+    hudCache.btnWalkDisabled = nextWalkDisabled;
+  }
+  if (hudCache.btnStartDisabled !== nextStartDisabled) {
+    els.btnStart.disabled = nextStartDisabled;
+    hudCache.btnStartDisabled = nextStartDisabled;
   }
 
   let posText = "—";
-  if (s.phase === "finished") {
-    posText = "已完成";
-  } else if (currentConfig.revealMode === "full") {
-    posText = `交通信号灯${s.lightIndex}（${s.lightIndex}/${currentConfig.numLights}）`;
-  } else {
-    posText = s.phase === "moving" ? "非交通信号灯" : "交通信号灯";
+  let timeText = formatSeconds(0, 1);
+  let moneyText = formatMoney(currentConfig.startMoney);
+  let lightText = "—";
+  let moneyUrgent = false;
+  let lightRed = false;
+  let lightGreen = false;
+
+  if (s.phase !== "idle") {
+    if (s.phase === "finished") {
+      posText = "已完成";
+    } else if (currentConfig.revealMode === "full") {
+      posText = `交通信号灯${s.lightIndex}（${s.lightIndex}/${currentConfig.numLights}）`;
+    } else {
+      posText = s.phase === "moving" ? "非交通信号灯" : "交通信号灯";
+    }
+    timeText = formatSeconds(s.elapsedSec, 1);
+    moneyText = formatMoney(s.money);
+    moneyUrgent = s.money <= 5 || Math.floor(s.elapsedSec * 2) % 2 === 0;
+
+    if (s.phase === "moving") {
+      lightText = "行走中";
+    } else if (s.phase === "waiting_red") {
+      const isRed = s.currentLightColor === "red";
+      lightText = isRed ? "🔴 红灯" : "🟢 绿灯";
+      lightRed = isRed;
+      lightGreen = !isRed;
+    } else if (s.phase === "finished") {
+      lightText = "✅ 完成";
+    }
   }
-  els.posText.textContent = posText;
 
-  els.timeText.textContent = formatSeconds(s.elapsedSec, 1);
-  els.moneyText.textContent = formatMoney(s.money);
-
-  const urgent = s.phase !== "idle" && (s.money <= 5 || (Math.floor(s.elapsedSec * 2) % 2 === 0));
-  els.moneyText.classList.toggle("urgent", urgent);
-
-  if (s.phase === "moving") {
-    els.lightText.textContent = "行走中";
-    els.lightText.classList.remove("light-red", "light-green");
-  } else if (s.phase === "waiting_red") {
-    const isRed = s.currentLightColor === "red";
-    els.lightText.textContent = isRed ? "🔴 红灯" : "🟢 绿灯";
-    els.lightText.classList.toggle("light-red", isRed);
-    els.lightText.classList.toggle("light-green", !isRed);
-  } else if (s.phase === "finished") {
-    els.lightText.textContent = "✅ 完成";
-    els.lightText.classList.remove("light-red", "light-green");
-  } else {
-    els.lightText.textContent = "—";
-    els.lightText.classList.remove("light-red", "light-green");
+  if (hudCache.posText !== posText) {
+    els.posText.textContent = posText;
+    hudCache.posText = posText;
+  }
+  if (hudCache.timeText !== timeText) {
+    els.timeText.textContent = timeText;
+    hudCache.timeText = timeText;
+  }
+  if (hudCache.moneyText !== moneyText) {
+    els.moneyText.textContent = moneyText;
+    hudCache.moneyText = moneyText;
+  }
+  if (hudCache.lightText !== lightText) {
+    els.lightText.textContent = lightText;
+    hudCache.lightText = lightText;
+  }
+  if (hudCache.moneyUrgent !== moneyUrgent) {
+    els.moneyText.classList.toggle("urgent", moneyUrgent);
+    hudCache.moneyUrgent = moneyUrgent;
+  }
+  if (hudCache.lightRed !== lightRed) {
+    els.lightText.classList.toggle("light-red", lightRed);
+    hudCache.lightRed = lightRed;
+  }
+  if (hudCache.lightGreen !== lightGreen) {
+    els.lightText.classList.toggle("light-green", lightGreen);
+    hudCache.lightGreen = lightGreen;
   }
 }
 
@@ -510,23 +561,39 @@ function drawMinimap(): void {
     els.minimap.height = targetH;
   }
 
-  minimapCtx.clearRect(0, 0, els.minimap.width, els.minimap.height);
-
   const pad = 14 * dpr;
   const x0 = pad;
   const x1 = els.minimap.width - pad;
   const y = els.minimap.height / 2;
 
-  // route line (background)
-  minimapCtx.strokeStyle = "rgba(255,255,255,0.12)";
-  minimapCtx.lineWidth = 3 * dpr;
-  minimapCtx.lineCap = "round";
-  minimapCtx.beginPath();
-  minimapCtx.moveTo(x0, y);
-  minimapCtx.lineTo(x1, y);
-  minimapCtx.stroke();
+  const nextBaseKey = `${targetW}x${targetH}`;
+  if (minimapBaseCtx && minimapBaseKey !== nextBaseKey) {
+    minimapBase.width = targetW;
+    minimapBase.height = targetH;
+    minimapBaseCtx.clearRect(0, 0, targetW, targetH);
+    minimapBaseCtx.strokeStyle = "rgba(255,255,255,0.12)";
+    minimapBaseCtx.lineWidth = 3 * dpr;
+    minimapBaseCtx.lineCap = "round";
+    minimapBaseCtx.beginPath();
+    minimapBaseCtx.moveTo(x0, y);
+    minimapBaseCtx.lineTo(x1, y);
+    minimapBaseCtx.stroke();
+    minimapBaseCtx.fillStyle = "rgba(255,255,255,0.35)";
+    minimapBaseCtx.beginPath();
+    minimapBaseCtx.arc(x0, y, 3 * dpr, 0, Math.PI * 2);
+    minimapBaseCtx.fill();
+    minimapBaseCtx.fillStyle = "rgba(255,255,255,0.35)";
+    minimapBaseCtx.fillRect(x1 - 1 * dpr, y - 8 * dpr, 2 * dpr, 16 * dpr);
+    minimapBaseCtx.fillStyle = "rgba(0,194,255,0.45)";
+    minimapBaseCtx.fillRect(x1 + 1 * dpr, y - 8 * dpr, 6 * dpr, 5 * dpr);
+    minimapBaseKey = nextBaseKey;
+  }
 
-  // route line (progress)
+  minimapCtx.clearRect(0, 0, els.minimap.width, els.minimap.height);
+  if (minimapBaseKey === nextBaseKey) {
+    minimapCtx.drawImage(minimapBase, 0, 0);
+  }
+
   const p = engine.getRouteProgress01();
   const px = x0 + (x1 - x0) * p;
   const progressGrad = minimapCtx.createLinearGradient(x0, 0, px, 0);
@@ -538,18 +605,6 @@ function drawMinimap(): void {
   minimapCtx.moveTo(x0, y);
   minimapCtx.lineTo(px, y);
   minimapCtx.stroke();
-
-  // start marker
-  minimapCtx.fillStyle = "rgba(255,255,255,0.35)";
-  minimapCtx.beginPath();
-  minimapCtx.arc(x0, y, 3 * dpr, 0, Math.PI * 2);
-  minimapCtx.fill();
-
-  // end marker (flag)
-  minimapCtx.fillStyle = "rgba(255,255,255,0.35)";
-  minimapCtx.fillRect(x1 - 1 * dpr, y - 8 * dpr, 2 * dpr, 16 * dpr);
-  minimapCtx.fillStyle = "rgba(0,194,255,0.45)";
-  minimapCtx.fillRect(x1 + 1 * dpr, y - 8 * dpr, 6 * dpr, 5 * dpr);
 
   // lights
   const n = currentConfig.numLights;
@@ -589,9 +644,9 @@ function loop(): void {
   const nowMs = performance.now();
   engine.tick(nowMs);
 
-  world.render(engine.state, engine.getRouteProgress01(), nowMs);
+  world?.render(engine.state, engine.getRouteProgress01(), nowMs);
   updateHud();
-  if (currentConfig.revealMode === "full") drawMinimap();
+  if (currentConfig.revealMode === "full" && world) drawMinimap();
 
   if (!finishGate && lastPhase !== engine.state.phase) {
     lastPhase = engine.state.phase;
