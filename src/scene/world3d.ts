@@ -65,7 +65,7 @@ export class World3D {
       alpha: false,
       powerPreference: "high-performance"
     });
-    this.dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.renderer.setPixelRatio(this.dpr);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -84,7 +84,9 @@ export class World3D {
     // FogExp2：无硬性的 far 截断，避免“信号灯突然跳出来”，渐显更自然。
     this.scene.fog = isSequential ? new THREE.FogExp2(this.atmosphereColor, 0.04) : null;
 
-    this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 520);
+    const cameraNear = 0.2;
+    const cameraFar = Math.max(360, this.routeLength + 170);
+    this.camera = new THREE.PerspectiveCamera(55, 1, cameraNear, cameraFar);
     this.camera.position.set(0, 14, -18);
     this.cameraTarget.set(0, 1.2, 8);
     this.camera.lookAt(this.cameraTarget);
@@ -99,8 +101,17 @@ export class World3D {
     this.scene.add(this.avatar);
     this.setupTrafficLights();
 
-    // Post-processing (写实：SSAO + Bloom + FXAA)
-    this.composer = new EffectComposer(this.renderer);
+    // Post-processing (写实：MSAA + SSAO + Bloom + FXAA)
+    const initialSize = this.renderer.getSize(new THREE.Vector2());
+    const composerTarget = new THREE.WebGLRenderTarget(
+      Math.max(1, Math.round(initialSize.x * this.dpr)),
+      Math.max(1, Math.round(initialSize.y * this.dpr)),
+      { type: THREE.HalfFloatType }
+    );
+    if (this.renderer.capabilities.isWebGL2) {
+      composerTarget.samples = Math.min(4, this.renderer.capabilities.maxSamples);
+    }
+    this.composer = new EffectComposer(this.renderer, composerTarget);
     this.composer.setPixelRatio(this.dpr);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
@@ -113,7 +124,7 @@ export class World3D {
     this.patchSsaoVisibilityMask();
     this.composer.addPass(this.ssaoPass);
 
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.2, 0.95);
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.2, 1.02);
     this.composer.addPass(this.bloomPass);
 
     this.fxaaPass = new ShaderPass(FXAAShader);
@@ -265,7 +276,7 @@ export class World3D {
     const height = parent ? parent.clientHeight : window.innerHeight;
 
     // Post-processing 开销较大，限制 DPR 保持帧率稳定
-    this.dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.renderer.setPixelRatio(this.dpr);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
@@ -517,32 +528,42 @@ export class World3D {
     this.scene.add(curbR);
 
     // Edge lines
-    const edgeGeo = new THREE.PlaneGeometry(0.12, length);
+    const edgeGeo = new THREE.PlaneGeometry(0.14, length);
     const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
+      color: 0xf0ede6,
       roughness: 0.92,
       metalness: 0,
       transparent: true,
-      opacity: 0.22
+      opacity: 0.22,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
     });
     const edgeL = new THREE.Mesh(edgeGeo, edgeMat);
     edgeL.rotation.x = -Math.PI / 2;
-    edgeL.position.set(-(roadHalf - 0.35), 0.01, centerZ);
+    edgeL.position.set(-(roadHalf - 0.35), 0.02, centerZ);
+    edgeL.renderOrder = 2;
     this.scene.add(edgeL);
 
     const edgeR = new THREE.Mesh(edgeGeo, edgeMat);
     edgeR.rotation.x = -Math.PI / 2;
-    edgeR.position.set(roadHalf - 0.35, 0.01, centerZ);
+    edgeR.position.set(roadHalf - 0.35, 0.02, centerZ);
+    edgeR.renderOrder = 2;
     this.scene.add(edgeR);
 
     // Center dashed line
-    const lineGeo = new THREE.PlaneGeometry(0.25, 2.2);
+    const lineGeo = new THREE.PlaneGeometry(0.3, 2.2);
     const lineMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
+      color: 0xf0ede6,
       roughness: 0.9,
       metalness: 0,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.8,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
     });
 
     const dashCount = Math.ceil((this.routeLength + 200) / 3.2);
@@ -553,11 +574,12 @@ export class World3D {
     for (let i = 0; i < dashCount; i++) {
       const z = startZ + i * 3.2;
       m.makeRotationX(-Math.PI / 2);
-      m.setPosition(0, 0.012, z);
+      m.setPosition(0, 0.02, z);
       dashes.setMatrixAt(idx, m);
       idx += 1;
     }
     dashes.instanceMatrix.needsUpdate = true;
+    dashes.renderOrder = 2;
     this.scene.add(dashes);
   }
 
@@ -952,8 +974,11 @@ export class World3D {
         const capH = 0.28 + random() * 0.12;
         const capW = Math.max(0.6, topW * (0.88 + random() * 0.06));
         const capD = Math.max(0.6, topD * (0.88 + random() * 0.06));
-        const topY = totalH - 0.02;
-        p.set(topCenterX, topY - capH / 2, topCenterZ);
+        const buildingTopY = totalH - 0.02;
+        // Keep the cap slightly above the building top to avoid coplanar z-fighting.
+        const capBottomY = buildingTopY + 0.03;
+        const capTopY = capBottomY + capH;
+        p.set(topCenterX, capBottomY + capH / 2, topCenterZ);
         s.set(capW, capH, capD);
         m.compose(p, q, s);
         roofUnits.setMatrixAt(roofIdx, m);
@@ -968,7 +993,7 @@ export class World3D {
           const unitH = 0.35 + random() * 0.95;
           const ux = topCenterX + (random() - 0.5) * Math.max(0, (capW - unitW)) * 0.55;
           const uz = topCenterZ + (random() - 0.5) * Math.max(0, (capD - unitD)) * 0.55;
-          p.set(ux, topY + unitH / 2 - 0.01, uz);
+          p.set(ux, capTopY + unitH / 2 + 0.01, uz);
           s.set(unitW, unitH, unitD);
           m.compose(p, q, s);
           roofUnits.setMatrixAt(roofIdx, m);
@@ -1238,12 +1263,16 @@ export class World3D {
       metalness: 0.4
     });
     const stripeMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
+      color: 0xf0ede6,
       fog: false,
       roughness: 0.85,
       metalness: 0,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.8,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
     });
 
     for (let i = 1; i <= this.config.numLights; i++) {
@@ -1325,12 +1354,16 @@ export class World3D {
       // stop line marker
       const stopLineMat = registerFadeMaterial(
         new THREE.MeshStandardMaterial({
-          color: 0xffffff,
+          color: 0xf0ede6,
           fog: false,
           roughness: 0.85,
           metalness: 0,
           transparent: true,
-          opacity: 0.55
+          opacity: 0.55,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2
         })
       );
       const stopLine = new THREE.Mesh(
@@ -1338,7 +1371,8 @@ export class World3D {
         stopLineMat
       );
       stopLine.rotation.x = -Math.PI / 2;
-      stopLine.position.set(0, 0.012, 0);
+      stopLine.position.set(0, 0.02, 0);
+      stopLine.renderOrder = 2;
       group.add(stopLine);
 
       // crosswalk stripes
@@ -1347,7 +1381,8 @@ export class World3D {
       for (let s = 0; s < stripeCount; s++) {
         const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 1.35), stripeMatI);
         stripe.rotation.x = -Math.PI / 2;
-        stripe.position.set(-5.2 + s * 1.3, 0.011, -1.1);
+        stripe.position.set(-5.2 + s * 1.3, 0.02, -1.1);
+        stripe.renderOrder = 2;
         stripes.add(stripe);
       }
       group.add(stripes);
