@@ -21,6 +21,10 @@ const REVEAL_NEAR_DIST = 24;
 const REVEAL_FAR_DIST = 82;
 const REVEAL_NEAR_DIST_SQ = REVEAL_NEAR_DIST * REVEAL_NEAR_DIST;
 const REVEAL_FAR_DIST_SQ = REVEAL_FAR_DIST * REVEAL_FAR_DIST;
+const REVEAL_DEPTH_WRITE_ON = 0.06;
+const REVEAL_GEOM_GAMMA = 1.6;
+const REVEAL_CUE_GAMMA = 1.8;
+const SEQUENTIAL_OFF_BULB_OPACITY_SCALE = 0.12;
 const FLOAT_EPSILON = 1e-4;
 
 type LampVisual = {
@@ -1333,6 +1337,8 @@ export class World3D {
 
       const group = new THREE.Group();
       group.userData.noSSAO = true;
+      // Road markings are transparent and rendered late; keep traffic lights above them while fading in.
+      if (isSequential) group.renderOrder = 3;
       group.position.set(0, 0, i * this.spacing);
 
       const lampsRed: LampVisual[] = [];
@@ -1347,23 +1353,28 @@ export class World3D {
       // side pole + overhead arm (更像真实路口红绿灯)
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 5.6, 14), poleMatI);
       pole.position.set(-6.4, 2.8, 0.8);
+      pole.renderOrder = isSequential ? 1 : 0;
       group.add(pole);
 
       const arm = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.16, 0.16), poleMatI);
       arm.position.set(-3.0, 5.6, 0.8);
+      arm.renderOrder = isSequential ? 1 : 0;
       group.add(arm);
 
       const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 2.0, 0.7), boxMatI);
       box.position.set(0.0, 5.25, 0.8);
+      box.renderOrder = isSequential ? 2 : 0;
       group.add(box);
 
       // 灯箱边框（勾勒轮廓）
       const edgeFrame = new THREE.Mesh(new THREE.BoxGeometry(1.05, 2.1, 0.04), edgeMatI);
       edgeFrame.position.set(0.0, 5.25, 0.44);
+      edgeFrame.renderOrder = isSequential ? 2 : 0;
       group.add(edgeFrame);
 
       const backplate = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.3, 0.16), backplateMatI);
       backplate.position.set(0.0, 5.25, 0.55);
+      backplate.renderOrder = isSequential ? 2 : 0;
       group.add(backplate);
 
       // overhead lamps (带光晕，视觉更显著)
@@ -1375,19 +1386,23 @@ export class World3D {
       // pedestrian-side signal (更靠近视线，避免“看不见红绿灯”)
       const pedPole = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 3.4, 12), poleMatI);
       pedPole.position.set(5.9, 1.7, -0.8);
+      pedPole.renderOrder = isSequential ? 1 : 0;
       group.add(pedPole);
 
       const pedBox = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.5, 0.48), boxMatI);
       pedBox.position.set(5.9, 3.05, -0.8);
+      pedBox.renderOrder = isSequential ? 2 : 0;
       group.add(pedBox);
 
       // 行人灯箱边框
       const pedEdge = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.6, 0.04), edgeMatI);
       pedEdge.position.set(5.9, 3.05, -1.05);
+      pedEdge.renderOrder = isSequential ? 2 : 0;
       group.add(pedEdge);
 
       const pedBack = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.75, 0.14), backplateMatI);
       pedBack.position.set(5.9, 3.05, -1.03);
+      pedBack.renderOrder = isSequential ? 2 : 0;
       group.add(pedBack);
 
       lampsRed.push(this.createLamp(group, "red", new THREE.Vector3(5.9, 3.42, -1.18), 0.32));
@@ -1461,9 +1476,10 @@ export class World3D {
 
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(radius, 20, 20), material);
     bulb.position.copy(position);
+    bulb.renderOrder = this.config.revealMode === "sequential" ? 4 : 0;
     group.add(bulb);
 
-    const glow = new THREE.PointLight(which === "red" ? 0xff3340 : 0x52ff5a, 0, 16, 1.8);
+    const glow = new THREE.PointLight(which === "red" ? 0xff3340 : 0x52ff5a, 0, 6, 2.2);
     glow.position.copy(position);
     group.add(glow);
 
@@ -1482,6 +1498,7 @@ export class World3D {
     halo.position.copy(position).add(new THREE.Vector3(0, 0, -0.22));
     const s = radius * 8;
     halo.scale.set(s, s, 1);
+    halo.renderOrder = this.config.revealMode === "sequential" ? 5 : 0;
     group.add(halo);
 
     return {
@@ -1518,7 +1535,10 @@ export class World3D {
         lamp.lastBulbHex = nextBulbHex;
       }
 
-      const nextBulbOpacity = v;
+      const nextBulbOpacity =
+        this.config.revealMode === "sequential" && !on
+          ? v * SEQUENTIAL_OFF_BULB_OPACITY_SCALE
+          : v;
       if (
         !Number.isFinite(lamp.lastBulbOpacity) ||
         Math.abs(lamp.lastBulbOpacity - nextBulbOpacity) > FLOAT_EPSILON
@@ -1527,7 +1547,7 @@ export class World3D {
         lamp.lastBulbOpacity = nextBulbOpacity;
       }
 
-      const nextGlowIntensity = (on ? 4.2 + pulse * 3 : 0) * v;
+      const nextGlowIntensity = (on ? 1.5 + pulse * 1.2 : 0) * v;
       if (
         !Number.isFinite(lamp.lastGlowIntensity) ||
         Math.abs(lamp.lastGlowIntensity - nextGlowIntensity) > FLOAT_EPSILON
@@ -1563,7 +1583,8 @@ export class World3D {
       const baseOpaque = item.baseOpacity >= 0.999;
       const canUseOpaquePipeline = baseOpaque && v >= 0.999;
       const nextOpacity = canUseOpaquePipeline ? item.baseOpacity : item.baseOpacity * v;
-      const nextDepthWrite = baseOpaque ? v > 0.9 : false;
+      // Start writing depth early to avoid center lane lines blending through the traffic light during fade-in.
+      const nextDepthWrite = baseOpaque ? v >= REVEAL_DEPTH_WRITE_ON : false;
       const nextTransparent = canUseOpaquePipeline ? false : true;
 
       if (Math.abs(item.mat.opacity - nextOpacity) > FLOAT_EPSILON) item.mat.opacity = nextOpacity;
@@ -1582,14 +1603,13 @@ export class World3D {
     const denom = Math.max(1e-6, REVEAL_FAR_DIST - REVEAL_NEAR_DIST);
     const x = THREE.MathUtils.clamp((REVEAL_FAR_DIST - distance) / denom, 0, 1);
     const eased = x * x * (3 - 2 * x);
-    const geomGamma = 2.2;
-    return Math.pow(eased, geomGamma);
+    return Math.pow(eased, REVEAL_GEOM_GAMMA);
   }
 
   private cueVisibilityFromReveal(reveal01: number): number {
     const r = THREE.MathUtils.clamp(reveal01, 0, 1);
-    const cueGamma = 2.4;
-    return Math.pow(r, cueGamma);
+    // Keep active light cues visible earlier so fade-in does not feel like a "black gap".
+    return Math.pow(r, REVEAL_CUE_GAMMA);
   }
 
   private createGlowTexture(): THREE.Texture {
