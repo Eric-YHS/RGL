@@ -532,27 +532,22 @@ export class World3D {
     this.scene.add(curbR);
 
     // Edge lines
-    const edgeGeo = new THREE.PlaneGeometry(0.14, length);
+    // Keep road edge lines fully opaque to avoid distance shimmer from alpha blending/depth precision.
+    const edgeGeo = new THREE.PlaneGeometry(0.18, length);
     const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0xf0ede6,
-      roughness: 0.92,
-      metalness: 0,
-      transparent: true,
-      opacity: 0.22,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2
+      color: 0xe6e2d8,
+      roughness: 0.95,
+      metalness: 0
     });
     const edgeL = new THREE.Mesh(edgeGeo, edgeMat);
     edgeL.rotation.x = -Math.PI / 2;
-    edgeL.position.set(-(roadHalf - 0.35), 0.02, centerZ);
+    edgeL.position.set(-(roadHalf - 0.35), 0.012, centerZ);
     edgeL.renderOrder = 2;
     this.scene.add(edgeL);
 
     const edgeR = new THREE.Mesh(edgeGeo, edgeMat);
     edgeR.rotation.x = -Math.PI / 2;
-    edgeR.position.set(roadHalf - 0.35, 0.02, centerZ);
+    edgeR.position.set(roadHalf - 0.35, 0.012, centerZ);
     edgeR.renderOrder = 2;
     this.scene.add(edgeR);
 
