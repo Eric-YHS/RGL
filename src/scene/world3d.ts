@@ -83,6 +83,7 @@ export class World3D {
   private readonly atmosphereColor: THREE.Color;
   private envTarget: THREE.WebGLRenderTarget | null = null;
   private dpr: number = 1;
+  private portraitUiBias: number = 0;
   private disposed: boolean = false;
   private lastRenderMs: number | null = null;
 
@@ -279,11 +280,19 @@ export class World3D {
 
     // Camera (导航式跟随)
     const waiting = state.phase === "waiting_red";
-    const camHeight = waiting ? 12.5 : 13;
-    const camBack = waiting ? 16 : 18;
-    const camAhead = waiting ? 10 : 16;
+    const camHeight = waiting
+      ? THREE.MathUtils.lerp(12.5, 12.1, this.portraitUiBias)
+      : THREE.MathUtils.lerp(13, 12.6, this.portraitUiBias);
+    const camBack = waiting
+      ? THREE.MathUtils.lerp(16, 17.4, this.portraitUiBias)
+      : THREE.MathUtils.lerp(18, 19.6, this.portraitUiBias);
+    const camAhead = waiting
+      ? THREE.MathUtils.lerp(10, 9.6, this.portraitUiBias)
+      : THREE.MathUtils.lerp(16, 15.2, this.portraitUiBias);
     this.desiredCameraPos.set(0, camHeight, z - camBack);
-    const targetY = waiting ? 3.0 : 1.2;
+    const targetY = waiting
+      ? THREE.MathUtils.lerp(3.0, 4.3, this.portraitUiBias)
+      : THREE.MathUtils.lerp(1.2, 2.5, this.portraitUiBias);
     this.desiredCameraTarget.set(0, targetY, z + camAhead);
     this.camera.position.lerp(this.desiredCameraPos, 0.08);
     this.cameraTarget.lerp(this.desiredCameraTarget, 0.1);
@@ -337,6 +346,9 @@ export class World3D {
     this.renderer.setPixelRatio(this.dpr);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
+    // Mobile portrait framing: nudge horizon lower so the traffic light is less likely
+    // to be occluded by browser chrome / top overlays.
+    this.portraitUiBias = width <= 820 && height > width * 1.15 ? 1 : 0;
     this.camera.updateProjectionMatrix();
 
     this.composer.setPixelRatio(this.dpr);

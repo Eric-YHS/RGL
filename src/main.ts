@@ -703,14 +703,17 @@ function drawMinimap(): void {
   const h = els.minimap.height;
 
   const dpr = window.devicePixelRatio || 1;
-  const targetW = Math.round(220 * dpr);
-  const targetH = Math.round(130 * dpr);
+  const cssW = Math.round(els.minimap.clientWidth);
+  const cssH = Math.round(els.minimap.clientHeight);
+  if (cssW <= 0 || cssH <= 0) return;
+  const targetW = Math.round(cssW * dpr);
+  const targetH = Math.round(cssH * dpr);
   if (w !== targetW || h !== targetH) {
     els.minimap.width = targetW;
     els.minimap.height = targetH;
   }
 
-  const pad = 14 * dpr;
+  const pad = Math.max(10 * dpr, Math.min(14 * dpr, targetW * 0.09));
   const x0 = pad;
   const x1 = els.minimap.width - pad;
   const y = els.minimap.height / 2;
