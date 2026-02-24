@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
@@ -7,7 +6,12 @@ import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
 import type { ExperimentConfig, ExperimentState, LightColor } from "../experiment/types";
-import { createGrassTexture } from "./proceduralTextures";
+import {
+  createAsphaltTexture,
+  createBuildingFacadeTexture,
+  createGrassTexture,
+  createSidewalkTexture
+} from "./proceduralTextures";
 
 const QUALITY = {
   dprCap: 2,
@@ -367,43 +371,17 @@ export class World3D {
   };
 
   private setupEnvironment(): void {
-    // Fallback IBL（避免 HDRI 未加载完成前环境反射全黑）
-    const fallback = this.createEquirectEnvironmentTexture();
-    fallback.mapping = THREE.EquirectangularReflectionMapping;
+    // Use deterministic procedural sky only (no async texture swap/jump).
+    const skyTex = this.createEquirectEnvironmentTexture();
+    skyTex.mapping = THREE.EquirectangularReflectionMapping;
+    this.scene.background = skyTex;
+    this.scene.backgroundIntensity = 0.52;
+    this.ownedTextures.push(skyTex);
+
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.envTarget = pmrem.fromEquirectangular(fallback);
+    this.envTarget = pmrem.fromEquirectangular(skyTex);
     this.scene.environment = this.envTarget.texture;
-    fallback.dispose();
     pmrem.dispose();
-
-    // HDRI IBL + 背景（写实质感的关键）
-    const hdriUrl = "/hdri/daytime.hdr";
-    new RGBELoader().load(
-      hdriUrl,
-      (tex) => {
-        if (this.disposed) {
-          tex.dispose();
-          return;
-        }
-
-        tex.mapping = THREE.EquirectangularReflectionMapping;
-        // 控制变量：两种呈现方式使用同一套天空/环境光照（差异仅来自雾遮挡）
-        this.scene.background = tex;
-        this.scene.backgroundIntensity = 0.45;
-        this.ownedTextures.push(tex);
-
-        const pmrem2 = new THREE.PMREMGenerator(this.renderer);
-        const nextEnv = pmrem2.fromEquirectangular(tex);
-        this.envTarget?.dispose();
-        this.envTarget = nextEnv;
-        this.scene.environment = nextEnv.texture;
-        pmrem2.dispose();
-      },
-      undefined,
-      (err) => {
-        console.warn(`[World3D] HDRI 加载失败: ${hdriUrl}`, err);
-      }
-    );
   }
 
   private createEquirectEnvironmentTexture(): THREE.CanvasTexture {
@@ -447,7 +425,7 @@ export class World3D {
   }
 
   private setupLights(): void {
-    const hemi = new THREE.HemisphereLight(0xc8ddf0, 0x5a7a96, 0.65);
+    const hemi = new THREE.HemisphereLight(0xc8ddf0, 0x5a7a96, 0.85);
     hemi.position.set(0, 80, 0);
     this.scene.add(hemi);
 
@@ -456,12 +434,12 @@ export class World3D {
     sun.castShadow = false;
     this.scene.add(sun);
 
-    const fill = new THREE.DirectionalLight(0x9ec5e8, 0.25);
+    const fill = new THREE.DirectionalLight(0x9ec5e8, 0.34);
     fill.position.set(-30, 28, 30);
     this.scene.add(fill);
 
     // 清晨天空环境光
-    const ambient = new THREE.AmbientLight(this.atmosphereColor, 0.1);
+    const ambient = new THREE.AmbientLight(this.atmosphereColor, 0.2);
     this.scene.add(ambient);
   }
 
@@ -482,43 +460,16 @@ export class World3D {
     grassTex.repeat.set(140 / 10, (length + 120) / 10);
     this.ownedTextures.push(grassTex);
 
-    const loader = new THREE.TextureLoader();
+    // Deterministic procedural textures: avoid async image pop-in on mobile.
+    const asphaltDiff = createAsphaltTexture({ seed: 9 });
+    asphaltDiff.anisotropy = aniso;
+    asphaltDiff.repeat.set(roadWidth / 6, length / 6);
+    this.ownedTextures.push(asphaltDiff);
 
-    // Road (Poly Haven, 1K)
-    const asphaltDiff = loader.load("/textures/polyhaven/asphalt_05/asphalt_05_diff_1k.jpg");
-    asphaltDiff.colorSpace = THREE.SRGBColorSpace;
-    const asphaltNormal = loader.load("/textures/polyhaven/asphalt_05/asphalt_05_nor_gl_1k.png");
-    asphaltNormal.colorSpace = THREE.NoColorSpace;
-    const asphaltArm = loader.load("/textures/polyhaven/asphalt_05/asphalt_05_arm_1k.jpg");
-    asphaltArm.colorSpace = THREE.NoColorSpace;
-    for (const t of [asphaltDiff, asphaltNormal, asphaltArm]) {
-      t.anisotropy = aniso;
-      t.wrapS = THREE.RepeatWrapping;
-      t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(roadWidth / 6, length / 6);
-    }
-    this.ownedTextures.push(asphaltDiff, asphaltNormal, asphaltArm);
-
-    // Sidewalk (Poly Haven, 1K)
-    const pavementDiff = loader.load(
-      "/textures/polyhaven/concrete_pavement/concrete_pavement_diff_1k.jpg"
-    );
-    pavementDiff.colorSpace = THREE.SRGBColorSpace;
-    const pavementNormal = loader.load(
-      "/textures/polyhaven/concrete_pavement/concrete_pavement_nor_gl_1k.png"
-    );
-    pavementNormal.colorSpace = THREE.NoColorSpace;
-    const pavementArm = loader.load(
-      "/textures/polyhaven/concrete_pavement/concrete_pavement_arm_1k.jpg"
-    );
-    pavementArm.colorSpace = THREE.NoColorSpace;
-    for (const t of [pavementDiff, pavementNormal, pavementArm]) {
-      t.anisotropy = aniso;
-      t.wrapS = THREE.RepeatWrapping;
-      t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(sidewalkWidth / 2.2, length / 2.2);
-    }
-    this.ownedTextures.push(pavementDiff, pavementNormal, pavementArm);
+    const pavementDiff = createSidewalkTexture({ seed: 17 });
+    pavementDiff.anisotropy = aniso;
+    pavementDiff.repeat.set(sidewalkWidth / 2.2, length / 2.2);
+    this.ownedTextures.push(pavementDiff);
 
     // Grass / ground
     const ground = new THREE.Mesh(
@@ -541,15 +492,10 @@ export class World3D {
     const roadMat = new THREE.MeshStandardMaterial({
       color: 0x777b82,
       map: asphaltDiff,
-      normalMap: asphaltNormal,
-      aoMap: asphaltArm,
-      roughnessMap: asphaltArm,
-      roughness: 0.97,
+      roughness: 0.98,
       metalness: 0.0,
-      envMapIntensity: 0.08
+      envMapIntensity: 0.0
     });
-    roadMat.normalScale.setScalar(0.85);
-    roadMat.aoMapIntensity = 0.65;
     const road = new THREE.Mesh(roadGeo, roadMat);
     road.rotation.x = -Math.PI / 2;
     road.position.set(0, 0.0, centerZ);
@@ -561,15 +507,10 @@ export class World3D {
     const sidewalkMat = new THREE.MeshStandardMaterial({
       color: 0xd7d9dd,
       map: pavementDiff,
-      normalMap: pavementNormal,
-      aoMap: pavementArm,
-      roughnessMap: pavementArm,
-      roughness: 1.0,
+      roughness: 0.98,
       metalness: 0.0,
-      envMapIntensity: 0.1
+      envMapIntensity: 0.0
     });
-    sidewalkMat.normalScale.setScalar(0.7);
-    sidewalkMat.aoMapIntensity = 0.7;
     const sidewalkL = new THREE.Mesh(sidewalkGeo, sidewalkMat);
     sidewalkL.rotation.x = -Math.PI / 2;
     sidewalkL.position.set(-(roadHalf + sidewalkWidth / 2), 0.008, centerZ);
@@ -798,30 +739,10 @@ export class World3D {
     geo.setAttribute("uv2", geo.attributes.uv);
 
     const aniso = this.renderer.capabilities.getMaxAnisotropy();
-    const loader = new THREE.TextureLoader();
-
-    // Building facade (Poly Haven, 1K)
-    const facadeDiff = loader.load(
-      "/textures/polyhaven/concrete_tile_facade/concrete_tile_facade_diff_1k.jpg"
-    );
-    facadeDiff.colorSpace = THREE.SRGBColorSpace;
-    const facadeNormal = loader.load(
-      "/textures/polyhaven/concrete_tile_facade/concrete_tile_facade_nor_gl_1k.png"
-    );
-    facadeNormal.colorSpace = THREE.NoColorSpace;
-    const facadeArm = loader.load(
-      "/textures/polyhaven/concrete_tile_facade/concrete_tile_facade_arm_1k.jpg"
-    );
-    facadeArm.colorSpace = THREE.NoColorSpace;
-
-    // Slightly larger tiles to avoid moiré on far buildings.
-    for (const t of [facadeDiff, facadeNormal, facadeArm]) {
-      t.anisotropy = aniso;
-      t.wrapS = THREE.RepeatWrapping;
-      t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(1.15, 2.35);
-    }
-    this.ownedTextures.push(facadeDiff, facadeNormal, facadeArm);
+    const facadeDiff = createBuildingFacadeTexture({ seed: 31, size: 384 });
+    facadeDiff.anisotropy = aniso;
+    facadeDiff.repeat.set(1.1, 2.2);
+    this.ownedTextures.push(facadeDiff);
 
     const mat = new THREE.MeshStandardMaterial({
       color: 0xbca182,
@@ -829,40 +750,10 @@ export class World3D {
       fog: false,
       emissive: 0x4a3724,
       emissiveIntensity: 0.14,
-      normalMap: facadeNormal,
-      roughnessMap: facadeArm,
       roughness: 0.97,
       metalness: 0.0,
       envMapIntensity: 0.0
     });
-    mat.normalScale.setScalar(0.38);
-
-    // Optional user wallpaper override:
-    // Put a file at `public/textures/wallpaper.jpg` (or `.png`) to replace the facade texture.
-    const applyWallpaper = (url: string, fallback?: () => void) => {
-      new THREE.TextureLoader().load(
-        url,
-        (tex) => {
-          if (this.disposed) {
-            tex.dispose();
-            return;
-          }
-
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = aniso;
-          tex.wrapS = THREE.RepeatWrapping;
-          tex.wrapT = THREE.RepeatWrapping;
-          tex.repeat.set(1.15, 2.35);
-          this.ownedTextures.push(tex);
-
-          mat.map = tex;
-          mat.needsUpdate = true;
-        },
-        undefined,
-        () => fallback?.()
-      );
-    };
-    applyWallpaper("/textures/wallpaper.jpg", () => applyWallpaper("/textures/wallpaper.png"));
 
     const roofMat = new THREE.MeshStandardMaterial({
       color: 0x6b5a48,
