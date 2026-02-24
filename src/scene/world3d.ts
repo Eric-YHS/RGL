@@ -824,18 +824,18 @@ export class World3D {
     this.ownedTextures.push(facadeDiff, facadeNormal, facadeArm);
 
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xf7f8fa,
+      color: 0xbca182,
       map: facadeDiff,
       fog: false,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.0,
+      emissive: 0x4a3724,
+      emissiveIntensity: 0.14,
       normalMap: facadeNormal,
       roughnessMap: facadeArm,
       roughness: 0.97,
       metalness: 0.0,
-      envMapIntensity: 0.03
+      envMapIntensity: 0.0
     });
-    mat.normalScale.setScalar(0.45);
+    mat.normalScale.setScalar(0.38);
 
     // Optional user wallpaper override:
     // Put a file at `public/textures/wallpaper.jpg` (or `.png`) to replace the facade texture.
@@ -865,13 +865,13 @@ export class World3D {
     applyWallpaper("/textures/wallpaper.jpg", () => applyWallpaper("/textures/wallpaper.png"));
 
     const roofMat = new THREE.MeshStandardMaterial({
-      color: 0x3b4652,
+      color: 0x6b5a48,
       fog: false,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.0,
+      emissive: 0x302318,
+      emissiveIntensity: 0.09,
       roughness: 0.98,
       metalness: 0.0,
-      envMapIntensity: 0.02
+      envMapIntensity: 0.0
     });
 
     // windows (暖色发光，避免“建筑全黑”)
@@ -881,7 +881,7 @@ export class World3D {
       fog: false,
       vertexColors: true,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.2,
       depthWrite: true,
       blending: THREE.NormalBlending
     });
@@ -1085,9 +1085,9 @@ export class World3D {
 
         // Warm bias with occasional cooler offices
         if (random() < 0.82) {
-          baseWinColor.setHSL(0.105 + random() * 0.02, 0.35 + random() * 0.18, 0.62 + random() * 0.12);
+          baseWinColor.setHSL(0.1 + random() * 0.025, 0.4 + random() * 0.2, 0.68 + random() * 0.14);
         } else {
-          baseWinColor.setHSL(0.56 + random() * 0.05, 0.14 + random() * 0.1, 0.68 + random() * 0.1);
+          baseWinColor.setHSL(0.56 + random() * 0.05, 0.15 + random() * 0.1, 0.72 + random() * 0.1);
         }
 
         const marginZ = 0.45;
