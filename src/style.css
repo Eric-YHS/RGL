@@ -95,12 +95,16 @@ canvas.webgl {
 
 .panel-control .control-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 10px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .panel-control .control-tip {
-  margin-top: 10px;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
 }
 
 .panel-minimap .minimap-box {
@@ -509,17 +513,20 @@ canvas.webgl {
   }
 
   .panel-control .control-actions {
-    margin-top: 6px;
+    margin-top: 5px;
+    gap: 6px;
   }
 
   .panel-control .btn {
     padding: 8px 10px;
     font-size: 13px;
     border-radius: 10px;
+    flex: 0 0 auto;
   }
 
   .panel-control .control-tip {
-    margin-top: 6px;
+    font-size: 9.5px;
+    line-height: 1.2;
   }
 
   .panel-minimap .minimap-box {
@@ -530,11 +537,5 @@ canvas.webgl {
     min-width: 170px;
     font-size: 15px;
     padding: 10px 14px;
-  }
-}
-
-@media (max-width: 820px) and (orientation: portrait) and (max-height: 860px) {
-  .panel-control .control-tip {
-    display: none;
   }
 }

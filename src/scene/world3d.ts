@@ -289,12 +289,16 @@ export class World3D {
     const camAhead = waiting
       ? THREE.MathUtils.lerp(10, 9.2, this.portraitUiBias)
       : THREE.MathUtils.lerp(16, 14.8, this.portraitUiBias);
-    const camX = THREE.MathUtils.lerp(0, -1.35, this.portraitUiBias);
+    const camX = waiting
+      ? THREE.MathUtils.lerp(0, -2.15, this.portraitUiBias)
+      : THREE.MathUtils.lerp(0, -1.65, this.portraitUiBias);
     this.desiredCameraPos.set(camX, camHeight, z - camBack);
     const targetY = waiting
       ? THREE.MathUtils.lerp(3.0, 3.9, this.portraitUiBias)
       : THREE.MathUtils.lerp(1.2, 2.3, this.portraitUiBias);
-    const targetX = THREE.MathUtils.lerp(0, -1.0, this.portraitUiBias);
+    const targetX = waiting
+      ? THREE.MathUtils.lerp(0, -2.3, this.portraitUiBias)
+      : THREE.MathUtils.lerp(0, -1.9, this.portraitUiBias);
     this.desiredCameraTarget.set(targetX, targetY, z + camAhead);
     this.camera.position.lerp(this.desiredCameraPos, 0.08);
     this.cameraTarget.lerp(this.desiredCameraTarget, 0.1);
@@ -833,13 +837,13 @@ export class World3D {
       map: facadeDiff,
       fog: false,
       emissive: 0xffffff,
-      emissiveIntensity: 0.08,
+      emissiveIntensity: 0.02,
       normalMap: facadeNormal,
       roughnessMap: facadeArm,
       metalnessMap: facadeArm,
       roughness: 0.92,
       metalness: 0.0,
-      envMapIntensity: 0.55
+      envMapIntensity: 0.28
     });
     mat.normalScale.setScalar(0.45);
 
@@ -874,7 +878,7 @@ export class World3D {
       color: 0x3b4652,
       fog: false,
       emissive: 0xffffff,
-      emissiveIntensity: 0.035,
+      emissiveIntensity: 0.015,
       roughness: 0.95,
       metalness: 0.05,
       envMapIntensity: 0.25
@@ -887,9 +891,9 @@ export class World3D {
       fog: false,
       vertexColors: true,
       transparent: true,
-      opacity: 0.34,
+      opacity: 0.22,
       depthWrite: false,
-      blending: THREE.AdditiveBlending
+      blending: THREE.NormalBlending
     });
     windowMat.toneMapped = false;
 
