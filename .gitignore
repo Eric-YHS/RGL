@@ -18,3 +18,7 @@ pnpm-debug.log*
 !.env.example
 
 coverage/
+
+# local ops notes (secrets)
+LOCAL_SERVER_ACCESS.md
+LOCAL_SERVER_ACCESS_*.md
