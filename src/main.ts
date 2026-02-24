@@ -2,20 +2,35 @@ import "./style.css";
 
 import type { ExperimentConfig, RevealMode } from "./experiment/types";
 import { ExperimentEngine } from "./experiment/engine";
+import type { ClientDeviceInfo, SessionSubmission } from "./experiment/logger";
 import { ExperimentLogger } from "./experiment/logger";
 import { formatMoney, formatSeconds } from "./experiment/utils";
 import { World3D } from "./scene/world3d";
 
 type RunKind = "practice" | "formal";
+type SubmitOutcome = "sent" | "queued";
 
 const params = new URLSearchParams(window.location.search);
 const participantId = (params.get("pid") ?? "").trim();
+const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
+const PENDING_SUBMISSIONS_KEY = "honglvdeng_pending_submissions_v1";
 
-type XlsxModule = typeof import("xlsx");
-let xlsxPromise: Promise<XlsxModule> | null = null;
-function getXlsx(): Promise<XlsxModule> {
-  if (!xlsxPromise) xlsxPromise = import("xlsx");
-  return xlsxPromise;
+function normalizeApiBaseUrl(raw: string | undefined): string {
+  if (!raw) return "";
+  return raw.replace(/\/+$/, "");
+}
+
+function makeApiUrl(pathname: string): string {
+  if (apiBaseUrl) return `${apiBaseUrl}${pathname}`;
+  return pathname;
+}
+
+function createClientSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  const rand = Math.random().toString(36).slice(2);
+  return `fallback-${Date.now().toString(36)}-${rand}`;
 }
 
 function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig {
@@ -38,6 +53,120 @@ function createLogger(config: ExperimentConfig, runKind_: RunKind): ExperimentLo
     startedAtIso: new Date().toISOString(),
     runKind: runKind_
   });
+}
+
+type SubmissionApiResponse = {
+  ok: boolean;
+  sessionId: number;
+  deduplicated?: boolean;
+};
+
+function loadPendingSubmissions(): SessionSubmission[] {
+  try {
+    const raw = window.localStorage.getItem(PENDING_SUBMISSIONS_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as SessionSubmission[];
+  } catch {
+    return [];
+  }
+}
+
+function savePendingSubmissions(payloads: SessionSubmission[]): void {
+  try {
+    if (payloads.length === 0) {
+      window.localStorage.removeItem(PENDING_SUBMISSIONS_KEY);
+      return;
+    }
+    window.localStorage.setItem(PENDING_SUBMISSIONS_KEY, JSON.stringify(payloads));
+  } catch {
+    // Ignore storage quota errors; submission retries will still work for current tab.
+  }
+}
+
+function enqueuePendingSubmission(payload: SessionSubmission): void {
+  const pending = loadPendingSubmissions();
+  const idx = pending.findIndex((p) => p.clientSessionId === payload.clientSessionId);
+  if (idx >= 0) {
+    pending[idx] = payload;
+  } else {
+    pending.push(payload);
+  }
+  savePendingSubmissions(pending);
+}
+
+function removePendingSubmission(clientSessionId: string): void {
+  const pending = loadPendingSubmissions();
+  const next = pending.filter((p) => p.clientSessionId !== clientSessionId);
+  if (next.length !== pending.length) savePendingSubmissions(next);
+}
+
+async function postSubmission(payload: SessionSubmission): Promise<SubmissionApiResponse> {
+  const res = await fetch(makeApiUrl("/api/submissions"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`);
+  }
+
+  const body: unknown = await res.json();
+  const data = body as Partial<SubmissionApiResponse>;
+  if (!data.ok || typeof data.sessionId !== "number") {
+    throw new Error("Unexpected submission response");
+  }
+  return {
+    ok: true,
+    sessionId: data.sessionId,
+    deduplicated: Boolean(data.deduplicated)
+  };
+}
+
+async function submitSubmissionWithFallback(payload: SessionSubmission): Promise<SubmitOutcome> {
+  try {
+    await postSubmission(payload);
+    removePendingSubmission(payload.clientSessionId);
+    return "sent";
+  } catch (err) {
+    console.error("[submitSubmissionWithFallback] failed, queued for retry:", err);
+    enqueuePendingSubmission(payload);
+    return "queued";
+  }
+}
+
+async function flushPendingSubmissions(): Promise<void> {
+  const pending = loadPendingSubmissions();
+  if (pending.length === 0) return;
+  const remained: SessionSubmission[] = [];
+
+  for (const payload of pending) {
+    try {
+      await postSubmission(payload);
+    } catch (err) {
+      console.error("[flushPendingSubmissions] still pending:", err);
+      remained.push(payload);
+    }
+  }
+
+  savePendingSubmissions(remained);
+}
+
+function collectDeviceInfo(): ClientDeviceInfo {
+  return {
+    userAgent: navigator.userAgent,
+    language: navigator.language,
+    platform: navigator.platform,
+    screenWidth: window.screen?.width ?? 0,
+    screenHeight: window.screen?.height ?? 0,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
+  };
 }
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -112,6 +241,8 @@ let currentConfig: ExperimentConfig = practiceConfig;
 let logger: ExperimentLogger = createLogger(currentConfig, runKind);
 let engine: ExperimentEngine = new ExperimentEngine(currentConfig, logger);
 let world: World3D | null = null;
+let formalClientSessionId = createClientSessionId();
+let formalSubmission: SessionSubmission | null = null;
 
 function updateTopHints(): void {
   els.runHint.textContent = runKind === "practice" ? "练习" : "正式实验";
@@ -136,12 +267,30 @@ function switchRun(next: RunKind): void {
   currentConfig = next === "practice" ? practiceConfig : formalConfig;
   logger = createLogger(currentConfig, runKind);
   engine = new ExperimentEngine(currentConfig, logger);
+  formalClientSessionId = createClientSessionId();
+  formalSubmission = null;
   world?.dispose();
   world = new World3D(els.canvas, currentConfig);
   lastPhase = engine.state.phase;
   finishGate = false;
   updateTopHints();
   updateMinimapVisibility();
+}
+
+function buildFormalSubmission(): SessionSubmission {
+  if (runKind !== "formal") {
+    throw new Error("Formal submission requested outside formal run");
+  }
+  return logger.buildSubmission({
+    clientSessionId: formalClientSessionId,
+    submittedAtIso: new Date().toISOString(),
+    summary: {
+      elapsedSec: engine.state.elapsedSec,
+      money: engine.state.money,
+      violations: engine.state.violations
+    },
+    device: collectDeviceInfo()
+  });
 }
 
 function setRevealMode(mode: RevealMode): void {
@@ -333,7 +482,7 @@ function showPostQuestion(): void {
     <h2>补充（可选）</h2>
     <textarea class="textarea" id="postText" placeholder="如愿意，可补充一句原因…"></textarea>
     <div class="actions">
-      <button class="btn primary" id="btnSubmitPost">提交并导出数据</button>
+      <button class="btn primary" id="btnSubmitPost">提交并保存数据</button>
     </div>
   `);
 
@@ -376,59 +525,54 @@ function showFormalResults(): void {
   const elapsed = engine.state.elapsedSec;
   const money = engine.state.money;
   const v = engine.state.violations;
+  if (!formalSubmission) {
+    formalSubmission = buildFormalSubmission();
+  }
 
   openModal(`
-    <h1>已提交</h1>
+    <h1>实验已完成</h1>
     <p>耗时：<strong>${formatSeconds(elapsed, 1)}</strong>；最终金额：<strong>${formatMoney(
       money
     )}</strong>；闯红灯次数：<strong>${v}</strong></p>
-    <h2>数据导出</h2>
-    <p class="hint">导出为一个 XLSX 文件（包含两个 sheet：WALK 按键表、闯红灯表）。</p>
+    <h2>数据上报</h2>
+    <p class="hint" id="submitStatus">正在提交到服务器，请稍候…</p>
     <div class="actions">
-      <button class="btn primary" id="btnDownloadXlsx">下载：实验数据.xlsx</button>
+      <button class="btn primary" id="btnRetrySubmit" style="display:none;">重试提交</button>
       <button class="btn" id="btnCloseResults">关闭</button>
     </div>
   `);
 
+  const submitStatus = document.querySelector<HTMLParagraphElement>("#submitStatus");
+  const btnRetrySubmit = document.querySelector<HTMLButtonElement>("#btnRetrySubmit");
+
   document.querySelector<HTMLButtonElement>("#btnCloseResults")?.addEventListener("click", () => {
     closeModal();
   });
-  document.querySelector<HTMLButtonElement>("#btnDownloadXlsx")?.addEventListener("click", () => {
-    void downloadXlsx().catch((err) => {
-      console.error("[downloadXlsx] failed", err);
-    });
+
+  let inFlight = false;
+  const runSubmit = async (): Promise<void> => {
+    if (inFlight || !formalSubmission) return;
+    inFlight = true;
+    if (btnRetrySubmit) btnRetrySubmit.style.display = "none";
+    if (submitStatus) submitStatus.textContent = "正在提交到服务器，请稍候…";
+    const outcome = await submitSubmissionWithFallback(formalSubmission);
+    if (outcome === "sent") {
+      if (submitStatus) submitStatus.textContent = "数据已成功保存到服务器。";
+      void flushPendingSubmissions();
+    } else {
+      if (submitStatus) {
+        submitStatus.textContent =
+          "网络异常，数据已暂存于当前设备；恢复联网后将自动补传，可点击重试。";
+      }
+      if (btnRetrySubmit) btnRetrySubmit.style.display = "inline-flex";
+    }
+    inFlight = false;
+  };
+
+  btnRetrySubmit?.addEventListener("click", () => {
+    void runSubmit();
   });
-}
-
-async function downloadXlsx(): Promise<void> {
-  const XLSX = await getXlsx();
-  const wb = XLSX.utils.book_new();
-  const wsWalk = XLSX.utils.aoa_to_sheet(logger.toWalkPressSheetAoa());
-  const wsViolation = XLSX.utils.aoa_to_sheet(logger.toViolationSheetAoa());
-  XLSX.utils.book_append_sheet(wb, wsWalk, "WALK按键");
-  XLSX.utils.book_append_sheet(wb, wsViolation, "闯红灯");
-
-  const timestamp = new Date().toISOString().replaceAll(/[-:]/g, "").replaceAll(".", "");
-  const pid = participantId || "anon";
-  const name = `honglvdeng_${pid}_${runKind}_${currentConfig.revealMode}_${timestamp}.xlsx`;
-  const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  downloadBlobFile(
-    name,
-    out,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-  );
-}
-
-function downloadBlobFile(filename: string, content: BlobPart, mime: string): void {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  void runSubmit();
 }
 
 els.btnStart.addEventListener("click", () => {
@@ -471,7 +615,12 @@ const hudCache = {
 
 updateTopHints();
 updateMinimapVisibility();
+void flushPendingSubmissions();
 showRevealModeSelect();
+
+window.addEventListener("online", () => {
+  void flushPendingSubmissions();
+});
 
 function updateHud(): void {
   const s = engine.state;

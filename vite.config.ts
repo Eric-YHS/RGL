@@ -97,5 +97,12 @@ export default defineConfig({
   server: {
     // Allow temporary tunnel hostnames (e.g. localhost.run) during external testing.
     allowedHosts: true,
+    // In local development, proxy API requests to the backend service.
+    proxy: {
+      "/api": {
+        target: process.env.VITE_DEV_API_TARGET ?? "http://localhost:8787",
+        changeOrigin: true,
+      },
+    },
   },
 });

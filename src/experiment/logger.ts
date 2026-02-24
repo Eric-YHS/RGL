@@ -9,6 +9,38 @@ export type SessionMeta = {
   runKind: "practice" | "formal";
 };
 
+export type ClientDeviceInfo = {
+  userAgent: string;
+  language: string;
+  platform: string;
+  screenWidth: number;
+  screenHeight: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  timeZone: string;
+};
+
+export type SubmissionSummary = {
+  elapsedSec: number;
+  money: number;
+  violations: number;
+};
+
+export type SessionSubmission = {
+  clientSessionId: string;
+  participantId: string;
+  startedAtIso: string;
+  submittedAtIso: string;
+  runKind: SessionMeta["runKind"];
+  revealMode: ExperimentConfig["revealMode"];
+  comprehensionAnswer: "yes" | "no" | "";
+  postRuleAttitude: "A" | "B" | "C" | "D" | "";
+  postRuleAttitudeText: string;
+  summary: SubmissionSummary;
+  device: ClientDeviceInfo;
+  events: LogEvent[];
+};
+
 export class ExperimentLogger {
   private readonly config: ExperimentConfig;
   private readonly meta: SessionMeta;
@@ -156,6 +188,32 @@ export class ExperimentLogger {
 
   toViolationCsv(): string {
     return aoaToCsv(this.toViolationSheetAoa());
+  }
+
+  buildSubmission(args: {
+    clientSessionId: string;
+    submittedAtIso: string;
+    summary: SubmissionSummary;
+    device: ClientDeviceInfo;
+  }): SessionSubmission {
+    return {
+      clientSessionId: args.clientSessionId,
+      participantId: this.meta.participantId,
+      startedAtIso: this.meta.startedAtIso,
+      submittedAtIso: args.submittedAtIso,
+      runKind: this.meta.runKind,
+      revealMode: this.config.revealMode,
+      comprehensionAnswer: this.comprehensionAnswer,
+      postRuleAttitude: this.postRuleAttitude,
+      postRuleAttitudeText: this.postRuleAttitudeText,
+      summary: {
+        elapsedSec: Number(args.summary.elapsedSec.toFixed(3)),
+        money: Number(args.summary.money.toFixed(2)),
+        violations: Math.max(0, Math.floor(args.summary.violations))
+      },
+      device: args.device,
+      events: this.events.map((e) => ({ ...e }))
+    };
   }
 }
 

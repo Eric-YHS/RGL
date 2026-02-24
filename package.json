@@ -4,9 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:web": "vite",
+    "dev:api": "npm --prefix server run dev",
     "build": "vite build",
     "preview": "vite preview",
+    "start:api": "npm --prefix server run start",
+    "export:xlsx": "npm --prefix server run export:xlsx --",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -14,6 +18,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "concurrently": "^8.2.2",
     "typescript": "^5.4.5",
     "vite": "^5.2.0"
   }

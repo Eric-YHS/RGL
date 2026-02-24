@@ -1,6 +1,9 @@
 node_modules/
+server/node_modules/
 dist/
 .vite/
+data/
+exports/
 
 *.log
 npm-debug.log*
@@ -12,5 +15,6 @@ pnpm-debug.log*
 
 .env
 .env.*
+!.env.example
 
 coverage/
