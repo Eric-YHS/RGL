@@ -178,32 +178,32 @@ app.innerHTML = `
 
     <div class="hud">
       <div class="left">
-        <div class="panel">
-          <div style="display:flex; gap:10px; align-items:center; justify-content:space-between;">
-            <div style="font-weight:700;">控制</div>
+        <div class="panel panel-control">
+          <div class="panel-head">
+            <div class="panel-title">控制</div>
             <div class="hint" id="runHint"></div>
           </div>
-          <div style="display:flex; gap:10px; margin-top:10px;">
+          <div class="control-actions">
             <button class="btn primary" id="btnStart">开始</button>
           </div>
-          <div class="hint" style="margin-top:10px;">
-            提示：只有在<strong>红灯等待</strong>时点击“通行（WALK）”，才会闯红灯。
+          <div class="hint control-tip">
+            提示：仅在<strong>红灯等待</strong>时点击“通行（WALK）”才会闯红灯。
           </div>
         </div>
 
-        <div class="panel status">
+        <div class="panel status panel-status">
           <div class="row"><div class="label">当前位置</div><div class="value" id="posText">—</div></div>
           <div class="row"><div class="label">耗费时间</div><div class="value" id="timeText">0.0s</div></div>
           <div class="row"><div class="label">剩余金额</div><div class="value money" id="moneyText">￥10.00</div></div>
           <div class="row" id="lightRow" style="display:none;"><div class="label">信号灯</div><div class="value" id="lightText">—</div></div>
         </div>
 
-        <div class="panel" id="minimapPanel" style="display:none;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <div style="font-weight:700; font-size:13px;">小地图</div>
+        <div class="panel panel-minimap" id="minimapPanel" style="display:none;">
+          <div class="panel-head">
+            <div class="panel-title panel-title-sm">小地图</div>
             <div class="hint">总览路线</div>
           </div>
-          <div class="minimap" style="margin-top:10px;">
+          <div class="minimap minimap-box">
             <canvas id="minimap"></canvas>
           </div>
         </div>

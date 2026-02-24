@@ -78,6 +78,35 @@ canvas.webgl {
   animation: panelSlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
+.panel-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title {
+  font-weight: 700;
+}
+
+.panel-title-sm {
+  font-size: 13px;
+}
+
+.panel-control .control-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.panel-control .control-tip {
+  margin-top: 10px;
+}
+
+.panel-minimap .minimap-box {
+  margin-top: 10px;
+}
+
 .hud .left > .panel:nth-child(1) { animation-delay: 0s; }
 .hud .left > .panel:nth-child(2) { animation-delay: 0.08s; }
 .hud .left > .panel:nth-child(3) { animation-delay: 0.16s; }
@@ -442,41 +471,70 @@ canvas.webgl {
 
 @media (max-width: 820px) and (orientation: portrait) {
   :root {
-    --hud-offset-top: 8px;
-    --hud-offset-side: 8px;
-    --walk-bottom: 16px;
-    --minimap-w: min(54vw, 190px);
-    --minimap-h: clamp(72px, 11vh, 92px);
+    --hud-offset-top: 6px;
+    --hud-offset-side: 6px;
+    --walk-bottom: 14px;
+    --minimap-w: min(48vw, 160px);
+    --minimap-h: clamp(56px, 8.5vh, 72px);
   }
 
   .hud {
-    gap: 8px;
+    gap: 6px;
   }
 
   .hud .left {
     min-width: 0;
-    width: min(92vw, 340px);
-    gap: 8px;
+    width: min(86vw, 310px);
+    gap: 6px;
   }
 
   .hud .panel {
-    padding: 8px 10px;
-    border-radius: 12px;
+    padding: 6px 8px;
+    border-radius: 10px;
   }
 
   .hud .status {
-    gap: 4px;
-    font-size: 12px;
+    gap: 2px;
+    font-size: 11px;
+  }
+
+  .panel-status .row {
+    gap: 6px;
+    line-height: 1.2;
   }
 
   .hud .hint {
-    font-size: 11px;
-    line-height: 1.35;
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .panel-control .control-actions {
+    margin-top: 6px;
+  }
+
+  .panel-control .btn {
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+
+  .panel-control .control-tip {
+    margin-top: 6px;
+  }
+
+  .panel-minimap .minimap-box {
+    margin-top: 6px;
   }
 
   .center-controls .btn {
     min-width: 170px;
     font-size: 15px;
     padding: 10px 14px;
+  }
+}
+
+@media (max-width: 820px) and (orientation: portrait) and (max-height: 860px) {
+  .panel-control .control-tip {
+    display: none;
   }
 }
