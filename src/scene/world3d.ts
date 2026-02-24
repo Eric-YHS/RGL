@@ -280,25 +280,14 @@ export class World3D {
 
     // Camera (导航式跟随)
     const waiting = state.phase === "waiting_red";
-    const camHeight = waiting
-      ? THREE.MathUtils.lerp(12.5, 12.2, this.portraitUiBias)
-      : THREE.MathUtils.lerp(13, 12.7, this.portraitUiBias);
-    const camBack = waiting
-      ? THREE.MathUtils.lerp(16, 20.5, this.portraitUiBias)
-      : THREE.MathUtils.lerp(18, 22.0, this.portraitUiBias);
-    const camAhead = waiting
-      ? THREE.MathUtils.lerp(10, 9.2, this.portraitUiBias)
-      : THREE.MathUtils.lerp(16, 14.8, this.portraitUiBias);
-    const camX = waiting
-      ? THREE.MathUtils.lerp(0, 0.55, this.portraitUiBias)
-      : THREE.MathUtils.lerp(0, 0.4, this.portraitUiBias);
+    // Keep portrait framing stable across moving/waiting phases to avoid mobile "tilt jump".
+    const camHeight = THREE.MathUtils.lerp(waiting ? 12.5 : 13, 12.35, this.portraitUiBias);
+    const camBack = THREE.MathUtils.lerp(waiting ? 16 : 18, 21.0, this.portraitUiBias);
+    const camAhead = THREE.MathUtils.lerp(waiting ? 10 : 16, 11.6, this.portraitUiBias);
+    const camX = THREE.MathUtils.lerp(0, 0.18, this.portraitUiBias);
     this.desiredCameraPos.set(camX, camHeight, z - camBack);
-    const targetY = waiting
-      ? THREE.MathUtils.lerp(3.0, 3.9, this.portraitUiBias)
-      : THREE.MathUtils.lerp(1.2, 2.3, this.portraitUiBias);
-    const targetX = waiting
-      ? THREE.MathUtils.lerp(0, -0.35, this.portraitUiBias)
-      : THREE.MathUtils.lerp(0, -0.2, this.portraitUiBias);
+    const targetY = THREE.MathUtils.lerp(waiting ? 3.0 : 1.2, 2.85, this.portraitUiBias);
+    const targetX = THREE.MathUtils.lerp(0, -0.08, this.portraitUiBias);
     this.desiredCameraTarget.set(targetX, targetY, z + camAhead);
     this.camera.position.lerp(this.desiredCameraPos, 0.08);
     this.cameraTarget.lerp(this.desiredCameraTarget, 0.1);
@@ -550,15 +539,14 @@ export class World3D {
     const roadGeo = new THREE.PlaneGeometry(roadWidth + roadEdgeOverlap * 2, length);
     roadGeo.setAttribute("uv2", roadGeo.attributes.uv);
     const roadMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
+      color: 0x777b82,
       map: asphaltDiff,
       normalMap: asphaltNormal,
       aoMap: asphaltArm,
       roughnessMap: asphaltArm,
-      metalnessMap: asphaltArm,
-      roughness: 1.0,
+      roughness: 0.97,
       metalness: 0.0,
-      envMapIntensity: 0.55
+      envMapIntensity: 0.08
     });
     roadMat.normalScale.setScalar(0.85);
     roadMat.aoMapIntensity = 0.65;
@@ -571,15 +559,14 @@ export class World3D {
     const sidewalkGeo = new THREE.PlaneGeometry(sidewalkWidth, length);
     sidewalkGeo.setAttribute("uv2", sidewalkGeo.attributes.uv);
     const sidewalkMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
+      color: 0xd7d9dd,
       map: pavementDiff,
       normalMap: pavementNormal,
       aoMap: pavementArm,
       roughnessMap: pavementArm,
-      metalnessMap: pavementArm,
       roughness: 1.0,
       metalness: 0.0,
-      envMapIntensity: 0.38
+      envMapIntensity: 0.1
     });
     sidewalkMat.normalScale.setScalar(0.7);
     sidewalkMat.aoMapIntensity = 0.7;
