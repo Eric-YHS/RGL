@@ -290,15 +290,15 @@ export class World3D {
       ? THREE.MathUtils.lerp(10, 9.2, this.portraitUiBias)
       : THREE.MathUtils.lerp(16, 14.8, this.portraitUiBias);
     const camX = waiting
-      ? THREE.MathUtils.lerp(0, 1.6, this.portraitUiBias)
-      : THREE.MathUtils.lerp(0, 1.2, this.portraitUiBias);
+      ? THREE.MathUtils.lerp(0, 0.55, this.portraitUiBias)
+      : THREE.MathUtils.lerp(0, 0.4, this.portraitUiBias);
     this.desiredCameraPos.set(camX, camHeight, z - camBack);
     const targetY = waiting
       ? THREE.MathUtils.lerp(3.0, 3.9, this.portraitUiBias)
       : THREE.MathUtils.lerp(1.2, 2.3, this.portraitUiBias);
     const targetX = waiting
-      ? THREE.MathUtils.lerp(0, -0.9, this.portraitUiBias)
-      : THREE.MathUtils.lerp(0, -0.6, this.portraitUiBias);
+      ? THREE.MathUtils.lerp(0, -0.35, this.portraitUiBias)
+      : THREE.MathUtils.lerp(0, -0.2, this.portraitUiBias);
     this.desiredCameraTarget.set(targetX, targetY, z + camAhead);
     this.camera.position.lerp(this.desiredCameraPos, 0.08);
     this.cameraTarget.lerp(this.desiredCameraTarget, 0.1);
@@ -356,6 +356,10 @@ export class World3D {
     // to be occluded by browser chrome / top overlays.
     this.portraitUiBias = width <= 820 && height > width * 1.15 ? 1 : 0;
     this.camera.fov = this.portraitUiBias > 0 ? 66 : 55;
+    // Reduce mobile portrait post FX to avoid occasional "ghost/transparent building" artifacts.
+    const mobilePortrait = this.portraitUiBias > 0;
+    this.ssaoPass.enabled = QUALITY.ssaoEnabled && !mobilePortrait;
+    this.bloomPass.enabled = QUALITY.bloomEnabled && !mobilePortrait;
     this.camera.updateProjectionMatrix();
 
     this.composer.setPixelRatio(this.dpr);
@@ -396,7 +400,7 @@ export class World3D {
         tex.mapping = THREE.EquirectangularReflectionMapping;
         // 控制变量：两种呈现方式使用同一套天空/环境光照（差异仅来自雾遮挡）
         this.scene.background = tex;
-        this.scene.backgroundIntensity = 0.6;
+        this.scene.backgroundIntensity = 0.45;
         this.ownedTextures.push(tex);
 
         const pmrem2 = new THREE.PMREMGenerator(this.renderer);
@@ -837,13 +841,13 @@ export class World3D {
       map: facadeDiff,
       fog: false,
       emissive: 0xffffff,
-      emissiveIntensity: 0.02,
+      emissiveIntensity: 0.0,
       normalMap: facadeNormal,
       roughnessMap: facadeArm,
       metalnessMap: facadeArm,
       roughness: 0.92,
       metalness: 0.0,
-      envMapIntensity: 0.28
+      envMapIntensity: 0.16
     });
     mat.normalScale.setScalar(0.45);
 
@@ -878,10 +882,10 @@ export class World3D {
       color: 0x3b4652,
       fog: false,
       emissive: 0xffffff,
-      emissiveIntensity: 0.015,
+      emissiveIntensity: 0.0,
       roughness: 0.95,
       metalness: 0.05,
-      envMapIntensity: 0.25
+      envMapIntensity: 0.12
     });
 
     // windows (暖色发光，避免“建筑全黑”)
@@ -891,8 +895,8 @@ export class World3D {
       fog: false,
       vertexColors: true,
       transparent: true,
-      opacity: 0.22,
-      depthWrite: false,
+      opacity: 0.12,
+      depthWrite: true,
       blending: THREE.NormalBlending
     });
     windowMat.toneMapped = false;
