@@ -109,6 +109,21 @@ location /api/ {
 }
 ```
 
+### 可选：GitHub 更新后自动部署（服务器轮询）
+
+仓库内提供脚本：`ops/auto_deploy.sh`。  
+建议在服务器（`ubuntu` 用户）配置 cron 每分钟执行一次：
+
+```bash
+* * * * * /opt/honglvdeng/ops/auto_deploy.sh >> /opt/honglvdeng/logs/auto-deploy.log 2>&1
+```
+
+脚本行为：
+
+- 拉取 `origin/前后端`
+- 仅在远端有新提交时执行 `pull + install + build + pm2 restart`
+- 通过 `flock` 防止并发重复部署
+
 ## 示例短片
 
 如需在练习说明页展示示例短片，请将视频文件放到：
