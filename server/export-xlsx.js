@@ -95,17 +95,67 @@ try {
     )
     .all(filters.params);
 
+  const sessionsZh = sessions.map((row) => ({
+    会话ID: row.id,
+    客户端会话ID: row.client_session_id,
+    被试编号: row.participant_id,
+    开始时间: row.started_at_iso,
+    提交时间: row.submitted_at_iso,
+    任务类型: formatRunKind(row.run_kind),
+    呈现方式: formatRevealMode(row.reveal_mode),
+    理解测验回答: formatComprehensionAnswer(row.comprehension_answer),
+    规则看法选项: formatPostRuleAttitude(row.post_rule_attitude),
+    规则看法补充: row.post_rule_attitude_text ?? "",
+    实验总用时_秒: row.elapsed_sec,
+    最终金额_元: row.money,
+    闯红灯次数: row.violations,
+    语言: formatLanguage(row.language),
+    平台: formatPlatform(row.platform),
+    屏幕宽: row.screen_width,
+    屏幕高: row.screen_height,
+    视口宽: row.viewport_width,
+    视口高: row.viewport_height,
+    时区: row.time_zone,
+    IP地址: row.ip_address,
+    浏览器标识_原文: row.user_agent,
+    入库时间: row.created_at
+  }));
+
+  const eventsZh = events.map((row) => ({
+    事件ID: row.id,
+    会话ID: row.session_id,
+    序号: row.seq,
+    被试编号: row.participant_id,
+    开始时间: row.started_at_iso,
+    任务类型: formatRunKind(row.run_kind),
+    呈现方式: formatRevealMode(row.reveal_mode),
+    理解测验回答: formatComprehensionAnswer(row.comprehension_answer),
+    规则看法选项: formatPostRuleAttitude(row.post_rule_attitude),
+    规则看法补充: row.post_rule_attitude_text ?? "",
+    事件: formatEvent(row.event),
+    阶段: formatPhase(row.phase),
+    页面时间_ms: row.t_ms,
+    实验用时_秒: row.t_sec,
+    信号灯序号: row.light_index,
+    灯色: formatLightColor(row.light_color),
+    剩余金额_元: row.money,
+    路线进度_0_1: row.route_pos_01,
+    路线进度_0_10: row.route_pos_10,
+    备注: row.note ?? "",
+    入库时间: row.created_at
+  }));
+
   const walkRows = events
     .filter((row) => row.event === "walk_press")
     .map((row) => ({
       被试编号: row.participant_id,
-      开始时间_ISO: row.started_at_iso,
+      开始时间: row.started_at_iso,
       任务类型: formatRunKind(row.run_kind),
       呈现方式: formatRevealMode(row.reveal_mode),
       理解测验回答: formatComprehensionAnswer(row.comprehension_answer),
       规则看法选项: formatPostRuleAttitude(row.post_rule_attitude),
       规则看法补充: row.post_rule_attitude_text,
-      事件: "按下WALK",
+      事件: "按下通行键",
       页面时间_ms: row.t_ms,
       实验用时_秒: row.t_sec,
       位置刻度_0_10: row.route_pos_10,
@@ -120,7 +170,7 @@ try {
     .filter((row) => row.event === "violation")
     .map((row) => ({
       被试编号: row.participant_id,
-      开始时间_ISO: row.started_at_iso,
+      开始时间: row.started_at_iso,
       任务类型: formatRunKind(row.run_kind),
       呈现方式: formatRevealMode(row.reveal_mode),
       理解测验回答: formatComprehensionAnswer(row.comprehension_answer),
@@ -135,10 +185,10 @@ try {
     }));
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sessions), "Sessions");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(events), "Events");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(walkRows), "WALK按键");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(violationRows), "闯红灯");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sessionsZh), "会话数据");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(eventsZh), "事件明细");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(walkRows), "通行按键");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(violationRows), "闯红灯记录");
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   XLSX.writeFile(wb, outPath);
@@ -282,6 +332,35 @@ function formatLightColor(v) {
   if (v === "red") return "红";
   if (v === "green") return "绿";
   return "";
+}
+
+function formatEvent(v) {
+  if (v === "walk_press") return "按下通行键";
+  if (v === "violation") return "闯红灯";
+  return String(v ?? "");
+}
+
+function formatLanguage(v) {
+  const text = String(v ?? "").trim();
+  if (!text) return "";
+  if (text.startsWith("zh")) return "中文";
+  if (text.startsWith("en")) return "英文";
+  return text;
+}
+
+function formatPlatform(v) {
+  switch (v) {
+    case "iPhone":
+      return "iPhone";
+    case "MacIntel":
+      return "Mac";
+    case "Win32":
+      return "Windows";
+    case "Linux x86_64":
+      return "Linux";
+    default:
+      return String(v ?? "");
+  }
 }
 
 function formatWalkEffect(row) {
