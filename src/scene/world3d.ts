@@ -1439,7 +1439,7 @@ export class World3D {
       group.add(pedBack);
 
       lampsRed.push(this.createLamp(group, "red", new THREE.Vector3(5.9, 3.82, -1.18), 0.32));
-      lampsCountdown.push(this.createCountdownLamp(group, new THREE.Vector3(5.9, 3.05, -1.18), 0.2));
+      lampsCountdown.push(this.createCountdownLamp(group, new THREE.Vector3(5.84, 3.05, -1.18), 0.2));
       lampsGreen.push(
         this.createLamp(group, "green", new THREE.Vector3(5.9, 2.34, -1.18), 0.32)
       );
@@ -1573,8 +1573,8 @@ export class World3D {
     group.add(bulb);
 
     const canvas = document.createElement("canvas");
-    canvas.width = 128;
-    canvas.height = 128;
+    canvas.width = 256;
+    canvas.height = 256;
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.minFilter = THREE.LinearFilter;
@@ -1582,18 +1582,19 @@ export class World3D {
     texture.generateMipmaps = false;
     this.ownedTextures.push(texture);
 
-    const spriteMat = new THREE.SpriteMaterial({
+    const panelMat = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
       opacity: 0,
       blending: THREE.NormalBlending,
       depthWrite: false,
       depthTest: false,
-      fog: false
+      fog: false,
+      color: 0xffffff
     });
-    const sprite = new THREE.Sprite(spriteMat);
-    sprite.position.copy(position).add(new THREE.Vector3(0, 0, -0.22));
-    const baseScale = radius * 3.0;
+    const sprite = new THREE.Sprite(panelMat);
+    sprite.position.copy(position).add(new THREE.Vector3(0, 0, -0.16));
+    const baseScale = radius * 3.2;
     sprite.scale.set(baseScale, baseScale, 1);
     sprite.renderOrder = this.config.revealMode === "sequential" ? 20 : 10;
     group.add(sprite);
@@ -1630,7 +1631,7 @@ export class World3D {
       return;
     }
 
-    ctx.fillStyle = "rgba(8,10,14,1)";
+    ctx.fillStyle = "rgba(8,10,14,0.96)";
     ctx.beginPath();
     ctx.arc(center, center, size * 0.45, 0, Math.PI * 2);
     ctx.fill();
@@ -1641,14 +1642,17 @@ export class World3D {
     ctx.arc(center, center, size * 0.4, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(255,247,220,1)";
-    ctx.strokeStyle = "rgba(35,22,0,1)";
-    ctx.lineWidth = size * 0.06;
-    ctx.font = `700 ${Math.floor(size * 0.66)}px "Arial Black", Arial, sans-serif`;
+    ctx.fillStyle = "rgba(255,255,245,1)";
+    ctx.strokeStyle = "rgba(18,14,8,1)";
+    ctx.lineWidth = size * 0.065;
+    ctx.font = `700 ${Math.floor(size * 0.7)}px "Arial Black", Arial, sans-serif`;
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = size * 0.04;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.strokeText(text, center, center + size * 0.03);
     ctx.fillText(text, center, center + size * 0.03);
+    ctx.shadowBlur = 0;
 
     texture.needsUpdate = true;
   }
