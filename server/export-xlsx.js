@@ -115,7 +115,7 @@ try {
     屏幕高: row.screen_height,
     视口宽: row.viewport_width,
     视口高: row.viewport_height,
-    时区: row.time_zone,
+    时区: formatTimeZone(row.time_zone),
     IP地址: row.ip_address,
     浏览器标识_原文: row.user_agent,
     入库时间: row.created_at
@@ -349,18 +349,22 @@ function formatLanguage(v) {
 }
 
 function formatPlatform(v) {
-  switch (v) {
-    case "iPhone":
-      return "iPhone";
-    case "MacIntel":
-      return "Mac";
-    case "Win32":
-      return "Windows";
-    case "Linux x86_64":
-      return "Linux";
-    default:
-      return String(v ?? "");
-  }
+  const text = String(v ?? "").trim();
+  if (!text) return "";
+  if (/iphone/i.test(text)) return "苹果手机";
+  if (/ipad/i.test(text)) return "苹果平板";
+  if (/mac/i.test(text)) return "苹果电脑";
+  if (/win/i.test(text)) return "Windows电脑";
+  if (/android|linux arm|armv8/i.test(text)) return "安卓设备";
+  if (/linux/i.test(text)) return "Linux电脑";
+  return text;
+}
+
+function formatTimeZone(v) {
+  const text = String(v ?? "").trim();
+  if (!text) return "";
+  if (text === "Asia/Shanghai") return "中国标准时间(UTC+8)";
+  return text;
 }
 
 function formatWalkEffect(row) {
