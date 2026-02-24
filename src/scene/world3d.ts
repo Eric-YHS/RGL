@@ -290,15 +290,15 @@ export class World3D {
       ? THREE.MathUtils.lerp(10, 9.2, this.portraitUiBias)
       : THREE.MathUtils.lerp(16, 14.8, this.portraitUiBias);
     const camX = waiting
-      ? THREE.MathUtils.lerp(0, -2.15, this.portraitUiBias)
-      : THREE.MathUtils.lerp(0, -1.65, this.portraitUiBias);
+      ? THREE.MathUtils.lerp(0, 1.6, this.portraitUiBias)
+      : THREE.MathUtils.lerp(0, 1.2, this.portraitUiBias);
     this.desiredCameraPos.set(camX, camHeight, z - camBack);
     const targetY = waiting
       ? THREE.MathUtils.lerp(3.0, 3.9, this.portraitUiBias)
       : THREE.MathUtils.lerp(1.2, 2.3, this.portraitUiBias);
     const targetX = waiting
-      ? THREE.MathUtils.lerp(0, -2.3, this.portraitUiBias)
-      : THREE.MathUtils.lerp(0, -1.9, this.portraitUiBias);
+      ? THREE.MathUtils.lerp(0, -0.9, this.portraitUiBias)
+      : THREE.MathUtils.lerp(0, -0.6, this.portraitUiBias);
     this.desiredCameraTarget.set(targetX, targetY, z + camAhead);
     this.camera.position.lerp(this.desiredCameraPos, 0.08);
     this.cameraTarget.lerp(this.desiredCameraTarget, 0.1);
