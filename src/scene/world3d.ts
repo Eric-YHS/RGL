@@ -831,10 +831,9 @@ export class World3D {
       emissiveIntensity: 0.0,
       normalMap: facadeNormal,
       roughnessMap: facadeArm,
-      metalnessMap: facadeArm,
-      roughness: 0.92,
+      roughness: 0.97,
       metalness: 0.0,
-      envMapIntensity: 0.16
+      envMapIntensity: 0.03
     });
     mat.normalScale.setScalar(0.45);
 
@@ -870,9 +869,9 @@ export class World3D {
       fog: false,
       emissive: 0xffffff,
       emissiveIntensity: 0.0,
-      roughness: 0.95,
-      metalness: 0.05,
-      envMapIntensity: 0.12
+      roughness: 0.98,
+      metalness: 0.0,
+      envMapIntensity: 0.02
     });
 
     // windows (暖色发光，避免“建筑全黑”)
