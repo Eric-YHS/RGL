@@ -41,12 +41,31 @@ type LampVisual = {
   lastHaloScale: number;
 };
 
+type CountdownVisual = {
+  bulb: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+  sprite: THREE.Sprite;
+  texture: THREE.CanvasTexture;
+  onColor: number;
+  offColor: number;
+  baseScale: number;
+  lastBulbHex: number;
+  lastBulbOpacity: number;
+  lastSpriteOpacity: number;
+  lastSpriteScale: number;
+  lastText: string;
+};
+
 type TrafficLightMesh = {
   index: number;
   group: THREE.Group;
   red: LampVisual[];
+  countdown: CountdownVisual[];
   green: LampVisual[];
-  fadeMaterials: Array<{ mat: THREE.MeshStandardMaterial; baseOpacity: number }>;
+  fadeMaterials: Array<{
+    mat: THREE.MeshStandardMaterial;
+    baseOpacity: number;
+    role: "pole" | "body" | "marking";
+  }>;
   reveal01: number;
 };
 
@@ -281,6 +300,7 @@ export class World3D {
       tl.group.visible = true;
       const gated = this.config.revealMode === "sequential" && tl.index > state.lightIndex + 1;
       const color = this.getTrafficLightColor(state, tl.index);
+      const countdown = this.getTrafficLightCountdown(state, tl.index);
 
       let targetReveal01 = 1;
       if (this.config.revealMode === "sequential") {
@@ -299,6 +319,7 @@ export class World3D {
         this.config.revealMode === "sequential" ? this.cueVisibilityFromReveal(tl.reveal01) : 1;
       this.setTrafficLightFadeMaterials(tl.fadeMaterials, tl.reveal01);
       this.setLampGroup(tl.red, "red", color, nowMs, tl.index * 2, cueVisibility01);
+      this.setCountdownGroup(tl.countdown, countdown, nowMs, cueVisibility01);
       this.setLampGroup(tl.green, "green", color, nowMs, tl.index * 2 + 1, cueVisibility01);
     }
 
@@ -1324,14 +1345,21 @@ export class World3D {
     });
 
     for (let i = 1; i <= this.config.numLights; i++) {
-      const fadeMaterials: Array<{ mat: THREE.MeshStandardMaterial; baseOpacity: number }> = [];
-      const registerFadeMaterial = (mat: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial => {
+      const fadeMaterials: Array<{
+        mat: THREE.MeshStandardMaterial;
+        baseOpacity: number;
+        role: "pole" | "body" | "marking";
+      }> = [];
+      const registerFadeMaterial = (
+        mat: THREE.MeshStandardMaterial,
+        role: "pole" | "body" | "marking"
+      ): THREE.MeshStandardMaterial => {
         if (!isSequential) return mat;
         const baseOpacity = mat.opacity;
         mat.transparent = true;
         mat.depthWrite = false;
         mat.opacity = 0;
-        fadeMaterials.push({ mat, baseOpacity });
+        fadeMaterials.push({ mat, baseOpacity, role });
         return mat;
       };
 
@@ -1342,72 +1370,78 @@ export class World3D {
       group.position.set(0, 0, i * this.spacing);
 
       const lampsRed: LampVisual[] = [];
+      const lampsCountdown: CountdownVisual[] = [];
       const lampsGreen: LampVisual[] = [];
 
-      const poleMatI = registerFadeMaterial(isSequential ? poleMat.clone() : poleMat);
-      const boxMatI = registerFadeMaterial(isSequential ? boxMat.clone() : boxMat);
-      const backplateMatI = registerFadeMaterial(isSequential ? backplateMat.clone() : backplateMat);
-      const edgeMatI = registerFadeMaterial(isSequential ? edgeMat.clone() : edgeMat);
-      const stripeMatI = registerFadeMaterial(isSequential ? stripeMat.clone() : stripeMat);
+      const poleMatI = registerFadeMaterial(isSequential ? poleMat.clone() : poleMat, "pole");
+      const boxMatI = registerFadeMaterial(isSequential ? boxMat.clone() : boxMat, "body");
+      const backplateMatI = registerFadeMaterial(
+        isSequential ? backplateMat.clone() : backplateMat,
+        "body"
+      );
+      const edgeMatI = registerFadeMaterial(isSequential ? edgeMat.clone() : edgeMat, "body");
+      const stripeMatI = registerFadeMaterial(isSequential ? stripeMat.clone() : stripeMat, "marking");
 
       // side pole + overhead arm (更像真实路口红绿灯)
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 5.6, 14), poleMatI);
       pole.position.set(-6.4, 2.8, 0.8);
-      pole.renderOrder = isSequential ? 1 : 0;
+      pole.renderOrder = isSequential ? 2 : 0;
       group.add(pole);
 
       const arm = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.16, 0.16), poleMatI);
       arm.position.set(-3.0, 5.6, 0.8);
-      arm.renderOrder = isSequential ? 1 : 0;
+      arm.renderOrder = isSequential ? 2 : 0;
       group.add(arm);
 
-      const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 2.0, 0.7), boxMatI);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 2.25, 0.7), boxMatI);
       box.position.set(0.0, 5.25, 0.8);
-      box.renderOrder = isSequential ? 2 : 0;
+      box.renderOrder = isSequential ? 1 : 0;
       group.add(box);
 
       // 灯箱边框（勾勒轮廓）
-      const edgeFrame = new THREE.Mesh(new THREE.BoxGeometry(1.05, 2.1, 0.04), edgeMatI);
+      const edgeFrame = new THREE.Mesh(new THREE.BoxGeometry(1.05, 2.35, 0.04), edgeMatI);
       edgeFrame.position.set(0.0, 5.25, 0.44);
-      edgeFrame.renderOrder = isSequential ? 2 : 0;
+      edgeFrame.renderOrder = isSequential ? 1 : 0;
       group.add(edgeFrame);
 
-      const backplate = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.3, 0.16), backplateMatI);
+      const backplate = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.55, 0.16), backplateMatI);
       backplate.position.set(0.0, 5.25, 0.55);
-      backplate.renderOrder = isSequential ? 2 : 0;
+      backplate.renderOrder = isSequential ? 1 : 0;
       group.add(backplate);
 
       // overhead lamps (带光晕，视觉更显著)
-      lampsRed.push(this.createLamp(group, "red", new THREE.Vector3(0.0, 5.72, 0.38), 0.32));
+      lampsRed.push(this.createLamp(group, "red", new THREE.Vector3(0.0, 6.08, 0.38), 0.32));
+      lampsCountdown.push(this.createCountdownLamp(group, new THREE.Vector3(0.0, 5.25, 0.38), 0.2));
       lampsGreen.push(
-        this.createLamp(group, "green", new THREE.Vector3(0.0, 4.82, 0.38), 0.32)
+        this.createLamp(group, "green", new THREE.Vector3(0.0, 4.46, 0.38), 0.32)
       );
 
       // pedestrian-side signal (更靠近视线，避免“看不见红绿灯”)
       const pedPole = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 3.4, 12), poleMatI);
       pedPole.position.set(5.9, 1.7, -0.8);
-      pedPole.renderOrder = isSequential ? 1 : 0;
+      pedPole.renderOrder = isSequential ? 2 : 0;
       group.add(pedPole);
 
-      const pedBox = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.5, 0.48), boxMatI);
+      const pedBox = new THREE.Mesh(new THREE.BoxGeometry(0.75, 2.1, 0.48), boxMatI);
       pedBox.position.set(5.9, 3.05, -0.8);
-      pedBox.renderOrder = isSequential ? 2 : 0;
+      pedBox.renderOrder = isSequential ? 1 : 0;
       group.add(pedBox);
 
       // 行人灯箱边框
-      const pedEdge = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.6, 0.04), edgeMatI);
+      const pedEdge = new THREE.Mesh(new THREE.BoxGeometry(0.85, 2.2, 0.04), edgeMatI);
       pedEdge.position.set(5.9, 3.05, -1.05);
-      pedEdge.renderOrder = isSequential ? 2 : 0;
+      pedEdge.renderOrder = isSequential ? 1 : 0;
       group.add(pedEdge);
 
-      const pedBack = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.75, 0.14), backplateMatI);
+      const pedBack = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.35, 0.14), backplateMatI);
       pedBack.position.set(5.9, 3.05, -1.03);
-      pedBack.renderOrder = isSequential ? 2 : 0;
+      pedBack.renderOrder = isSequential ? 1 : 0;
       group.add(pedBack);
 
-      lampsRed.push(this.createLamp(group, "red", new THREE.Vector3(5.9, 3.42, -1.18), 0.32));
+      lampsRed.push(this.createLamp(group, "red", new THREE.Vector3(5.9, 3.82, -1.18), 0.32));
+      lampsCountdown.push(this.createCountdownLamp(group, new THREE.Vector3(5.9, 3.05, -1.18), 0.2));
       lampsGreen.push(
-        this.createLamp(group, "green", new THREE.Vector3(5.9, 2.68, -1.18), 0.32)
+        this.createLamp(group, "green", new THREE.Vector3(5.9, 2.34, -1.18), 0.32)
       );
 
       // stop line marker
@@ -1423,7 +1457,8 @@ export class World3D {
           polygonOffset: true,
           polygonOffsetFactor: -2,
           polygonOffsetUnits: -2
-        })
+        }),
+        "marking"
       );
       const stopLine = new THREE.Mesh(
         new THREE.PlaneGeometry(12, 0.22),
@@ -1451,6 +1486,7 @@ export class World3D {
         index: i,
         group,
         red: lampsRed,
+        countdown: lampsCountdown,
         green: lampsGreen,
         fadeMaterials,
         reveal01: 0
@@ -1479,7 +1515,7 @@ export class World3D {
     bulb.renderOrder = this.config.revealMode === "sequential" ? 4 : 0;
     group.add(bulb);
 
-    const glow = new THREE.PointLight(which === "red" ? 0xff3340 : 0x52ff5a, 0, 6, 2.2);
+    const glow = new THREE.PointLight(which === "red" ? 0xff3340 : 0x52ff5a, 0, 4.8, 2.2);
     glow.position.copy(position);
     group.add(glow);
 
@@ -1496,7 +1532,7 @@ export class World3D {
     const halo = new THREE.Sprite(haloMat);
     // 相机在 -Z 方向，光晕往相机方向略微偏移，避免被灯箱遮挡形成“方块边缘”
     halo.position.copy(position).add(new THREE.Vector3(0, 0, -0.22));
-    const s = radius * 8;
+    const s = radius * 5.8;
     halo.scale.set(s, s, 1);
     halo.renderOrder = this.config.revealMode === "sequential" ? 5 : 0;
     group.add(halo);
@@ -1514,6 +1550,107 @@ export class World3D {
       lastHaloOpacity: Number.NaN,
       lastHaloScale: Number.NaN
     };
+  }
+
+  private createCountdownLamp(
+    group: THREE.Group,
+    position: THREE.Vector3,
+    radius: number
+  ): CountdownVisual {
+    const offColor = 0x101820;
+    const onColor = 0xffb020;
+
+    const material = new THREE.MeshBasicMaterial({
+      color: offColor,
+      fog: false,
+      transparent: true,
+      opacity: 1
+    });
+
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(radius, 20, 20), material);
+    bulb.position.copy(position);
+    bulb.renderOrder = this.config.revealMode === "sequential" ? 4 : 0;
+    group.add(bulb);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 128;
+    canvas.height = 128;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    this.ownedTextures.push(texture);
+
+    const spriteMat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.NormalBlending,
+      depthWrite: false,
+      depthTest: false,
+      fog: false
+    });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.position.copy(position).add(new THREE.Vector3(0, 0, -0.22));
+    const baseScale = radius * 3.0;
+    sprite.scale.set(baseScale, baseScale, 1);
+    sprite.renderOrder = this.config.revealMode === "sequential" ? 20 : 10;
+    group.add(sprite);
+
+    this.drawCountdownTexture(texture, "");
+
+    return {
+      bulb,
+      sprite,
+      texture,
+      onColor,
+      offColor,
+      baseScale,
+      lastBulbHex: -1,
+      lastBulbOpacity: Number.NaN,
+      lastSpriteOpacity: Number.NaN,
+      lastSpriteScale: Number.NaN,
+      lastText: ""
+    };
+  }
+
+  private drawCountdownTexture(texture: THREE.CanvasTexture, text: string): void {
+    const canvas = texture.image;
+    if (!(canvas instanceof HTMLCanvasElement)) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const size = canvas.width;
+    const center = size / 2;
+
+    ctx.clearRect(0, 0, size, size);
+    if (text.length === 0) {
+      texture.needsUpdate = true;
+      return;
+    }
+
+    ctx.fillStyle = "rgba(8,10,14,1)";
+    ctx.beginPath();
+    ctx.arc(center, center, size * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,190,80,0.9)";
+    ctx.lineWidth = size * 0.055;
+    ctx.beginPath();
+    ctx.arc(center, center, size * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255,247,220,1)";
+    ctx.strokeStyle = "rgba(35,22,0,1)";
+    ctx.lineWidth = size * 0.06;
+    ctx.font = `700 ${Math.floor(size * 0.66)}px "Arial Black", Arial, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeText(text, center, center + size * 0.03);
+    ctx.fillText(text, center, center + size * 0.03);
+
+    texture.needsUpdate = true;
   }
 
   private setLampGroup(
@@ -1547,7 +1684,7 @@ export class World3D {
         lamp.lastBulbOpacity = nextBulbOpacity;
       }
 
-      const nextGlowIntensity = (on ? 1.5 + pulse * 1.2 : 0) * v;
+      const nextGlowIntensity = (on ? 1.0 + pulse * 0.7 : 0) * v;
       if (
         !Number.isFinite(lamp.lastGlowIntensity) ||
         Math.abs(lamp.lastGlowIntensity - nextGlowIntensity) > FLOAT_EPSILON
@@ -1556,7 +1693,7 @@ export class World3D {
         lamp.lastGlowIntensity = nextGlowIntensity;
       }
 
-      const nextHaloOpacity = (on ? 0.88 + pulse : 0) * v;
+      const nextHaloOpacity = (on ? 0.72 + pulse * 0.6 : 0) * v;
       if (
         !Number.isFinite(lamp.lastHaloOpacity) ||
         Math.abs(lamp.lastHaloOpacity - nextHaloOpacity) > FLOAT_EPSILON
@@ -1565,7 +1702,7 @@ export class World3D {
         lamp.lastHaloOpacity = nextHaloOpacity;
       }
 
-      const scale = on ? lamp.haloBaseScale * (1.18 + pulse * 1.2) : lamp.haloBaseScale;
+      const scale = on ? lamp.haloBaseScale * (1.08 + pulse * 0.7) : lamp.haloBaseScale;
       if (!Number.isFinite(lamp.lastHaloScale) || Math.abs(lamp.lastHaloScale - scale) > FLOAT_EPSILON) {
         lamp.halo.scale.set(scale, scale, 1);
         lamp.lastHaloScale = scale;
@@ -1573,18 +1710,86 @@ export class World3D {
     }
   }
 
+  private setCountdownGroup(
+    group: CountdownVisual[],
+    countdown: number | null,
+    nowMs: number,
+    visibility01: number
+  ): void {
+    void nowMs;
+    const active = countdown !== null;
+    const text = active ? String(countdown) : "";
+    const v = THREE.MathUtils.clamp(visibility01, 0, 1);
+
+    for (const lamp of group) {
+      if (lamp.lastText !== text) {
+        this.drawCountdownTexture(lamp.texture, text);
+        lamp.lastText = text;
+      }
+
+      const nextBulbHex = lamp.offColor;
+      if (lamp.lastBulbHex !== nextBulbHex) {
+        lamp.bulb.material.color.setHex(nextBulbHex);
+        lamp.lastBulbHex = nextBulbHex;
+      }
+
+      const nextBulbOpacity =
+        this.config.revealMode === "sequential" && !active
+          ? v * SEQUENTIAL_OFF_BULB_OPACITY_SCALE
+          : v;
+      if (
+        !Number.isFinite(lamp.lastBulbOpacity) ||
+        Math.abs(lamp.lastBulbOpacity - nextBulbOpacity) > FLOAT_EPSILON
+      ) {
+        lamp.bulb.material.opacity = nextBulbOpacity;
+        lamp.lastBulbOpacity = nextBulbOpacity;
+      }
+
+      const nextSpriteOpacity = active ? 1.0 * v : 0;
+      if (
+        !Number.isFinite(lamp.lastSpriteOpacity) ||
+        Math.abs(lamp.lastSpriteOpacity - nextSpriteOpacity) > FLOAT_EPSILON
+      ) {
+        lamp.sprite.material.opacity = nextSpriteOpacity;
+        lamp.lastSpriteOpacity = nextSpriteOpacity;
+      }
+
+      const nextScale = lamp.baseScale;
+      if (
+        !Number.isFinite(lamp.lastSpriteScale) ||
+        Math.abs(lamp.lastSpriteScale - nextScale) > FLOAT_EPSILON
+      ) {
+        lamp.sprite.scale.set(nextScale, nextScale, 1);
+        lamp.lastSpriteScale = nextScale;
+      }
+    }
+  }
+
   private setTrafficLightFadeMaterials(
-    fadeMaterials: Array<{ mat: THREE.MeshStandardMaterial; baseOpacity: number }>,
+    fadeMaterials: Array<{
+      mat: THREE.MeshStandardMaterial;
+      baseOpacity: number;
+      role: "pole" | "body" | "marking";
+    }>,
     visibility01: number
   ): void {
     if (this.config.revealMode !== "sequential") return;
     const v = THREE.MathUtils.clamp(visibility01, 0, 1);
     for (const item of fadeMaterials) {
+      // Keep all parts revealing together; use depth/write and render order to avoid pole bleed-through.
+      const roleVisibility = v;
+
       const baseOpaque = item.baseOpacity >= 0.999;
-      const canUseOpaquePipeline = baseOpaque && v >= 0.999;
-      const nextOpacity = canUseOpaquePipeline ? item.baseOpacity : item.baseOpacity * v;
+      const canUseOpaquePipeline = baseOpaque && roleVisibility >= 0.999;
+      const nextOpacity = canUseOpaquePipeline
+        ? item.baseOpacity
+        : item.baseOpacity * roleVisibility;
       // Start writing depth early to avoid center lane lines blending through the traffic light during fade-in.
-      const nextDepthWrite = baseOpaque ? v >= REVEAL_DEPTH_WRITE_ON : false;
+      const nextDepthWrite = baseOpaque
+        ? item.role === "body"
+          ? roleVisibility >= 0.001
+          : roleVisibility >= REVEAL_DEPTH_WRITE_ON
+        : false;
       const nextTransparent = canUseOpaquePipeline ? false : true;
 
       if (Math.abs(item.mat.opacity - nextOpacity) > FLOAT_EPSILON) item.mat.opacity = nextOpacity;
@@ -1641,6 +1846,20 @@ export class World3D {
     tex.magFilter = THREE.LinearFilter;
     tex.generateMipmaps = false;
     return tex;
+  }
+
+  private getTrafficLightCountdown(state: ExperimentState, index: number): number | null {
+    if (index !== state.lightIndex) return null;
+    if (state.phase !== "waiting_red") return null;
+    if (state.currentLightColor !== "red") return null;
+    if (state.greenAtSec === null) return null;
+
+    const remainSec = state.greenAtSec - state.elapsedSec;
+    if (remainSec <= 0) return null;
+
+    const upper = Math.max(1, Math.ceil(this.config.redWaitSec));
+    const countdown = Math.ceil(remainSec);
+    return THREE.MathUtils.clamp(countdown, 1, upper);
   }
 
   private getTrafficLightColor(state: ExperimentState, index: number): LightColor {
