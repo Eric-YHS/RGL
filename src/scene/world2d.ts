@@ -384,41 +384,39 @@ export class World2D {
     ctx.lineTo(x, hipY);
     ctx.stroke();
 
-    // Arms
-    const armSwing = swing;
-    // Left arm
+    // Arms (opposite to legs: left arm forward when right leg forward)
+    // Left arm swings forward (+swing)
     ctx.beginPath();
     ctx.moveTo(x, shoulderY);
     ctx.lineTo(
-      x - Math.cos(1.2 + armSwing) * armLen,
-      shoulderY + Math.sin(1.2 + armSwing) * armLen
+      x + Math.sin(swing) * armLen,
+      shoulderY + Math.cos(swing) * armLen
     );
     ctx.stroke();
-    // Right arm
+    // Right arm swings opposite (-swing)
     ctx.beginPath();
     ctx.moveTo(x, shoulderY);
     ctx.lineTo(
-      x + Math.cos(1.2 - armSwing) * armLen,
-      shoulderY + Math.sin(1.2 - armSwing) * armLen
+      x + Math.sin(-swing) * armLen,
+      shoulderY + Math.cos(-swing) * armLen
     );
     ctx.stroke();
 
-    // Legs
-    const legSwing = swing;
-    // Left leg
+    // Legs: right leg forward when left arm forward
+    // Left leg swings opposite to left arm
     ctx.beginPath();
     ctx.moveTo(x, hipY);
     ctx.lineTo(
-      x - Math.sin(0.3 + legSwing) * legLen * 0.5,
-      hipY + Math.cos(0.3 + legSwing) * legLen
+      x + Math.sin(-swing) * legLen * 0.5,
+      hipY + Math.cos(-swing) * legLen
     );
     ctx.stroke();
-    // Right leg
+    // Right leg swings opposite to right arm
     ctx.beginPath();
     ctx.moveTo(x, hipY);
     ctx.lineTo(
-      x + Math.sin(0.3 - legSwing) * legLen * 0.5,
-      hipY + Math.cos(0.3 - legSwing) * legLen
+      x + Math.sin(swing) * legLen * 0.5,
+      hipY + Math.cos(swing) * legLen
     );
     ctx.stroke();
 
