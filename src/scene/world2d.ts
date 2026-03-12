@@ -349,18 +349,19 @@ export class World2D {
     const roadTop = this.roadY - this.roadH / 2 - 4; // include sidewalk
     const roadBot = this.roadY + this.roadH / 2 + 4;
 
-    const bands: Array<{ y: number; h: number; color: string }> = [
-      { y: 0, h: roadTop, color: "#ddeef6" },            // sky (bottom of gradient)
-      { y: roadTop, h: roadBot - roadTop, color: "#b0b0a8" }, // road + sidewalk
-      { y: roadBot, h: this.h - roadBot, color: "#c8d8c0" }  // ground
+    // [r,g,b] for each band to build proper transparent→solid gradients
+    const bands: Array<{ y: number; h: number; color: string; rgb: string }> = [
+      { y: 0, h: roadTop, color: "#ddeef6", rgb: "221,238,246" },
+      { y: roadTop, h: roadBot - roadTop, color: "#b0b0a8", rgb: "176,176,168" },
+      { y: roadBot, h: this.h - roadBot, color: "#c8d8c0", rgb: "200,216,192" }
     ];
 
     for (const band of bands) {
-      // Gradient fade zone
+      // Gradient fade zone: from transparent version of the SAME color to solid
       if (fadeRight > fadeLeft) {
         const grad = ctx.createLinearGradient(fadeLeft, 0, fadeRight, 0);
-        grad.addColorStop(0, "rgba(0,0,0,0)"); // transparent
-        grad.addColorStop(1, band.color);       // solid band color
+        grad.addColorStop(0, `rgba(${band.rgb},0)`);
+        grad.addColorStop(1, `rgba(${band.rgb},1)`);
         ctx.fillStyle = grad;
         ctx.fillRect(fadeLeft, band.y, fadeRight - fadeLeft, band.h);
       }
