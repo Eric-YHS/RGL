@@ -53,6 +53,7 @@ export class World2D {
   private lightXs: number[] = [];
   private lightPositions01: number[] = []; // normalized [0,1] positions of lights on route
   private figH = 0;
+  private lastAvatarX = -1; // track movement to decide walk animation
 
   /* Fog parameters for sequential mode */
   private readonly fogLeadPx = 0.12; // how far ahead of avatar (as fraction of road width) is clear
@@ -155,7 +156,8 @@ export class World2D {
       const lightX = this.lightXs[state.lightIndex - 1];
       avatarX = Math.min(avatarX, lightX - stopOffset);
     }
-    this.drawStickFigure(ctx, avatarX, state.phase, nowMs);
+    this.drawStickFigure(ctx, avatarX, state.phase, nowMs, avatarX !== this.lastAvatarX);
+    this.lastAvatarX = avatarX;
 
     // Fog overlay for sequential mode (drawn after scene, before money overlay)
     if (this.config.revealMode === "sequential") {
@@ -357,12 +359,13 @@ export class World2D {
   private drawStickFigure(
     ctx: CanvasRenderingContext2D,
     x: number,
-    phase: Phase,
-    nowMs: number
+    _phase: Phase,
+    nowMs: number,
+    isActuallyMoving: boolean
   ): void {
     const h = this.figH;
     const headR = h * 0.12;
-    const neckY = this.roadY + this.roadH / 2 + 8; // stand on south sidewalk
+    const neckY = this.roadY + this.roadH / 2 + 8;
     const headCY = neckY - h + headR;
     const shoulderY = headCY + headR + h * 0.06;
     const hipY = shoulderY + h * 0.35;
@@ -370,13 +373,11 @@ export class World2D {
     const armLen = h * 0.25;
     const legLen = footY - hipY;
 
-    const isWalking = phase === "moving";
-    // swing: positive = forward (right on screen), negative = backward (left)
-    const swing = isWalking ? Math.sin(nowMs * 0.008) : 0;
+    // Static spread so limbs are always visible (even when standing still)
+    const spread = 6; // pixels outward for each side
 
-    // Horizontal displacement for limbs
-    const armDx = swing * armLen * 0.7;  // how far the hand swings forward/back
-    const legDx = swing * legLen * 0.45; // how far the foot swings forward/back
+    // Walk animation: extra horizontal displacement on top of spread
+    const walkDx = isActuallyMoving ? Math.sin(nowMs * 0.008) * armLen * 0.6 : 0;
 
     ctx.save();
     ctx.strokeStyle = "#1a1a1a";
@@ -389,34 +390,34 @@ export class World2D {
     ctx.arc(x, headCY, headR, 0, Math.PI * 2);
     ctx.fill();
 
-    // Body (neck to hip)
+    // Body
     ctx.beginPath();
     ctx.moveTo(x, shoulderY);
     ctx.lineTo(x, hipY);
     ctx.stroke();
 
-    // Left arm swings opposite to right leg (contralateral gait)
+    // Left arm: base spread left + walk swing
     ctx.beginPath();
     ctx.moveTo(x, shoulderY);
-    ctx.lineTo(x + armDx, shoulderY + armLen * 0.85);
+    ctx.lineTo(x - spread + walkDx, shoulderY + armLen * 0.85);
     ctx.stroke();
 
-    // Right arm swings opposite direction
+    // Right arm: base spread right - walk swing (contralateral)
     ctx.beginPath();
     ctx.moveTo(x, shoulderY);
-    ctx.lineTo(x - armDx, shoulderY + armLen * 0.85);
+    ctx.lineTo(x + spread - walkDx, shoulderY + armLen * 0.85);
     ctx.stroke();
 
-    // Left leg: opposite to left arm (same direction as right arm)
+    // Left leg: base spread left - walk swing (opposite to left arm)
     ctx.beginPath();
     ctx.moveTo(x, hipY);
-    ctx.lineTo(x - legDx, hipY + legLen * 0.95);
+    ctx.lineTo(x - spread - walkDx, hipY + legLen * 0.95);
     ctx.stroke();
 
-    // Right leg: opposite to right arm (same direction as left arm)
+    // Right leg: base spread right + walk swing (opposite to right arm)
     ctx.beginPath();
     ctx.moveTo(x, hipY);
-    ctx.lineTo(x + legDx, hipY + legLen * 0.95);
+    ctx.lineTo(x + spread + walkDx, hipY + legLen * 0.95);
     ctx.stroke();
 
     ctx.restore();
