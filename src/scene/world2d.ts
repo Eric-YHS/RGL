@@ -146,12 +146,14 @@ export class World2D {
       this.drawTrafficLight(ctx, x, color, "top", nowMs);
     }
 
-    // Stick figure — offset left of light when waiting so it doesn't overlap/pass the light
+    // Stick figure — always stop just left of the current target light
     const roadW = this.roadRight - this.roadLeft;
+    const stopOffset = 28; // pixels before the light pole
     let avatarX = this.roadLeft + roadW * progress01;
-    if (state.phase === "waiting_red" && state.lightIndex >= 1 && state.lightIndex <= this.config.numLights) {
+    if (state.phase !== "idle" && state.phase !== "finished" &&
+        state.lightIndex >= 1 && state.lightIndex <= this.config.numLights) {
       const lightX = this.lightXs[state.lightIndex - 1];
-      avatarX = lightX - 28; // stand just before the traffic light
+      avatarX = Math.min(avatarX, lightX - stopOffset);
     }
     this.drawStickFigure(ctx, avatarX, state.phase, nowMs);
 
@@ -369,9 +371,12 @@ export class World2D {
     const legLen = footY - hipY;
 
     const isWalking = phase === "moving";
-    const swing = isWalking ? Math.sin(nowMs * 0.0085) * 0.6 : 0;
-    // Static splay so limbs are visible even when standing
-    const splay = 0.25;
+    // swing: positive = forward (right on screen), negative = backward (left)
+    const swing = isWalking ? Math.sin(nowMs * 0.008) : 0;
+
+    // Horizontal displacement for limbs
+    const armDx = swing * armLen * 0.7;  // how far the hand swings forward/back
+    const legDx = swing * legLen * 0.45; // how far the foot swings forward/back
 
     ctx.save();
     ctx.strokeStyle = "#1a1a1a";
@@ -390,40 +395,28 @@ export class World2D {
     ctx.lineTo(x, hipY);
     ctx.stroke();
 
-    // Arms (opposite to legs: left arm forward when right leg forward)
-    // Left arm
+    // Left arm swings opposite to right leg (contralateral gait)
     ctx.beginPath();
     ctx.moveTo(x, shoulderY);
-    ctx.lineTo(
-      x - Math.sin(splay - swing) * armLen,
-      shoulderY + Math.cos(splay - swing) * armLen
-    );
-    ctx.stroke();
-    // Right arm
-    ctx.beginPath();
-    ctx.moveTo(x, shoulderY);
-    ctx.lineTo(
-      x + Math.sin(splay + swing) * armLen,
-      shoulderY + Math.cos(splay + swing) * armLen
-    );
+    ctx.lineTo(x + armDx, shoulderY + armLen * 0.85);
     ctx.stroke();
 
-    // Legs (contralateral to arms)
-    // Left leg
+    // Right arm swings opposite direction
     ctx.beginPath();
-    ctx.moveTo(x, hipY);
-    ctx.lineTo(
-      x - Math.sin(splay + swing) * legLen * 0.5,
-      hipY + Math.cos(splay + swing) * legLen
-    );
+    ctx.moveTo(x, shoulderY);
+    ctx.lineTo(x - armDx, shoulderY + armLen * 0.85);
     ctx.stroke();
-    // Right leg
+
+    // Left leg: opposite to left arm (same direction as right arm)
     ctx.beginPath();
     ctx.moveTo(x, hipY);
-    ctx.lineTo(
-      x + Math.sin(splay - swing) * legLen * 0.5,
-      hipY + Math.cos(splay - swing) * legLen
-    );
+    ctx.lineTo(x - legDx, hipY + legLen * 0.95);
+    ctx.stroke();
+
+    // Right leg: opposite to right arm (same direction as left arm)
+    ctx.beginPath();
+    ctx.moveTo(x, hipY);
+    ctx.lineTo(x + legDx, hipY + legLen * 0.95);
     ctx.stroke();
 
     ctx.restore();
