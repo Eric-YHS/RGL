@@ -5,7 +5,7 @@ import { ExperimentEngine } from "./experiment/engine";
 import type { ClientDeviceInfo, SessionSubmission } from "./experiment/logger";
 import { ExperimentLogger } from "./experiment/logger";
 import { formatMoney, formatSeconds } from "./experiment/utils";
-import { World3D } from "./scene/world3d";
+import { World2D } from "./scene/world2d";
 
 type RunKind = "practice" | "formal";
 type SubmitOutcome = "sent" | "queued";
@@ -198,15 +198,6 @@ app.innerHTML = `
           <div class="row" id="lightRow" style="display:none;"><div class="label">信号灯</div><div class="value" id="lightText">—</div></div>
         </div>
 
-        <div class="panel panel-minimap" id="minimapPanel" style="display:none;">
-          <div class="panel-head">
-            <div class="panel-title panel-title-sm">小地图</div>
-            <div class="hint">总览路线</div>
-          </div>
-          <div class="minimap minimap-box">
-            <canvas id="minimap"></canvas>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -230,8 +221,6 @@ const els = {
   moneyText: document.querySelector<HTMLDivElement>("#moneyText")!,
   lightText: document.querySelector<HTMLDivElement>("#lightText")!,
   lightRow: document.querySelector<HTMLDivElement>("#lightRow")!,
-  minimapPanel: document.querySelector<HTMLDivElement>("#minimapPanel")!,
-  minimap: document.querySelector<HTMLCanvasElement>("#minimap")!,
   modal: document.querySelector<HTMLDivElement>("#modal")!,
   modalCard: document.querySelector<HTMLDivElement>("#modalCard")!
 };
@@ -240,17 +229,12 @@ let runKind: RunKind = "practice";
 let currentConfig: ExperimentConfig = practiceConfig;
 let logger: ExperimentLogger = createLogger(currentConfig, runKind);
 let engine: ExperimentEngine = new ExperimentEngine(currentConfig, logger);
-let world: World3D | null = null;
+let world: World2D | null = null;
 let formalClientSessionId = createClientSessionId();
 let formalSubmission: SessionSubmission | null = null;
 
 function updateTopHints(): void {
   els.runHint.textContent = runKind === "practice" ? "练习" : "正式实验";
-}
-
-function updateMinimapVisibility(): void {
-  els.minimapPanel.style.display =
-    currentConfig.revealMode === "full" ? "block" : "none";
 }
 
 function openModal(html: string): void {
@@ -270,11 +254,10 @@ function switchRun(next: RunKind): void {
   formalClientSessionId = createClientSessionId();
   formalSubmission = null;
   world?.dispose();
-  world = new World3D(els.canvas, currentConfig);
+  world = new World2D(els.canvas, currentConfig);
   lastPhase = engine.state.phase;
   finishGate = false;
   updateTopHints();
-  updateMinimapVisibility();
 }
 
 function buildFormalSubmission(): SessionSubmission {
@@ -291,34 +274,6 @@ function buildFormalSubmission(): SessionSubmission {
     },
     device: collectDeviceInfo()
   });
-}
-
-function setRevealMode(mode: RevealMode): void {
-  formalConfig = makeConfig(mode, 5);
-  practiceConfig = makeConfig(mode, 2);
-  switchRun("practice");
-}
-
-function showRevealModeSelect(): void {
-  openModal(`
-    <h1>请选择呈现方式</h1>
-    <p class="hint">请在开始前选择一种呈现方式（本次任务中将保持不变）。</p>
-    <div class="actions" style="flex-direction:column; align-items:stretch; gap:12px;">
-      <button class="btn primary" id="btnRevealFull">全呈现（显示小地图）</button>
-      <button class="btn" id="btnRevealSequential">逐个呈现（雾中渐显）</button>
-    </div>
-  `);
-
-  document.querySelector<HTMLButtonElement>("#btnRevealFull")?.addEventListener("click", () => {
-    setRevealMode("full");
-    showPracticeIntro();
-  });
-  document
-    .querySelector<HTMLButtonElement>("#btnRevealSequential")
-    ?.addEventListener("click", () => {
-      setRevealMode("sequential");
-      showPracticeIntro();
-    });
 }
 
 function showPracticeIntro(): void {
@@ -594,10 +549,6 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-const minimapCtx = els.minimap.getContext("2d");
-const minimapBase = document.createElement("canvas");
-const minimapBaseCtx = minimapBase.getContext("2d");
-let minimapBaseKey = "";
 let lastPhase: typeof engine.state.phase = engine.state.phase;
 let finishGate = false;
 
@@ -614,9 +565,9 @@ const hudCache = {
 };
 
 updateTopHints();
-updateMinimapVisibility();
 void flushPendingSubmissions();
-showRevealModeSelect();
+switchRun("practice");
+showPracticeIntro();
 
 window.addEventListener("online", () => {
   void flushPendingSubmissions();
@@ -646,10 +597,8 @@ function updateHud(): void {
   if (s.phase !== "idle") {
     if (s.phase === "finished") {
       posText = "已完成";
-    } else if (currentConfig.revealMode === "full") {
-      posText = `交通信号灯${s.lightIndex}（${s.lightIndex}/${currentConfig.numLights}）`;
     } else {
-      posText = s.phase === "moving" ? "非交通信号灯" : "交通信号灯";
+      posText = `交通信号灯${s.lightIndex}（${s.lightIndex}/${currentConfig.numLights}）`;
     }
     timeText = formatSeconds(s.elapsedSec, 1);
     moneyText = formatMoney(s.money);
@@ -697,100 +646,6 @@ function updateHud(): void {
   }
 }
 
-function drawMinimap(): void {
-  if (!minimapCtx) return;
-  const w = els.minimap.width;
-  const h = els.minimap.height;
-
-  const dpr = window.devicePixelRatio || 1;
-  const cssW = Math.round(els.minimap.clientWidth);
-  const cssH = Math.round(els.minimap.clientHeight);
-  if (cssW <= 0 || cssH <= 0) return;
-  const targetW = Math.round(cssW * dpr);
-  const targetH = Math.round(cssH * dpr);
-  if (w !== targetW || h !== targetH) {
-    els.minimap.width = targetW;
-    els.minimap.height = targetH;
-  }
-
-  const pad = Math.max(10 * dpr, Math.min(14 * dpr, targetW * 0.09));
-  const x0 = pad;
-  const x1 = els.minimap.width - pad;
-  const y = els.minimap.height / 2;
-
-  const nextBaseKey = `${targetW}x${targetH}`;
-  if (minimapBaseCtx && minimapBaseKey !== nextBaseKey) {
-    minimapBase.width = targetW;
-    minimapBase.height = targetH;
-    minimapBaseCtx.clearRect(0, 0, targetW, targetH);
-    minimapBaseCtx.strokeStyle = "rgba(255,255,255,0.12)";
-    minimapBaseCtx.lineWidth = 3 * dpr;
-    minimapBaseCtx.lineCap = "round";
-    minimapBaseCtx.beginPath();
-    minimapBaseCtx.moveTo(x0, y);
-    minimapBaseCtx.lineTo(x1, y);
-    minimapBaseCtx.stroke();
-    minimapBaseCtx.fillStyle = "rgba(255,255,255,0.35)";
-    minimapBaseCtx.beginPath();
-    minimapBaseCtx.arc(x0, y, 3 * dpr, 0, Math.PI * 2);
-    minimapBaseCtx.fill();
-    minimapBaseCtx.fillStyle = "rgba(255,255,255,0.35)";
-    minimapBaseCtx.fillRect(x1 - 1 * dpr, y - 8 * dpr, 2 * dpr, 16 * dpr);
-    minimapBaseCtx.fillStyle = "rgba(0,194,255,0.45)";
-    minimapBaseCtx.fillRect(x1 + 1 * dpr, y - 8 * dpr, 6 * dpr, 5 * dpr);
-    minimapBaseKey = nextBaseKey;
-  }
-
-  minimapCtx.clearRect(0, 0, els.minimap.width, els.minimap.height);
-  if (minimapBaseKey === nextBaseKey) {
-    minimapCtx.drawImage(minimapBase, 0, 0);
-  }
-
-  const p = engine.getRouteProgress01();
-  const px = x0 + (x1 - x0) * p;
-  const progressGrad = minimapCtx.createLinearGradient(x0, 0, px, 0);
-  progressGrad.addColorStop(0, "rgba(0,194,255,0.15)");
-  progressGrad.addColorStop(1, "rgba(0,194,255,0.55)");
-  minimapCtx.strokeStyle = progressGrad;
-  minimapCtx.lineWidth = 3 * dpr;
-  minimapCtx.beginPath();
-  minimapCtx.moveTo(x0, y);
-  minimapCtx.lineTo(px, y);
-  minimapCtx.stroke();
-
-  // lights
-  const n = currentConfig.numLights;
-  const s = engine.state;
-  for (let i = 1; i <= n; i++) {
-    const t = i / n;
-    const lx = x0 + (x1 - x0) * t;
-    // Determine color: passed lights are green, upcoming are red
-    let dotColor = "rgba(255,255,255,0.45)";
-    if (s.phase !== "idle") {
-      if (i < s.lightIndex) {
-        dotColor = "rgba(82,196,26,0.8)";
-      } else if (i === s.lightIndex && s.phase === "waiting_red") {
-        dotColor = s.currentLightColor === "red" ? "rgba(255,77,79,0.9)" : "rgba(82,196,26,0.9)";
-      } else {
-        dotColor = "rgba(255,77,79,0.55)";
-      }
-    }
-    minimapCtx.fillStyle = dotColor;
-    minimapCtx.beginPath();
-    minimapCtx.arc(lx, y, 4.2 * dpr, 0, Math.PI * 2);
-    minimapCtx.fill();
-  }
-
-  // avatar marker with glow
-  minimapCtx.shadowColor = "rgba(0,194,255,0.6)";
-  minimapCtx.shadowBlur = 8 * dpr;
-  minimapCtx.fillStyle = "rgba(0,194,255,0.95)";
-  minimapCtx.beginPath();
-  minimapCtx.arc(px, y, 6.2 * dpr, 0, Math.PI * 2);
-  minimapCtx.fill();
-  minimapCtx.shadowColor = "transparent";
-  minimapCtx.shadowBlur = 0;
-}
 
 function loop(): void {
   const nowMs = performance.now();
@@ -798,7 +653,6 @@ function loop(): void {
 
   world?.render(engine.state, engine.getRouteProgress01(), nowMs);
   updateHud();
-  if (currentConfig.revealMode === "full" && world) drawMinimap();
 
   if (!finishGate && lastPhase !== engine.state.phase) {
     lastPhase = engine.state.phase;

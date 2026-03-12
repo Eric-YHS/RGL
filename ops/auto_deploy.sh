@@ -3,7 +3,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/honglvdeng}"
 REMOTE="${REMOTE:-origin}"
-BRANCH="${BRANCH:-前后端}"
+BRANCH="${BRANCH:-2D}"
 LOCK_FILE="${LOCK_FILE:-/tmp/honglvdeng-auto-deploy.lock}"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"

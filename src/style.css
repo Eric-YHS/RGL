@@ -12,8 +12,6 @@
   --hud-offset-top: 14px;
   --hud-offset-side: 14px;
   --walk-bottom: 26px;
-  --minimap-w: 220px;
-  --minimap-h: 130px;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
     Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
     "Noto Sans SC", sans-serif;
@@ -50,7 +48,7 @@ canvas.webgl {
   width: 100%;
   height: 100%;
   display: block;
-  background: radial-gradient(1200px 800px at 20% 20%, #9fc2dc 0%, #8aacc8 60%, #7a9cb8 100%);
+  background: #87CEEB;
 }
 
 .hud {
@@ -107,9 +105,6 @@ canvas.webgl {
   line-height: 1.25;
 }
 
-.panel-minimap .minimap-box {
-  margin-top: 10px;
-}
 
 .hud .left > .panel:nth-child(1) { animation-delay: 0s; }
 .hud .left > .panel:nth-child(2) { animation-delay: 0.08s; }
@@ -385,20 +380,6 @@ canvas.webgl {
   font-size: 12px;
 }
 
-.minimap {
-  width: var(--minimap-w);
-  height: var(--minimap-h);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  overflow: hidden;
-}
-
-.minimap canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
 
 /* ---------- Scrollbar 暗色美化 ---------- */
 .card::-webkit-scrollbar {
@@ -478,8 +459,6 @@ canvas.webgl {
     --hud-offset-top: 6px;
     --hud-offset-side: 6px;
     --walk-bottom: 14px;
-    --minimap-w: min(48vw, 160px);
-    --minimap-h: clamp(56px, 8.5vh, 72px);
   }
 
   .hud {
@@ -529,9 +508,6 @@ canvas.webgl {
     line-height: 1.2;
   }
 
-  .panel-minimap .minimap-box {
-    margin-top: 6px;
-  }
 
   .center-controls .btn {
     min-width: 170px;
