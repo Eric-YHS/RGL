@@ -368,10 +368,10 @@ export class World2D {
   private computeAvatarX(state: ExperimentState, _progress01: number, stopOffset: number): number {
     if (state.phase === "idle") return this.roadLeft;
 
-    // When finished, stay just past the last light (don't jump to road end)
+    // When finished, stay at the last waiting position (no jump)
     if (state.phase === "finished") {
       const lastLightX = this.lightXs[this.lightXs.length - 1];
-      return lastLightX + stopOffset;
+      return lastLightX - stopOffset;
     }
 
     const idx = state.lightIndex; // 1-based, current target light
