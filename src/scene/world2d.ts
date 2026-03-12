@@ -365,10 +365,11 @@ export class World2D {
     // The stop point just before target light
     const toX = targetLightX - stopOffset;
 
-    // Departure point: road start, or just past the previous light
+    // Departure point: road start, or the stop position at the previous light
+    // (must match where the avatar was standing when waiting_red)
     const fromX = idx <= 1
       ? this.roadLeft
-      : this.lightXs[idx - 2] + stopOffset;
+      : this.lightXs[idx - 2] - stopOffset;
 
     // segmentFraction: 0 at segment start, 1 when arrived at light
     const segFrac = state.phase === "moving"
