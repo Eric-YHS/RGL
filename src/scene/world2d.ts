@@ -335,30 +335,44 @@ export class World2D {
     // Fog fully opaque starts after the fade zone
     const fogSolidX = clearEndX + roadW * this.fogFadePx;
 
-    // Draw fog: a gradient from transparent to white, then solid white to the right edge
-    if (fogSolidX < this.w) {
-      ctx.save();
+    if (fogSolidX >= this.w) return;
 
+    ctx.save();
+
+    const fadeLeft = Math.max(0, clearEndX);
+    const fadeRight = Math.min(this.w, fogSolidX);
+
+    // Repaint background bands over the fogged area to fully hide scene elements.
+    // We draw three horizontal strips (sky, road area, ground) with horizontal
+    // alpha gradients so the transition is smooth.
+
+    const roadTop = this.roadY - this.roadH / 2 - 4; // include sidewalk
+    const roadBot = this.roadY + this.roadH / 2 + 4;
+
+    const bands: Array<{ y: number; h: number; color: string }> = [
+      { y: 0, h: roadTop, color: "#ddeef6" },            // sky (bottom of gradient)
+      { y: roadTop, h: roadBot - roadTop, color: "#b0b0a8" }, // road + sidewalk
+      { y: roadBot, h: this.h - roadBot, color: "#c8d8c0" }  // ground
+    ];
+
+    for (const band of bands) {
       // Gradient fade zone
-      const fadeLeft = Math.max(0, clearEndX);
-      const fadeRight = Math.min(this.w, fogSolidX);
-
       if (fadeRight > fadeLeft) {
-        const fogGrad = ctx.createLinearGradient(fadeLeft, 0, fadeRight, 0);
-        fogGrad.addColorStop(0, "rgba(210,225,235,0)");
-        fogGrad.addColorStop(1, "rgba(210,225,235,0.92)");
-        ctx.fillStyle = fogGrad;
-        ctx.fillRect(fadeLeft, 0, fadeRight - fadeLeft, this.h);
+        const grad = ctx.createLinearGradient(fadeLeft, 0, fadeRight, 0);
+        grad.addColorStop(0, "rgba(0,0,0,0)"); // transparent
+        grad.addColorStop(1, band.color);       // solid band color
+        ctx.fillStyle = grad;
+        ctx.fillRect(fadeLeft, band.y, fadeRight - fadeLeft, band.h);
       }
 
-      // Solid fog from fadeRight to canvas edge
+      // Solid fog: fully repaint background from fadeRight to canvas edge
       if (fadeRight < this.w) {
-        ctx.fillStyle = "rgba(210,225,235,0.92)";
-        ctx.fillRect(fadeRight, 0, this.w - fadeRight, this.h);
+        ctx.fillStyle = band.color;
+        ctx.fillRect(fadeRight, band.y, this.w - fadeRight, band.h);
       }
-
-      ctx.restore();
     }
+
+    ctx.restore();
   }
 
   /* ------------------------------------------------------------------ */
