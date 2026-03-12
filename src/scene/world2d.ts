@@ -21,8 +21,8 @@ function generateUnevenPositions(numLights: number, seed = 42): number[] {
   // Generate random segment lengths, then normalize
   const raw: number[] = [];
   for (let i = 0; i <= numLights; i++) {
-    // Each segment between 0.6 and 1.4 relative weight
-    raw.push(0.6 + rng() * 0.8);
+    // Each segment between 0.3 and 1.7 relative weight (wide variance)
+    raw.push(0.3 + rng() * 1.4);
   }
   const total = raw.reduce((a, b) => a + b, 0);
   // Cumulative positions for lights (after each segment except the last)
@@ -57,8 +57,8 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
 
   /* Fog parameters for sequential mode */
-  private readonly fogLeadPx = 0.12; // how far ahead of avatar (as fraction of road width) is clear
-  private readonly fogFadePx = 0.08; // fade zone width as fraction of road width
+  private readonly fogLeadPx = 0.03; // how far ahead of avatar (as fraction of road width) is clear
+  private readonly fogFadePx = 0.04; // fade zone width as fraction of road width
 
   constructor(canvas: HTMLCanvasElement, config: ExperimentConfig) {
     this.canvas = canvas;
