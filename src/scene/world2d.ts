@@ -1,5 +1,40 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
 
+/* Deterministic PRNG (mulberry32) for reproducible uneven spacing */
+function mulberry32(seed: number): () => number {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Generate uneven spacing ratios for sequential mode.
+ * Returns cumulative positions in [0,1] for each light.
+ * Uses a fixed seed so every participant gets the same layout.
+ */
+function generateUnevenPositions(numLights: number, seed = 42): number[] {
+  const rng = mulberry32(seed);
+  // Generate random segment lengths, then normalize
+  const raw: number[] = [];
+  for (let i = 0; i <= numLights; i++) {
+    // Each segment between 0.6 and 1.4 relative weight
+    raw.push(0.6 + rng() * 0.8);
+  }
+  const total = raw.reduce((a, b) => a + b, 0);
+  // Cumulative positions for lights (after each segment except the last)
+  const positions: number[] = [];
+  let cum = 0;
+  for (let i = 0; i < numLights; i++) {
+    cum += raw[i] / total;
+    positions.push(cum);
+  }
+  return positions;
+}
+
 export class World2D {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -16,7 +51,12 @@ export class World2D {
   private roadLeft = 0;
   private roadRight = 0;
   private lightXs: number[] = [];
+  private lightPositions01: number[] = []; // normalized [0,1] positions of lights on route
   private figH = 0;
+
+  /* Fog parameters for sequential mode */
+  private readonly fogLeadPx = 0.12; // how far ahead of avatar (as fraction of road width) is clear
+  private readonly fogFadePx = 0.08; // fade zone width as fraction of road width
 
   constructor(canvas: HTMLCanvasElement, config: ExperimentConfig) {
     this.canvas = canvas;
@@ -53,10 +93,21 @@ export class World2D {
     this.roadRight = this.w * 0.92;
 
     const n = this.config.numLights;
-    this.lightXs = [];
-    for (let i = 1; i <= n; i++) {
-      this.lightXs.push(this.roadLeft + ((this.roadRight - this.roadLeft) * i) / (n + 1));
+    const isSequential = this.config.revealMode === "sequential";
+
+    if (isSequential) {
+      // Uneven spacing with fixed seed
+      this.lightPositions01 = generateUnevenPositions(n);
+    } else {
+      // Even spacing
+      this.lightPositions01 = [];
+      for (let i = 1; i <= n; i++) {
+        this.lightPositions01.push(i / (n + 1));
+      }
     }
+
+    const roadW = this.roadRight - this.roadLeft;
+    this.lightXs = this.lightPositions01.map((p) => this.roadLeft + roadW * p);
 
     this.figH = Math.min(70, this.h * 0.12);
   }
@@ -100,7 +151,12 @@ export class World2D {
     const avatarX = this.roadLeft + (this.roadRight - this.roadLeft) * progress01;
     this.drawStickFigure(ctx, avatarX, state.phase, nowMs);
 
-    // Prominent money overlay
+    // Fog overlay for sequential mode (drawn after scene, before money overlay)
+    if (this.config.revealMode === "sequential") {
+      this.drawFog(ctx, progress01);
+    }
+
+    // Prominent money overlay (always on top)
     this.drawMoneyOverlay(ctx, state.money, this.config.startMoney, nowMs, state.phase);
 
     ctx.restore();
@@ -216,9 +272,9 @@ export class World2D {
     const pulse = 0.7 + 0.3 * Math.abs(Math.sin(nowMs * 0.005));
 
     // Red bulb
-    this.drawBulb(ctx, cx, redCY, bulbR, color === "red", "#ff4d4f", "#4a2020", pulse, nowMs);
+    this.drawBulb(ctx, cx, redCY, bulbR, color === "red", "#ff4d4f", "#4a2020", pulse);
     // Green bulb
-    this.drawBulb(ctx, cx, greenCY, bulbR, color === "green", "#52c41a", "#1e3a1f", pulse, nowMs);
+    this.drawBulb(ctx, cx, greenCY, bulbR, color === "green", "#52c41a", "#1e3a1f", pulse);
   }
 
   private drawBulb(
@@ -229,8 +285,7 @@ export class World2D {
     active: boolean,
     onColor: string,
     offColor: string,
-    pulse: number,
-    _nowMs: number
+    pulse: number
   ): void {
     ctx.save();
     if (active) {
@@ -248,6 +303,45 @@ export class World2D {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Fog (sequential mode)                                              */
+  /* ------------------------------------------------------------------ */
+
+  private drawFog(ctx: CanvasRenderingContext2D, progress01: number): void {
+    const roadW = this.roadRight - this.roadLeft;
+    const avatarX = this.roadLeft + roadW * progress01;
+
+    // Clear zone ends a bit ahead of the avatar
+    const clearEndX = avatarX + roadW * this.fogLeadPx;
+    // Fog fully opaque starts after the fade zone
+    const fogSolidX = clearEndX + roadW * this.fogFadePx;
+
+    // Draw fog: a gradient from transparent to white, then solid white to the right edge
+    if (fogSolidX < this.w) {
+      ctx.save();
+
+      // Gradient fade zone
+      const fadeLeft = Math.max(0, clearEndX);
+      const fadeRight = Math.min(this.w, fogSolidX);
+
+      if (fadeRight > fadeLeft) {
+        const fogGrad = ctx.createLinearGradient(fadeLeft, 0, fadeRight, 0);
+        fogGrad.addColorStop(0, "rgba(210,225,235,0)");
+        fogGrad.addColorStop(1, "rgba(210,225,235,0.92)");
+        ctx.fillStyle = fogGrad;
+        ctx.fillRect(fadeLeft, 0, fadeRight - fadeLeft, this.h);
+      }
+
+      // Solid fog from fadeRight to canvas edge
+      if (fadeRight < this.w) {
+        ctx.fillStyle = "rgba(210,225,235,0.92)";
+        ctx.fillRect(fadeRight, 0, this.w - fadeRight, this.h);
+      }
+
+      ctx.restore();
+    }
   }
 
   /* ------------------------------------------------------------------ */
