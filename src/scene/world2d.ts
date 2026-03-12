@@ -147,15 +147,9 @@ export class World2D {
       this.drawTrafficLight(ctx, x, color, "top", nowMs);
     }
 
-    // Stick figure — always stop just left of the current target light
-    const roadW = this.roadRight - this.roadLeft;
+    // Stick figure — interpolate between actual light X positions
     const stopOffset = 28; // pixels before the light pole
-    let avatarX = this.roadLeft + roadW * progress01;
-    if (state.phase !== "idle" && state.phase !== "finished" &&
-        state.lightIndex >= 1 && state.lightIndex <= this.config.numLights) {
-      const lightX = this.lightXs[state.lightIndex - 1];
-      avatarX = Math.min(avatarX, lightX - stopOffset);
-    }
+    let avatarX = this.computeAvatarX(state, progress01, stopOffset);
     this.drawStickFigure(ctx, avatarX, state.phase, nowMs, avatarX !== this.lastAvatarX);
     this.lastAvatarX = avatarX;
 
@@ -350,6 +344,31 @@ export class World2D {
 
       ctx.restore();
     }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Avatar position                                                    */
+  /* ------------------------------------------------------------------ */
+
+  private computeAvatarX(state: ExperimentState, _progress01: number, stopOffset: number): number {
+    if (state.phase === "idle") return this.roadLeft;
+    if (state.phase === "finished") return this.roadRight;
+
+    const idx = state.lightIndex; // 1-based, current target light
+    const targetLightX = this.lightXs[idx - 1];
+    // Previous anchor: start of road or previous light
+    const prevX = idx <= 1 ? this.roadLeft : this.lightXs[idx - 2];
+
+    // segmentFraction: 0 at segment start, 1 when arrived at light
+    const segFrac = state.phase === "moving"
+      ? state.segmentProgressSec / this.config.segmentDurationSec
+      : 1;
+
+    // Interpolate from previous light (or road start) to just before current light
+    const fromX = idx <= 1 ? prevX : prevX + stopOffset; // depart from just past previous light
+    const toX = targetLightX - stopOffset; // arrive just before current light
+
+    return fromX + (toX - fromX) * Math.min(1, segFrac);
   }
 
   /* ------------------------------------------------------------------ */
