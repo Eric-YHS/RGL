@@ -54,6 +54,7 @@ export class World2D {
   private lightPositions01: number[] = []; // normalized [0,1] positions of lights on route
   private figH = 0;
   private lastAvatarX = -1; // track movement to decide walk animation
+  private smoothAvatarX = -1; // smoothed position to prevent jumps
 
   /* Fog parameters for sequential mode */
   private readonly fogLeadPx = 0.12; // how far ahead of avatar (as fraction of road width) is clear
@@ -149,7 +150,21 @@ export class World2D {
 
     // Stick figure — interpolate between actual light X positions
     const stopOffset = 28; // pixels before the light pole
-    let avatarX = this.computeAvatarX(state, progress01, stopOffset);
+    const targetX = this.computeAvatarX(state, progress01, stopOffset);
+
+    // Smooth movement: limit max jump per frame to prevent teleporting
+    const maxStepPx = 8; // max pixels per frame (~480px/sec at 60fps)
+    if (this.smoothAvatarX < 0) {
+      this.smoothAvatarX = targetX; // first frame
+    } else if (Math.abs(targetX - this.smoothAvatarX) > maxStepPx) {
+      // Move toward target at max speed
+      this.smoothAvatarX += Math.sign(targetX - this.smoothAvatarX) * maxStepPx;
+    } else {
+      this.smoothAvatarX = targetX;
+    }
+    if (state.phase === "idle") this.smoothAvatarX = targetX; // reset on idle
+
+    const avatarX = this.smoothAvatarX;
     this.drawStickFigure(ctx, avatarX, state.phase, nowMs, avatarX !== this.lastAvatarX);
     this.lastAvatarX = avatarX;
 
