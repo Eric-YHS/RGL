@@ -352,23 +352,30 @@ export class World2D {
 
   private computeAvatarX(state: ExperimentState, _progress01: number, stopOffset: number): number {
     if (state.phase === "idle") return this.roadLeft;
-    if (state.phase === "finished") return this.roadRight;
+
+    // When finished, stay just past the last light (don't jump to road end)
+    if (state.phase === "finished") {
+      const lastLightX = this.lightXs[this.lightXs.length - 1];
+      return lastLightX + stopOffset;
+    }
 
     const idx = state.lightIndex; // 1-based, current target light
     const targetLightX = this.lightXs[idx - 1];
-    // Previous anchor: start of road or previous light
-    const prevX = idx <= 1 ? this.roadLeft : this.lightXs[idx - 2];
+
+    // The stop point just before target light
+    const toX = targetLightX - stopOffset;
+
+    // Departure point: road start, or just past the previous light
+    const fromX = idx <= 1
+      ? this.roadLeft
+      : this.lightXs[idx - 2] + stopOffset;
 
     // segmentFraction: 0 at segment start, 1 when arrived at light
     const segFrac = state.phase === "moving"
-      ? state.segmentProgressSec / this.config.segmentDurationSec
-      : 1;
+      ? Math.min(1, state.segmentProgressSec / this.config.segmentDurationSec)
+      : 1; // waiting_red: fully arrived
 
-    // Interpolate from previous light (or road start) to just before current light
-    const fromX = idx <= 1 ? prevX : prevX + stopOffset; // depart from just past previous light
-    const toX = targetLightX - stopOffset; // arrive just before current light
-
-    return fromX + (toX - fromX) * Math.min(1, segFrac);
+    return fromX + (toX - fromX) * segFrac;
   }
 
   /* ------------------------------------------------------------------ */
