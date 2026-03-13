@@ -637,11 +637,12 @@ export class World2D {
       borderColor = "rgba(255, 96, 80, 0.42)";
     }
 
-    const fontSize = Math.min(68, this.w * 0.085);
-    const labelFontSize = Math.min(18, this.w * 0.024);
-    const subFontSize = Math.min(21, this.w * 0.028);
+    const compactPortrait = this.isCompactPortraitLayout();
+    const fontSize = compactPortrait ? Math.min(58, this.w * 0.1) : Math.min(68, this.w * 0.085);
+    const labelFontSize = compactPortrait ? Math.min(16, this.w * 0.038) : Math.min(18, this.w * 0.024);
+    const subFontSize = compactPortrait ? Math.min(18, this.w * 0.045) : Math.min(21, this.w * 0.028);
     const cx = this.w / 2;
-    const cy = this.h * 0.11;
+    const cy = compactPortrait ? this.h - Math.max(166, this.h * 0.21) : this.h * 0.11;
 
     const mainText = `￥${money.toFixed(2)}`;
     const labelText = "剩余金额";
@@ -649,16 +650,20 @@ export class World2D {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.translate(cx, cy + 8 - cardJoltY);
+    ctx.translate(cx, cy + (compactPortrait ? 0 : 8) - cardJoltY);
     ctx.scale(cardScale, cardScale);
 
     // Measure text for background pill
     ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
     const mainMetrics = ctx.measureText(mainText);
-    const pillW = mainMetrics.width + 78;
-    const pillH = fontSize + labelFontSize + subFontSize + 42;
+    const pillW = Math.min(
+      mainMetrics.width + (compactPortrait ? 64 : 78),
+      this.w - (compactPortrait ? 34 : 48)
+    );
+    const pillH = fontSize + labelFontSize + subFontSize + (compactPortrait ? 34 : 42);
     const pillX = -pillW / 2;
     const pillY = -pillH / 2;
+    const cornerRadius = compactPortrait ? 16 : 18;
 
     const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
     panelGrad.addColorStop(0, panelTop);
@@ -667,13 +672,13 @@ export class World2D {
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = 18 + (stage === 2 ? 20 : stage === 1 ? 14 : 8) + pulseKick * 14;
     ctx.fillStyle = panelGrad;
-    this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
+    this.roundRect(ctx, pillX, pillY, pillW, pillH, cornerRadius);
     ctx.fill();
 
     ctx.shadowBlur = 0;
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = 1.5;
-    this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
+    this.roundRect(ctx, pillX, pillY, pillW, pillH, cornerRadius);
     ctx.stroke();
 
     ctx.fillStyle =
@@ -682,14 +687,14 @@ export class World2D {
         : stage === 1
           ? `rgba(255, 122, 70, ${0.22 + pressure * 0.18 + pulseKick * 0.12})`
           : `rgba(255, 170, 86, ${0.18 + pressure * 0.12 + pulseKick * 0.08})`;
-    this.roundRect(ctx, pillX + 12, pillY + 10, pillW - 24, 7, 4);
+    this.roundRect(ctx, pillX + 12, pillY + 10, pillW - 24, compactPortrait ? 6 : 7, 4);
     ctx.fill();
 
     ctx.fillStyle = accentColor;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(labelText, 0, pillY + 24);
+    ctx.fillText(labelText, 0, pillY + (compactPortrait ? 21 : 24));
 
     // Main money text
     ctx.fillStyle = textColor;
@@ -707,7 +712,7 @@ export class World2D {
         : stage === 1
           ? `rgba(255, 177, 138, ${0.88 + pressure * 0.08})`
           : `rgba(255, 208, 168, ${0.84 + pressure * 0.06})`;
-    ctx.fillText(subText, 0, pillY + pillH - 24);
+    ctx.fillText(subText, 0, pillY + pillH - (compactPortrait ? 19 : 24));
 
     ctx.restore();
   }
@@ -733,6 +738,10 @@ export class World2D {
 
     const t = Math.min(1, (elapsedSec - stage2At) / Math.max(lightCycleSec * 1.2, 1e-6));
     return { stage: 2, pressure: 0.68 + t * 0.32 };
+  }
+
+  private isCompactPortraitLayout(): boolean {
+    return this.h > this.w && this.w <= 560;
   }
 
   /* ------------------------------------------------------------------ */
