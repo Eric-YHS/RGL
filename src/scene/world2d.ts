@@ -132,20 +132,7 @@ export class World2D {
       const x = this.lightXs[i];
       this.drawCrosswalk(ctx, x);
 
-      // Determine light color for this intersection
-      const lightIdx = i + 1; // 1-based
-      let color: "red" | "green" | "off" = "off";
-      if (state.phase !== "idle") {
-        if (lightIdx < state.lightIndex) {
-          color = "green"; // already passed
-        } else if (lightIdx === state.lightIndex && state.phase === "waiting_red") {
-          color = state.currentLightColor;
-        } else {
-          color = "red"; // upcoming
-        }
-      }
-
-      this.drawTrafficLight(ctx, x, color, "top", nowMs);
+      this.drawTrafficLight(ctx, x, this.getTrafficLightColor(state, i + 1), "top", nowMs);
     }
 
     // Stick figure — interpolate between actual light X positions
@@ -292,6 +279,24 @@ export class World2D {
     this.drawBulb(ctx, cx, redCY, bulbR, color === "red", "#ff4d4f", "#4a2020", pulse);
     // Green bulb
     this.drawBulb(ctx, cx, greenCY, bulbR, color === "green", "#52c41a", "#1e3a1f", pulse);
+  }
+
+  private getTrafficLightColor(
+    state: ExperimentState,
+    lightIdx: number
+  ): "red" | "green" | "off" {
+    if (state.phase === "idle") return "off";
+    if (state.phase === "finished") {
+      return state.passedOutcome[lightIdx] === "green" ? "green" : "red";
+    }
+    if (lightIdx < state.lightIndex) {
+      const outcome = state.passedOutcome[lightIdx];
+      return outcome === "green" ? "green" : "red";
+    }
+    if (lightIdx === state.lightIndex && state.phase === "waiting_red") {
+      return state.currentLightColor;
+    }
+    return "red";
   }
 
   private drawBulb(
