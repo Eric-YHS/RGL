@@ -11,21 +11,38 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+const SEQUENTIAL_POSITION_TEMPLATES: Record<number, number[][]> = {
+  2: [
+    [0.22, 0.72],
+    [0.19, 0.68],
+    [0.27, 0.76]
+  ],
+  5: [
+    [0.16, 0.42, 0.54, 0.75, 0.85],
+    [0.18, 0.30, 0.56, 0.69, 0.84],
+    [0.14, 0.39, 0.51, 0.77, 0.87]
+  ]
+};
+
 /**
  * Generate uneven spacing ratios for sequential mode.
  * Returns cumulative positions in [0,1] for each light.
  * Uses a fixed seed so every participant gets the same layout.
  */
 function generateUnevenPositions(numLights: number, seed = 42): number[] {
+  const templates = SEQUENTIAL_POSITION_TEMPLATES[numLights];
+  if (templates && templates.length > 0) {
+    const templateIndex = Math.abs(seed) % templates.length;
+    return templates[templateIndex].slice();
+  }
+
   const rng = mulberry32(seed);
-  // Generate random segment lengths, then normalize
   const raw: number[] = [];
   for (let i = 0; i <= numLights; i++) {
-    // Each segment between 0.3 and 1.7 relative weight (wide variance)
-    raw.push(0.3 + rng() * 1.4);
+    const edge = i === 0 || i === numLights;
+    raw.push(edge ? 0.9 + rng() * 0.45 : 0.55 + rng() * 2.0);
   }
   const total = raw.reduce((a, b) => a + b, 0);
-  // Cumulative positions for lights (after each segment except the last)
   const positions: number[] = [];
   let cum = 0;
   for (let i = 0; i < numLights; i++) {
@@ -157,7 +174,7 @@ export class World2D {
 
     // Fog overlay for sequential mode (drawn after scene, before money overlay)
     if (this.config.revealMode === "sequential") {
-      this.drawFog(ctx, progress01);
+      this.drawFog(ctx, state, avatarX);
     }
 
     // Prominent money overlay (always on top)
@@ -331,20 +348,38 @@ export class World2D {
   /*  Fog (sequential mode)                                              */
   /* ------------------------------------------------------------------ */
 
-  private drawFog(ctx: CanvasRenderingContext2D, progress01: number): void {
+  private drawFog(ctx: CanvasRenderingContext2D, state: ExperimentState, avatarX: number): void {
     const roadW = this.roadRight - this.roadLeft;
-    const avatarX = this.roadLeft + roadW * progress01;
-
-    // Clear zone ends a bit ahead of the avatar
+    const baseFadeW = roadW * this.fogFadePx;
     const clearEndX = avatarX + roadW * this.fogLeadPx;
-    // Fog fully opaque starts after the fade zone
-    const fogSolidX = clearEndX + roadW * this.fogFadePx;
+    let fogSolidX = clearEndX + baseFadeW;
+
+    if (state.phase !== "idle" && state.phase !== "finished") {
+      const currentTargetX = this.lightXs[state.lightIndex - 1];
+      const nextHiddenX = this.lightXs[state.lightIndex];
+
+      if (currentTargetX !== undefined && nextHiddenX !== undefined) {
+        const gap = nextHiddenX - currentTargetX;
+        const revealCapX = currentTargetX + gap * 0.46;
+        fogSolidX = Math.min(fogSolidX, revealCapX);
+      }
+    }
 
     if (fogSolidX >= this.w) return;
 
     ctx.save();
 
-    const fadeLeft = Math.max(0, clearEndX);
+    let fadeLeft = Math.max(0, fogSolidX - baseFadeW);
+    if (state.phase !== "idle" && state.phase !== "finished") {
+      const currentTargetX = this.lightXs[state.lightIndex - 1];
+      const nextHiddenX = this.lightXs[state.lightIndex];
+      if (currentTargetX !== undefined && nextHiddenX !== undefined) {
+        const gap = nextHiddenX - currentTargetX;
+        const minFadeLeft = currentTargetX + gap * 0.18;
+        const cappedFadeW = Math.min(baseFadeW, gap * 0.28);
+        fadeLeft = Math.max(minFadeLeft, fogSolidX - cappedFadeW);
+      }
+    }
     const fadeRight = Math.min(this.w, fogSolidX);
 
     // Repaint background bands over the fogged area to fully hide scene elements.
