@@ -237,7 +237,7 @@ export class World2D {
     const stripeGap = 5;
     const numStripes = Math.floor(this.roadH / (stripeW + stripeGap));
     const contentH = (numStripes - 1) * (stripeW + stripeGap) + stripeW;
-    const startY = top + (this.roadH - contentH) / 2 + 3;
+    const startY = top + (this.roadH - contentH) / 2 + 1;
 
     ctx.fillStyle = "rgba(255,255,255,0.75)";
     const crossW = 22;
