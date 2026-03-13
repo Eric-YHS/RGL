@@ -556,16 +556,16 @@ export class World2D {
 
     grad.addColorStop(0, "rgba(0,0,0,0)");
     if (stage === 0) {
-      grad.addColorStop(0.62, `rgba(212, 116, 76, ${0.02 + pressure * 0.03})`);
-      grad.addColorStop(1, `rgba(116, 44, 26, ${0.05 + pressure * 0.06 + heartbeat * pressure * 0.02})`);
+      grad.addColorStop(0.62, `rgba(94, 10, 12, ${0.02 + pressure * 0.03})`);
+      grad.addColorStop(1, `rgba(38, 0, 0, ${0.05 + pressure * 0.06 + heartbeat * pressure * 0.02})`);
     } else if (stage === 1) {
-      grad.addColorStop(0.56, `rgba(234, 128, 68, ${0.04 + pressure * 0.05})`);
-      grad.addColorStop(0.8, `rgba(168, 62, 30, ${0.08 + pressure * 0.08 + heartbeat * pressure * 0.03})`);
-      grad.addColorStop(1, `rgba(108, 34, 18, ${0.12 + pressure * 0.1 + heartbeat * pressure * 0.05})`);
+      grad.addColorStop(0.56, `rgba(118, 28, 16, ${0.04 + pressure * 0.05})`);
+      grad.addColorStop(0.8, `rgba(78, 20, 12, ${0.08 + pressure * 0.08 + heartbeat * pressure * 0.03})`);
+      grad.addColorStop(1, `rgba(42, 8, 8, ${0.12 + pressure * 0.1 + heartbeat * pressure * 0.05})`);
     } else {
-      grad.addColorStop(0.52, `rgba(255, 132, 92, ${0.05 + pressure * 0.08})`);
-      grad.addColorStop(0.74, `rgba(214, 72, 54, ${0.10 + pressure * 0.1 + heartbeat * pressure * 0.05})`);
-      grad.addColorStop(1, `rgba(138, 28, 24, ${0.16 + pressure * 0.14 + heartbeat * pressure * 0.08})`);
+      grad.addColorStop(0.52, `rgba(94, 10, 12, ${0.05 + pressure * 0.08})`);
+      grad.addColorStop(0.74, `rgba(70, 0, 0, ${0.10 + pressure * 0.1 + heartbeat * pressure * 0.05})`);
+      grad.addColorStop(1, `rgba(38, 0, 0, ${0.16 + pressure * 0.14 + heartbeat * pressure * 0.08})`);
     }
 
     ctx.save();
@@ -610,31 +610,31 @@ export class World2D {
     let textColor = "#f4f1e8";
     let glowColor = "rgba(255,255,255,0.18)";
     let accentColor = "rgba(255,255,255,0.68)";
-    let panelTop = "rgba(255, 239, 210, 0.9)";
-    let panelBottom = "rgba(255, 219, 175, 0.92)";
-    let borderColor = "rgba(214, 143, 78, 0.34)";
+    let panelTop = "rgba(38, 26, 28, 0.92)";
+    let panelBottom = "rgba(20, 16, 18, 0.94)";
+    let borderColor = "rgba(255,255,255,0.12)";
 
     if (stage === 0) {
-      textColor = "#8f401f";
-      glowColor = "rgba(255, 193, 122, 0.28)";
-      accentColor = "rgba(165, 95, 52, 0.9)";
-      panelTop = "rgba(255, 241, 218, 0.92)";
-      panelBottom = "rgba(255, 223, 187, 0.94)";
-      borderColor = "rgba(225, 160, 96, 0.36)";
+      textColor = "#fff0d2";
+      glowColor = "rgba(255, 201, 106, 0.3)";
+      accentColor = "rgba(255, 205, 144, 0.82)";
+      panelTop = "rgba(60, 34, 24, 0.92)";
+      panelBottom = "rgba(26, 16, 12, 0.96)";
+      borderColor = "rgba(255, 189, 112, 0.2)";
     } else if (stage === 1) {
-      textColor = "#ad3d12";
-      glowColor = "rgba(255, 149, 74, 0.42)";
-      accentColor = "rgba(185, 75, 26, 0.94)";
-      panelTop = "rgba(255, 227, 190, 0.93)";
-      panelBottom = "rgba(255, 194, 145, 0.95)";
-      borderColor = "rgba(237, 126, 62, 0.42)";
+      textColor = "#ffc070";
+      glowColor = "rgba(255, 132, 38, 0.44)";
+      accentColor = "rgba(255, 169, 104, 0.86)";
+      panelTop = "rgba(78, 28, 18, 0.94)";
+      panelBottom = "rgba(34, 12, 10, 0.98)";
+      borderColor = "rgba(255, 123, 60, 0.28)";
     } else {
-      textColor = "#b81f1f";
-      glowColor = "rgba(255, 96, 84, 0.58)";
-      accentColor = "rgba(201, 48, 43, 0.96)";
-      panelTop = "rgba(255, 213, 204, 0.95)";
-      panelBottom = "rgba(255, 171, 157, 0.97)";
-      borderColor = "rgba(232, 85, 72, 0.48)";
+      textColor = "#ff7466";
+      glowColor = "rgba(255, 64, 64, 0.68)";
+      accentColor = "rgba(255, 151, 133, 0.98)";
+      panelTop = "rgba(88, 12, 14, 0.96)";
+      panelBottom = "rgba(34, 4, 6, 0.99)";
+      borderColor = "rgba(255, 96, 80, 0.42)";
     }
 
     const fontSize = Math.min(68, this.w * 0.085);
@@ -644,7 +644,7 @@ export class World2D {
     const cy = this.h * 0.11;
 
     const mainText = `￥${money.toFixed(2)}`;
-    const labelText = stage === 2 ? "报酬流失正在加速你的压力" : "每一秒都在损失报酬";
+    const labelText = "每一秒都在损失报酬";
     const subText = `每秒 -￥${this.config.moneyLossPerSec.toFixed(2)}`;
 
     ctx.save();
@@ -678,10 +678,10 @@ export class World2D {
 
     ctx.fillStyle =
       stage === 2
-        ? `rgba(255, 96, 96, ${0.32 + pressure * 0.2 + pulseKick * 0.18})`
+        ? `rgba(255, 92, 92, ${0.24 + pressure * 0.28 + pulseKick * 0.16})`
         : stage === 1
-          ? `rgba(255, 150, 78, ${0.24 + pressure * 0.16 + pulseKick * 0.12})`
-          : `rgba(255, 194, 114, ${0.18 + pressure * 0.12 + pulseKick * 0.08})`;
+          ? `rgba(255, 122, 70, ${0.22 + pressure * 0.18 + pulseKick * 0.12})`
+          : `rgba(255, 170, 86, ${0.18 + pressure * 0.12 + pulseKick * 0.08})`;
     this.roundRect(ctx, pillX + 12, pillY + 10, pillW - 24, 7, 4);
     ctx.fill();
 
@@ -703,10 +703,10 @@ export class World2D {
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
     ctx.fillStyle =
       stage === 2
-        ? `rgba(177, 26, 26, ${0.92 + pressure * 0.08})`
+        ? `rgba(255, 160, 160, ${0.9 + pressure * 0.1})`
         : stage === 1
-          ? `rgba(185, 87, 32, ${0.9 + pressure * 0.08})`
-          : `rgba(160, 92, 42, ${0.88 + pressure * 0.06})`;
+          ? `rgba(255, 177, 138, ${0.88 + pressure * 0.08})`
+          : `rgba(255, 208, 168, ${0.84 + pressure * 0.06})`;
     ctx.fillText(subText, 0, pillY + pillH - 24);
 
     ctx.restore();
