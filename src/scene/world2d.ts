@@ -681,15 +681,6 @@ export class World2D {
     this.roundRect(ctx, pillX, pillY, pillW, pillH, cornerRadius);
     ctx.stroke();
 
-    ctx.fillStyle =
-      stage === 2
-        ? `rgba(255, 92, 92, ${0.24 + pressure * 0.28 + pulseKick * 0.16})`
-        : stage === 1
-          ? `rgba(255, 122, 70, ${0.22 + pressure * 0.18 + pulseKick * 0.12})`
-          : `rgba(255, 170, 86, ${0.18 + pressure * 0.12 + pulseKick * 0.08})`;
-    this.roundRect(ctx, pillX + 12, pillY + 10, pillW - 24, compactPortrait ? 6 : 7, 4);
-    ctx.fill();
-
     ctx.fillStyle = accentColor;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
