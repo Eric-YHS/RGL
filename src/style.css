@@ -157,16 +157,16 @@ canvas.webgl {
 
 .hud .money.urgent {
   color: var(--danger);
-  text-shadow: 0 0 14px rgba(255, 77, 79, 0.45);
-  animation: moneyShake 0.4s ease-in-out;
+  text-shadow: 0 0 18px rgba(255, 77, 79, 0.52);
+  animation: moneyShake 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes moneyShake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-2px); }
-  40% { transform: translateX(2px); }
-  60% { transform: translateX(-1.5px); }
-  80% { transform: translateX(1.5px); }
+  0%, 100% { transform: translateX(0) scale(1); }
+  20% { transform: translateX(-2px) scale(1.04); }
+  40% { transform: translateX(2px) scale(1.02); }
+  60% { transform: translateX(-1.5px) scale(1.05); }
+  80% { transform: translateX(1.5px) scale(1.01); }
 }
 
 .btn {

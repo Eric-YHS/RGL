@@ -72,6 +72,8 @@ export class World2D {
   private figH = 0;
   private lastAvatarX = -1; // track movement to decide walk animation
   private smoothAvatarX = -1; // smoothed position to prevent jumps
+  private lastMoneyPulseStep: number | null = null;
+  private moneyPulseUntilMs = 0;
 
   /* Fog parameters for sequential mode */
   private readonly fogLeadPx = 0.03; // how far ahead of avatar (as fraction of road width) is clear
@@ -176,6 +178,8 @@ export class World2D {
     if (this.config.revealMode === "sequential") {
       this.drawFog(ctx, state, avatarX);
     }
+
+    this.drawPressureVignette(ctx, state.money, this.config.startMoney, nowMs, state.phase);
 
     // Prominent money overlay (always on top)
     this.drawMoneyOverlay(ctx, state.money, this.config.startMoney, nowMs, state.phase);
@@ -526,7 +530,7 @@ export class World2D {
   /*  Money overlay (prominent)                                          */
   /* ------------------------------------------------------------------ */
 
-  private drawMoneyOverlay(
+  private drawPressureVignette(
     ctx: CanvasRenderingContext2D,
     money: number,
     startMoney: number,
@@ -535,61 +539,154 @@ export class World2D {
   ): void {
     if (phase === "idle") return;
 
-    const fraction = money / startMoney;
-    let textColor: string;
-    let glowColor: string;
-    let alpha = 1;
+    const fraction = Math.max(0, Math.min(1, money / startMoney));
+    const pressure = Math.max(0, Math.min(1, (0.9 - fraction) / 0.75));
+    if (pressure <= 0) return;
 
-    if (fraction > 0.7) {
-      textColor = "#52c41a";
-      glowColor = "rgba(82,196,26,0.6)";
-    } else if (fraction > 0.4) {
-      textColor = "#faad14";
-      glowColor = "rgba(250,173,20,0.6)";
-    } else {
-      textColor = "#ff4d4f";
-      glowColor = "rgba(255,77,79,0.7)";
-      alpha = 0.7 + 0.3 * Math.abs(Math.sin(nowMs * 0.004));
+    const heartbeat = Math.pow((Math.sin(nowMs * (0.002 + pressure * 0.0026)) + 1) / 2, 3);
+    const innerRadius = Math.max(this.w, this.h) * (0.5 - pressure * 0.08);
+    const outerRadius = Math.max(this.w, this.h) * 0.9;
+    const grad = ctx.createRadialGradient(
+      this.w / 2,
+      this.h / 2,
+      innerRadius,
+      this.w / 2,
+      this.h / 2,
+      outerRadius
+    );
+
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(0.62, `rgba(86, 8, 10, ${0.04 + pressure * 0.06})`);
+    grad.addColorStop(1, `rgba(32, 0, 0, ${0.08 + pressure * 0.14 + heartbeat * pressure * 0.05})`);
+
+    ctx.save();
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, this.w, this.h);
+    ctx.restore();
+  }
+
+  private drawMoneyOverlay(
+    ctx: CanvasRenderingContext2D,
+    money: number,
+    startMoney: number,
+    nowMs: number,
+    phase: Phase
+  ): void {
+    if (phase === "idle") {
+      this.lastMoneyPulseStep = null;
+      this.moneyPulseUntilMs = 0;
+      return;
     }
 
-    const fontSize = Math.min(48, this.w * 0.06);
-    const subFontSize = Math.min(18, this.w * 0.024);
+    const fraction = money / startMoney;
+    const pressure = Math.max(0, Math.min(1, 1 - fraction));
+    const pulseStep = Math.floor((money + 1e-6) * 10);
+    if (this.lastMoneyPulseStep === null) {
+      this.lastMoneyPulseStep = pulseStep;
+    } else if (pulseStep < this.lastMoneyPulseStep) {
+      this.moneyPulseUntilMs = nowMs + 260;
+      this.lastMoneyPulseStep = pulseStep;
+    } else if (pulseStep > this.lastMoneyPulseStep) {
+      this.lastMoneyPulseStep = pulseStep;
+    }
+
+    const pulseProgress = Math.max(0, this.moneyPulseUntilMs - nowMs) / 260;
+    const pulseKick = pulseProgress > 0 ? Math.sin((1 - pulseProgress) * Math.PI) : 0;
+    const heartbeat = Math.pow((Math.sin(nowMs * (0.0022 + pressure * 0.0028)) + 1) / 2, 3);
+    const cardScale = 1 + pulseKick * (0.04 + pressure * 0.025) + heartbeat * pressure * 0.02;
+    const alpha = 0.96 + heartbeat * pressure * 0.04;
+
+    let textColor = "#f4f1e8";
+    let glowColor = "rgba(255,255,255,0.18)";
+    let accentColor = "rgba(255,255,255,0.68)";
+    let panelTop = "rgba(38, 26, 28, 0.92)";
+    let panelBottom = "rgba(20, 16, 18, 0.94)";
+    let borderColor = "rgba(255,255,255,0.12)";
+
+    if (fraction > 0.7) {
+      textColor = "#fff4d6";
+      glowColor = "rgba(255, 216, 128, 0.26)";
+      accentColor = "rgba(255, 221, 168, 0.76)";
+      panelTop = "rgba(54, 40, 26, 0.9)";
+      panelBottom = "rgba(24, 18, 14, 0.95)";
+      borderColor = "rgba(255, 214, 143, 0.18)";
+    } else if (fraction > 0.4) {
+      textColor = "#ffd58a";
+      glowColor = "rgba(255, 173, 58, 0.34)";
+      accentColor = "rgba(255, 191, 120, 0.82)";
+      panelTop = "rgba(64, 34, 20, 0.92)";
+      panelBottom = "rgba(28, 16, 12, 0.96)";
+      borderColor = "rgba(255, 167, 62, 0.24)";
+    } else {
+      textColor = "#ff8a7a";
+      glowColor = "rgba(255, 77, 79, 0.55)";
+      accentColor = "rgba(255, 168, 150, 0.92)";
+      panelTop = "rgba(70, 18, 20, 0.94)";
+      panelBottom = "rgba(30, 8, 10, 0.98)";
+      borderColor = "rgba(255, 111, 97, 0.34)";
+    }
+
+    const fontSize = Math.min(68, this.w * 0.085);
+    const labelFontSize = Math.min(18, this.w * 0.024);
+    const subFontSize = Math.min(21, this.w * 0.028);
     const cx = this.w / 2;
-    const cy = this.h * 0.1;
+    const cy = this.h * 0.11;
 
     const mainText = `￥${money.toFixed(2)}`;
-    const subText = `-￥${this.config.moneyLossPerSec.toFixed(2)}/秒`;
+    const labelText = "报酬正在流失";
+    const subText = `每秒 -￥${this.config.moneyLossPerSec.toFixed(2)}`;
 
     ctx.save();
     ctx.globalAlpha = alpha;
+    ctx.translate(cx, cy + 8);
+    ctx.scale(cardScale, cardScale);
 
     // Measure text for background pill
-    ctx.font = `900 ${fontSize}px system-ui, sans-serif`;
+    ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
     const mainMetrics = ctx.measureText(mainText);
-    const pillW = mainMetrics.width + 40;
-    const pillH = fontSize + subFontSize + 24;
-    const pillX = cx - pillW / 2;
-    const pillY = cy - fontSize / 2 - 8;
+    const pillW = mainMetrics.width + 78;
+    const pillH = fontSize + labelFontSize + subFontSize + 42;
+    const pillX = -pillW / 2;
+    const pillY = -pillH / 2;
 
-    // Background pill
-    ctx.fillStyle = "rgba(0,0,0,0.50)";
-    this.roundRect(ctx, pillX, pillY, pillW, pillH, 14);
+    const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
+    panelGrad.addColorStop(0, panelTop);
+    panelGrad.addColorStop(1, panelBottom);
+
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 30 + pressure * 18 + pulseKick * 12;
+    ctx.fillStyle = panelGrad;
+    this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
     ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1.5;
+    this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(255, 92, 92, ${0.18 + pressure * 0.22 + pulseKick * 0.12})`;
+    this.roundRect(ctx, pillX + 12, pillY + 10, pillW - 24, 7, 4);
+    ctx.fill();
+
+    ctx.fillStyle = accentColor;
+    ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(labelText, 0, pillY + 24);
 
     // Main money text
     ctx.fillStyle = textColor;
     ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 22;
-    ctx.font = `900 ${fontSize}px system-ui, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(mainText, cx, cy);
+    ctx.shadowBlur = 24 + pressure * 16;
+    ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
+    ctx.fillText(mainText, 0, 6);
 
     // Sub text (loss rate)
     ctx.shadowBlur = 0;
-    ctx.font = `600 ${subFontSize}px system-ui, sans-serif`;
-    ctx.fillStyle = "rgba(255,255,255,0.65)";
-    ctx.fillText(subText, cx, cy + fontSize / 2 + subFontSize / 2 + 4);
+    ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
+    ctx.fillStyle = `rgba(255, 173, 173, ${0.84 + pressure * 0.12})`;
+    ctx.fillText(subText, 0, pillY + pillH - 24);
 
     ctx.restore();
   }
