@@ -236,11 +236,13 @@ export class World2D {
     const stripeW = 6;
     const stripeGap = 5;
     const numStripes = Math.floor(this.roadH / (stripeW + stripeGap));
+    const contentH = (numStripes - 1) * (stripeW + stripeGap) + stripeW;
+    const startY = top + (this.roadH - contentH) / 2 + 3;
 
     ctx.fillStyle = "rgba(255,255,255,0.75)";
     const crossW = 22;
     for (let s = 0; s < numStripes; s++) {
-      const sy = top + s * (stripeW + stripeGap) + 2;
+      const sy = startY + s * (stripeW + stripeGap);
       ctx.fillRect(x - crossW / 2, sy, crossW, stripeW);
     }
   }
@@ -302,7 +304,7 @@ export class World2D {
     state: ExperimentState,
     lightIdx: number
   ): "red" | "green" | "off" {
-    if (state.phase === "idle") return "off";
+    if (state.phase === "idle") return "red";
     if (state.phase === "finished") {
       return state.passedOutcome[lightIdx] === "green" ? "green" : "red";
     }
