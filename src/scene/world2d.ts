@@ -540,12 +540,12 @@ export class World2D {
     if (phase === "idle") return;
 
     const fraction = Math.max(0, Math.min(1, money / startMoney));
-    const pressure = Math.max(0, Math.min(1, (0.9 - fraction) / 0.75));
+    const pressure = Math.max(0, Math.min(1, (0.98 - fraction) / 0.68));
     if (pressure <= 0) return;
 
-    const heartbeat = Math.pow((Math.sin(nowMs * (0.002 + pressure * 0.0026)) + 1) / 2, 3);
-    const innerRadius = Math.max(this.w, this.h) * (0.5 - pressure * 0.08);
-    const outerRadius = Math.max(this.w, this.h) * 0.9;
+    const heartbeat = Math.pow((Math.sin(nowMs * (0.0028 + pressure * 0.0034)) + 1) / 2, 2.2);
+    const innerRadius = Math.max(this.w, this.h) * (0.48 - pressure * 0.12);
+    const outerRadius = Math.max(this.w, this.h) * 0.95;
     const grad = ctx.createRadialGradient(
       this.w / 2,
       this.h / 2,
@@ -556,8 +556,9 @@ export class World2D {
     );
 
     grad.addColorStop(0, "rgba(0,0,0,0)");
-    grad.addColorStop(0.62, `rgba(86, 8, 10, ${0.04 + pressure * 0.06})`);
-    grad.addColorStop(1, `rgba(32, 0, 0, ${0.08 + pressure * 0.14 + heartbeat * pressure * 0.05})`);
+    grad.addColorStop(0.52, `rgba(94, 10, 12, ${0.05 + pressure * 0.09})`);
+    grad.addColorStop(0.74, `rgba(70, 0, 0, ${0.10 + pressure * 0.14 + heartbeat * pressure * 0.05})`);
+    grad.addColorStop(1, `rgba(38, 0, 0, ${0.16 + pressure * 0.2 + heartbeat * pressure * 0.08})`);
 
     ctx.save();
     ctx.fillStyle = grad;
@@ -584,17 +585,18 @@ export class World2D {
     if (this.lastMoneyPulseStep === null) {
       this.lastMoneyPulseStep = pulseStep;
     } else if (pulseStep < this.lastMoneyPulseStep) {
-      this.moneyPulseUntilMs = nowMs + 260;
+      this.moneyPulseUntilMs = nowMs + 360;
       this.lastMoneyPulseStep = pulseStep;
     } else if (pulseStep > this.lastMoneyPulseStep) {
       this.lastMoneyPulseStep = pulseStep;
     }
 
-    const pulseProgress = Math.max(0, this.moneyPulseUntilMs - nowMs) / 260;
+    const pulseProgress = Math.max(0, this.moneyPulseUntilMs - nowMs) / 360;
     const pulseKick = pulseProgress > 0 ? Math.sin((1 - pulseProgress) * Math.PI) : 0;
-    const heartbeat = Math.pow((Math.sin(nowMs * (0.0022 + pressure * 0.0028)) + 1) / 2, 3);
-    const cardScale = 1 + pulseKick * (0.04 + pressure * 0.025) + heartbeat * pressure * 0.02;
-    const alpha = 0.96 + heartbeat * pressure * 0.04;
+    const heartbeat = Math.pow((Math.sin(nowMs * (0.003 + pressure * 0.0032)) + 1) / 2, 2.15);
+    const cardScale = 1 + pulseKick * (0.06 + pressure * 0.04) + heartbeat * pressure * 0.03;
+    const alpha = 0.95 + heartbeat * pressure * 0.06;
+    const cardJoltY = pulseKick * (2 + pressure * 4);
 
     let textColor = "#f4f1e8";
     let glowColor = "rgba(255,255,255,0.18)";
@@ -603,27 +605,27 @@ export class World2D {
     let panelBottom = "rgba(20, 16, 18, 0.94)";
     let borderColor = "rgba(255,255,255,0.12)";
 
-    if (fraction > 0.7) {
-      textColor = "#fff4d6";
-      glowColor = "rgba(255, 216, 128, 0.26)";
-      accentColor = "rgba(255, 221, 168, 0.76)";
-      panelTop = "rgba(54, 40, 26, 0.9)";
-      panelBottom = "rgba(24, 18, 14, 0.95)";
-      borderColor = "rgba(255, 214, 143, 0.18)";
-    } else if (fraction > 0.4) {
-      textColor = "#ffd58a";
-      glowColor = "rgba(255, 173, 58, 0.34)";
-      accentColor = "rgba(255, 191, 120, 0.82)";
-      panelTop = "rgba(64, 34, 20, 0.92)";
-      panelBottom = "rgba(28, 16, 12, 0.96)";
-      borderColor = "rgba(255, 167, 62, 0.24)";
+    if (fraction > 0.8) {
+      textColor = "#fff0d2";
+      glowColor = "rgba(255, 201, 106, 0.3)";
+      accentColor = "rgba(255, 205, 144, 0.82)";
+      panelTop = "rgba(60, 34, 24, 0.92)";
+      panelBottom = "rgba(26, 16, 12, 0.96)";
+      borderColor = "rgba(255, 189, 112, 0.2)";
+    } else if (fraction > 0.5) {
+      textColor = "#ffc070";
+      glowColor = "rgba(255, 132, 38, 0.44)";
+      accentColor = "rgba(255, 169, 104, 0.86)";
+      panelTop = "rgba(78, 28, 18, 0.94)";
+      panelBottom = "rgba(34, 12, 10, 0.98)";
+      borderColor = "rgba(255, 123, 60, 0.28)";
     } else {
-      textColor = "#ff8a7a";
-      glowColor = "rgba(255, 77, 79, 0.55)";
-      accentColor = "rgba(255, 168, 150, 0.92)";
-      panelTop = "rgba(70, 18, 20, 0.94)";
-      panelBottom = "rgba(30, 8, 10, 0.98)";
-      borderColor = "rgba(255, 111, 97, 0.34)";
+      textColor = "#ff7466";
+      glowColor = "rgba(255, 64, 64, 0.68)";
+      accentColor = "rgba(255, 151, 133, 0.98)";
+      panelTop = "rgba(88, 12, 14, 0.96)";
+      panelBottom = "rgba(34, 4, 6, 0.99)";
+      borderColor = "rgba(255, 96, 80, 0.42)";
     }
 
     const fontSize = Math.min(68, this.w * 0.085);
@@ -633,12 +635,12 @@ export class World2D {
     const cy = this.h * 0.11;
 
     const mainText = `￥${money.toFixed(2)}`;
-    const labelText = "报酬正在流失";
+    const labelText = "每一秒都在损失报酬";
     const subText = `每秒 -￥${this.config.moneyLossPerSec.toFixed(2)}`;
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.translate(cx, cy + 8);
+    ctx.translate(cx, cy + 8 - cardJoltY);
     ctx.scale(cardScale, cardScale);
 
     // Measure text for background pill
@@ -654,7 +656,7 @@ export class World2D {
     panelGrad.addColorStop(1, panelBottom);
 
     ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 30 + pressure * 18 + pulseKick * 12;
+    ctx.shadowBlur = 34 + pressure * 24 + pulseKick * 18;
     ctx.fillStyle = panelGrad;
     this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
     ctx.fill();
@@ -665,7 +667,7 @@ export class World2D {
     this.roundRect(ctx, pillX, pillY, pillW, pillH, 18);
     ctx.stroke();
 
-    ctx.fillStyle = `rgba(255, 92, 92, ${0.18 + pressure * 0.22 + pulseKick * 0.12})`;
+    ctx.fillStyle = `rgba(255, 92, 92, ${0.24 + pressure * 0.28 + pulseKick * 0.16})`;
     this.roundRect(ctx, pillX + 12, pillY + 10, pillW - 24, 7, 4);
     ctx.fill();
 
@@ -678,14 +680,14 @@ export class World2D {
     // Main money text
     ctx.fillStyle = textColor;
     ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 24 + pressure * 16;
+    ctx.shadowBlur = 28 + pressure * 24;
     ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
     ctx.fillText(mainText, 0, 6);
 
     // Sub text (loss rate)
     ctx.shadowBlur = 0;
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
-    ctx.fillStyle = `rgba(255, 173, 173, ${0.84 + pressure * 0.12})`;
+    ctx.fillStyle = `rgba(255, 160, 160, ${0.9 + pressure * 0.1})`;
     ctx.fillText(subText, 0, pillY + pillH - 24);
 
     ctx.restore();

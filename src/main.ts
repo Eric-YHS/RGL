@@ -632,7 +632,7 @@ function updateHud(): void {
     timeText = formatSeconds(s.elapsedSec, 1);
     moneyText = formatMoney(s.money);
     const moneyFraction = s.money / currentConfig.startMoney;
-    moneyUrgent = s.phase !== "finished" && moneyFraction <= 0.7 && Math.floor(s.elapsedSec * 1.2) % 2 === 0;
+    moneyUrgent = s.phase !== "finished" && moneyFraction <= 0.85 && Math.floor(s.elapsedSec * 1.8) % 2 === 0;
 
     if (s.phase === "moving") {
       lightText = "行走中";
