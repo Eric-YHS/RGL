@@ -644,7 +644,7 @@ export class World2D {
     const cy = this.h * 0.11;
 
     const mainText = `￥${money.toFixed(2)}`;
-    const labelText = "每一秒都在损失报酬";
+    const labelText = "剩余金额";
     const subText = `每秒 -￥${this.config.moneyLossPerSec.toFixed(2)}`;
 
     ctx.save();
