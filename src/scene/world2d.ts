@@ -416,6 +416,26 @@ export class World2D {
       }
     }
     ctx.putImageData(imgData, 0, 0);
+    return this.inflateSignalGlyph(canvas);
+  }
+
+  private inflateSignalGlyph(source: HTMLCanvasElement): HTMLCanvasElement {
+    const canvas = document.createElement("canvas");
+    canvas.width = source.width;
+    canvas.height = source.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return source;
+
+    const aspect = source.width / Math.max(source.height, 1);
+    const scaleX = aspect < 0.6 ? 1.16 : 1.1;
+    const scaleY = aspect < 0.6 ? 1.06 : 1.04;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(scaleX, scaleY);
+    ctx.drawImage(source, -source.width / 2, -source.height / 2, source.width, source.height);
+    ctx.restore();
     return canvas;
   }
 
@@ -427,18 +447,9 @@ export class World2D {
     bulbR: number,
     pulse: number
   ): void {
-    const scale = Math.min((bulbR * 2.08) / glyph.width, (bulbR * 2.2) / glyph.height);
+    const scale = Math.min((bulbR * 2.04) / glyph.width, (bulbR * 2.16) / glyph.height);
     const drawW = glyph.width * scale;
     const drawH = glyph.height * scale;
-    const drawX = cx - drawW / 2;
-    const drawY = cy - drawH / 2;
-    const thickenOffset = Math.max(0.75, bulbR * 0.08);
-    const thickenPasses = [
-      [-thickenOffset, 0],
-      [thickenOffset, 0],
-      [0, -thickenOffset],
-      [0, thickenOffset]
-    ] as const;
 
     ctx.save();
     ctx.globalAlpha = 0.9 + pulse * 0.1;
@@ -446,10 +457,7 @@ export class World2D {
     ctx.arc(cx, cy, bulbR, 0, Math.PI * 2);
     ctx.clip();
     ctx.imageSmoothingEnabled = false;
-    for (const [dx, dy] of thickenPasses) {
-      ctx.drawImage(glyph, drawX + dx, drawY + dy, drawW, drawH);
-    }
-    ctx.drawImage(glyph, drawX, drawY, drawW, drawH);
+    ctx.drawImage(glyph, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
     ctx.restore();
   }
 
