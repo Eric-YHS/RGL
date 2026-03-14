@@ -169,9 +169,45 @@ function collectDeviceInfo(): ClientDeviceInfo {
   };
 }
 
+function shouldBlockMobileAccess(): boolean {
+  const nav = navigator as Navigator & {
+    userAgentData?: {
+      mobile?: boolean;
+    };
+  };
+  const ua = navigator.userAgent ?? "";
+  const platform = navigator.platform ?? "";
+  const isIpadLike = platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  const uaSaysMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(
+    ua
+  );
+  const uaDataSaysMobile = Boolean(nav.userAgentData?.mobile);
+  const coarseTouchSmallScreen =
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches &&
+    Math.max(window.screen.width || 0, window.screen.height || 0) <= 1366;
+
+  return isIpadLike || uaSaysMobile || uaDataSaysMobile || coarseTouchSmallScreen;
+}
+
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Missing #app");
 
+if (shouldBlockMobileAccess()) {
+  document.body.classList.add("desktop-only-blocked");
+  app.innerHTML = `
+    <main class="desktop-only-gate">
+      <section class="desktop-only-card">
+        <div class="desktop-only-eyebrow">访问受限</div>
+        <h1>本实验仅支持电脑端作答</h1>
+        <p>检测到您当前正在使用手机或平板访问。本实验需要在电脑浏览器中完成，以保证页面布局、操作方式和实验记录一致。</p>
+        <div class="desktop-only-tips">
+          <div>请改用电脑打开当前链接后再继续。</div>
+          <div>推荐使用 Chrome、Edge 或 Safari 的桌面浏览器。</div>
+        </div>
+      </section>
+    </main>
+  `;
+} else {
 app.innerHTML = `
   <div class="stage">
     <canvas class="webgl" aria-label="实验场景"></canvas>
@@ -690,3 +726,4 @@ function loop(): void {
 }
 
 loop();
+}
