@@ -93,17 +93,21 @@ canvas.webgl {
 
 .panel-control .control-actions {
   display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 10px;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 8px;
   margin-top: 10px;
+}
+
+.panel-control .btn {
+  justify-self: start;
 }
 
 .panel-control .control-tip {
   margin: 0;
-  flex: 1;
   min-width: 0;
   line-height: 1.25;
+  max-width: 24ch;
 }
 
 
@@ -126,15 +130,15 @@ canvas.webgl {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(344px, calc(100vw - 40px));
+  width: min(296px, calc(100vw - 40px));
   min-width: 0;
 }
 
 .hud .status {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 7px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12.5px;
 }
 
 .hud .row {
