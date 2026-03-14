@@ -2,6 +2,11 @@ import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/typ
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
+type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
+
+const RED_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 17, y: 8, w: 15, h: 35 };
+const GREEN_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 14, y: 52, w: 24, h: 28 };
+
 function loadCanvasImage(src: string): HTMLImageElement {
   const img = new Image();
   img.decoding = "async";
@@ -83,6 +88,8 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
+  private redSignalGlyph: HTMLCanvasElement | null = null;
+  private greenSignalGlyph: HTMLCanvasElement | null = null;
   private fogFadeLeftX = -1;
   private fogFadeRightX = -1;
   private lastMoneyPulseStep: number | null = null;
@@ -277,13 +284,6 @@ export class World2D {
     side: "top" | "bottom",
     nowMs: number
   ): void {
-    const signalSprite =
-      color === "green" ? this.greenSignalSprite : color === "red" ? this.redSignalSprite : null;
-    if (signalSprite && this.isRenderableImage(signalSprite)) {
-      this.drawTrafficLightSprite(ctx, x, side, signalSprite);
-      return;
-    }
-
     const poleH = this.h * 0.14;
     const poleW = 3;
     const housingW = 20;
@@ -324,27 +324,14 @@ export class World2D {
     this.drawBulb(ctx, cx, redCY, bulbR, color === "red", "#ff4d4f", "#4a2020", pulse);
     // Green bulb
     this.drawBulb(ctx, cx, greenCY, bulbR, color === "green", "#52c41a", "#1e3a1f", pulse);
-  }
 
-  private drawTrafficLightSprite(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    side: "top" | "bottom",
-    sprite: HTMLImageElement
-  ): void {
-    const roadEdge =
-      side === "top"
-        ? this.roadY - this.roadH / 2
-        : this.roadY + this.roadH / 2;
-    const totalH = this.h * 0.14 + 42;
-    const totalW = totalH * (sprite.naturalWidth / sprite.naturalHeight);
-    const drawX = x - totalW / 2;
-    const drawY = side === "top" ? roadEdge - totalH + 4 : roadEdge - 4;
-
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(sprite, drawX, drawY, totalW, totalH);
-    ctx.restore();
+    if (color === "red") {
+      const glyph = this.getSignalGlyph("red");
+      if (glyph) this.drawSignalGlyph(ctx, glyph, cx, redCY, bulbR, pulse);
+    } else if (color === "green") {
+      const glyph = this.getSignalGlyph("green");
+      if (glyph) this.drawSignalGlyph(ctx, glyph, cx, greenCY, bulbR, pulse);
+    }
   }
 
   private getTrafficLightColor(
@@ -389,6 +376,67 @@ export class World2D {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+  }
+
+  private getSignalGlyph(kind: "red" | "green"): HTMLCanvasElement | null {
+    if (kind === "red") {
+      if (this.redSignalGlyph) return this.redSignalGlyph;
+      if (!this.isRenderableImage(this.redSignalSprite)) return null;
+      this.redSignalGlyph = this.prepareSignalGlyph(this.redSignalSprite, RED_SIGNAL_GLYPH_CROP);
+      return this.redSignalGlyph;
+    }
+
+    if (this.greenSignalGlyph) return this.greenSignalGlyph;
+    if (!this.isRenderableImage(this.greenSignalSprite)) return null;
+    this.greenSignalGlyph = this.prepareSignalGlyph(this.greenSignalSprite, GREEN_SIGNAL_GLYPH_CROP);
+    return this.greenSignalGlyph;
+  }
+
+  private prepareSignalGlyph(
+    sprite: HTMLImageElement,
+    crop: SignalGlyphCrop
+  ): HTMLCanvasElement | null {
+    const canvas = document.createElement("canvas");
+    canvas.width = crop.w;
+    canvas.height = crop.h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.drawImage(sprite, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+    const imgData = ctx.getImageData(0, 0, crop.w, crop.h);
+    const data = imgData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (r < 40 && g < 40 && b < 40) {
+        data[i + 3] = 0;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+  }
+
+  private drawSignalGlyph(
+    ctx: CanvasRenderingContext2D,
+    glyph: HTMLCanvasElement,
+    cx: number,
+    cy: number,
+    bulbR: number,
+    pulse: number
+  ): void {
+    const scale = Math.min((bulbR * 1.65) / glyph.width, (bulbR * 1.78) / glyph.height);
+    const drawW = glyph.width * scale;
+    const drawH = glyph.height * scale;
+
+    ctx.save();
+    ctx.globalAlpha = 0.9 + pulse * 0.1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, bulbR * 0.98, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(glyph, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
     ctx.restore();
   }
 
