@@ -799,7 +799,7 @@ export class World2D {
     );
     const ribbonH = compactPortrait ? 78 : 92;
     const cx = routeCenterX;
-    const overlayLift = compactPortrait ? 16 : 32;
+    const overlayLift = compactPortrait ? 20 : 42;
     const cy = Math.max(
       compactPortrait ? this.h * 0.228 : this.h * 0.208,
       lightsTopY - (compactPortrait ? 54 : 70)
@@ -830,7 +830,7 @@ export class World2D {
 
     const leftInset = pillX + (compactPortrait ? 18 : 22);
     const rightInset = pillX + ribbonW - (compactPortrait ? 18 : 22);
-    const topRowY = pillY + (compactPortrait ? 22 : 25);
+    const topRowY = pillY + (compactPortrait ? 24 : 28);
     const bottomRowY = pillY + ribbonH - (compactPortrait ? 16 : 18);
 
     ctx.fillStyle = accentColor;
@@ -844,7 +844,7 @@ export class World2D {
     ctx.shadowBlur = 12 + (stage === 2 ? 16 : stage === 1 ? 12 : 8) + pressure * 12;
     ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
     ctx.textAlign = "right";
-    ctx.fillText(mainText, rightInset, topRowY + (compactPortrait ? 2 : 3));
+    ctx.fillText(mainText, rightInset, topRowY);
 
     ctx.shadowBlur = 0;
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
