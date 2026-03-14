@@ -72,6 +72,8 @@ export class World2D {
   private figH = 0;
   private lastAvatarX = -1; // track movement to decide walk animation
   private smoothAvatarX = -1; // smoothed position to prevent jumps
+  private fogFadeLeftX = -1;
+  private fogFadeRightX = -1;
   private lastMoneyPulseStep: number | null = null;
   private moneyPulseUntilMs = 0;
 
@@ -131,6 +133,7 @@ export class World2D {
     this.lightXs = this.lightPositions01.map((p) => this.roadLeft + roadW * p);
 
     this.figH = Math.min(70, this.h * 0.12);
+    this.resetFogTracking();
   }
 
   /* ------------------------------------------------------------------ */
@@ -354,6 +357,10 @@ export class World2D {
   /* ------------------------------------------------------------------ */
 
   private drawFog(ctx: CanvasRenderingContext2D, state: ExperimentState, avatarX: number): void {
+    if (state.phase === "idle") {
+      this.resetFogTracking();
+    }
+
     const roadW = this.roadRight - this.roadLeft;
     const baseFadeW = this.getFogFadeWidthPx(roadW);
     const currentTargetX = state.phase !== "idle" && state.phase !== "finished"
@@ -373,10 +380,20 @@ export class World2D {
       }
     }
 
+    if (this.fogFadeLeftX >= 0) {
+      fadeLeft = Math.max(fadeLeft, this.fogFadeLeftX);
+    }
+    if (this.fogFadeRightX >= 0) {
+      fogSolidX = Math.max(fogSolidX, this.fogFadeRightX);
+    }
+    fogSolidX = Math.max(fogSolidX, fadeLeft);
+
     if (fogSolidX >= this.w) return;
 
     ctx.save();
     const fadeRight = Math.min(this.w, fogSolidX);
+    this.fogFadeLeftX = fadeLeft;
+    this.fogFadeRightX = fadeRight;
 
     // Repaint background bands over the fogged area to fully hide scene elements.
     // We draw three horizontal strips (sky, road area, ground) with horizontal
@@ -723,6 +740,11 @@ export class World2D {
 
   private isCompactPortraitLayout(): boolean {
     return this.h > this.w && this.w <= 560;
+  }
+
+  private resetFogTracking(): void {
+    this.fogFadeLeftX = -1;
+    this.fogFadeRightX = -1;
   }
 
   private getResolvedPassedLightColor(
