@@ -750,74 +750,88 @@ export class World2D {
     }
 
     const { stage, pressure } = this.getMoneyStress(money, startMoney);
-    const pulseWindowMs = stage >= 2 ? 200 : stage === 1 ? 180 : 160;
     const pulseStep = Math.floor((money + 1e-6) * 10);
     if (this.lastMoneyPulseStep === null) {
       this.lastMoneyPulseStep = pulseStep;
     } else if (pulseStep < this.lastMoneyPulseStep) {
-      this.moneyPulseUntilMs = nowMs + pulseWindowMs;
+      this.moneyPulseUntilMs = nowMs + (stage >= 2 ? 420 : stage === 1 ? 320 : 240);
       this.lastMoneyPulseStep = pulseStep;
     } else if (pulseStep > this.lastMoneyPulseStep) {
       this.lastMoneyPulseStep = pulseStep;
     }
 
+    const pulseWindowMs = stage >= 2 ? 420 : stage === 1 ? 320 : 240;
     const pulseProgress = Math.max(0, this.moneyPulseUntilMs - nowMs) / pulseWindowMs;
     const pulseKick = pulseProgress > 0 ? Math.sin((1 - pulseProgress) * Math.PI) : 0;
-    const cardScale = 1 + pulseKick * (0.012 + pressure * 0.008);
-    const alpha = 1;
-    const cardJoltY = pulseKick * 1.2;
+    const heartbeat = Math.pow((Math.sin(nowMs * (0.002 + stage * 0.0006 + pressure * 0.0022)) + 1) / 2, 2.1);
+    const cardScale =
+      1 + pulseKick * (stage === 2 ? 0.085 : stage === 1 ? 0.06 : 0.035) + heartbeat * pressure * 0.025;
+    const alpha = 0.97 + heartbeat * pressure * 0.03;
+    const cardJoltY = pulseKick * (stage === 2 ? 4 : stage === 1 ? 2.5 : 1.5);
 
-    const moneyFontFamily = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
-    const labelColor = "#eef2f6";
-    const mainTextColor = pulseKick > 0 ? "#ff4458" : "#ef233c";
-    const subPrefixColor = "#b8c2ce";
-    const subValueColor = pulseKick > 0 ? "#fff27a" : "#ffea00";
-    const panelColor = "rgba(13, 18, 26, 0.985)";
-    const headerColor = "rgba(8, 12, 18, 0.995)";
-    const flashBandColor = `rgba(239, 35, 60, ${0.08 + pulseKick * 0.14})`;
-    const borderColor = `rgba(239, 35, 60, ${0.38 + pulseKick * 0.28})`;
-    const dividerColor = "rgba(207, 216, 227, 0.16)";
-    const amountStrokeColor = "rgba(0, 0, 0, 0.58)";
-    const cardShadowColor = "rgba(0, 0, 0, 0.26)";
+    let textColor = "#f4f1e8";
+    let glowColor = "rgba(255,255,255,0.18)";
+    let accentColor = "rgba(255,255,255,0.68)";
+    let panelTop = "rgba(38, 26, 28, 0.92)";
+    let panelBottom = "rgba(20, 16, 18, 0.94)";
+    let borderColor = "rgba(255,255,255,0.12)";
+
+    if (stage === 0) {
+      textColor = "#fff0d2";
+      glowColor = "rgba(255, 201, 106, 0.3)";
+      accentColor = "rgba(255, 205, 144, 0.82)";
+      panelTop = "rgba(60, 34, 24, 0.92)";
+      panelBottom = "rgba(26, 16, 12, 0.96)";
+      borderColor = "rgba(255, 189, 112, 0.2)";
+    } else if (stage === 1) {
+      textColor = "#ffc070";
+      glowColor = "rgba(255, 132, 38, 0.44)";
+      accentColor = "rgba(255, 169, 104, 0.86)";
+      panelTop = "rgba(78, 28, 18, 0.94)";
+      panelBottom = "rgba(34, 12, 10, 0.98)";
+      borderColor = "rgba(255, 123, 60, 0.28)";
+    } else {
+      textColor = "#ff7466";
+      glowColor = "rgba(255, 64, 64, 0.68)";
+      accentColor = "rgba(255, 151, 133, 0.98)";
+      panelTop = "rgba(88, 12, 14, 0.96)";
+      panelBottom = "rgba(34, 4, 6, 0.99)";
+      borderColor = "rgba(255, 96, 80, 0.42)";
+    }
 
     const compactPortrait = this.isCompactPortraitLayout();
     const routeCenterX =
       this.lightXs.length > 0 ? (this.lightXs[0] + this.lightXs[this.lightXs.length - 1]) / 2 : this.w / 2;
     const routeSpan =
       this.lightXs.length > 1 ? this.lightXs[this.lightXs.length - 1] - this.lightXs[0] : this.w * 0.42;
-    const fontSize = compactPortrait ? Math.min(48, this.w * 0.097) : Math.min(72, this.w * 0.056);
-    const labelFontSize = compactPortrait ? Math.min(18, this.w * 0.038) : Math.min(22, this.w * 0.019);
-    const subFontSize = compactPortrait ? Math.min(18, this.w * 0.04) : Math.min(23, this.w * 0.018);
+    const fontSize = compactPortrait ? Math.min(46, this.w * 0.094) : Math.min(68, this.w * 0.053);
+    const labelFontSize = compactPortrait ? Math.min(18, this.w * 0.038) : Math.min(24, this.w * 0.02);
+    const subFontSize = compactPortrait ? Math.min(17, this.w * 0.039) : Math.min(21, this.w * 0.017);
     const roadTop = this.roadY - this.roadH / 2;
     const lightsTopY = roadTop - this.h * 0.14 - 42;
 
     const mainText = `￥${money.toFixed(2)}`;
     const labelText = "剩余金额";
-    const subPrefixText = "每秒 -";
-    const subValueText = `￥${this.config.moneyLossPerSec.toFixed(2)}`;
-    const subGap = compactPortrait ? 7 : 10;
+    const subText = `每秒 -￥${this.config.moneyLossPerSec.toFixed(2)}`;
 
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
     const labelWidth = ctx.measureText(labelText).width;
-    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
+    ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
     const mainWidth = ctx.measureText(mainText).width;
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
-    const subPrefixWidth = ctx.measureText(subPrefixText).width;
-    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
-    const subValueWidth = ctx.measureText(subValueText).width;
-    const subTotalWidth = subPrefixWidth + subGap + subValueWidth;
+    const subWidth = ctx.measureText(subText).width;
     const ribbonW = Math.min(
-      compactPortrait ? this.w - 36 : 500,
+      compactPortrait ? this.w - 36 : 468,
       Math.max(
-        compactPortrait ? 256 : 356,
-        labelWidth + mainWidth + 108,
-        subTotalWidth + 88,
-        routeSpan * (compactPortrait ? 0.58 : 0.4)
+        compactPortrait ? 252 : 344,
+        labelWidth + mainWidth + 98,
+        subWidth + 76,
+        routeSpan * (compactPortrait ? 0.58 : 0.38)
       )
     );
-    const ribbonH = compactPortrait ? 88 : 108;
+    const ribbonH = compactPortrait ? 84 : 104;
     const cx = routeCenterX;
     const overlayLift = compactPortrait ? 22 : 46;
     const cy = Math.max(
@@ -830,70 +844,52 @@ export class World2D {
 
     const pillX = -ribbonW / 2;
     const pillY = -ribbonH / 2;
-    const cornerRadius = compactPortrait ? 12 : 14;
-    const headerBandH = compactPortrait ? 36 : 42;
-    const dividerY = pillY + headerBandH + (compactPortrait ? 6 : 7);
+    const cornerRadius = compactPortrait ? 19 : 22;
 
-    ctx.shadowColor = cardShadowColor;
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetY = 5;
-    ctx.fillStyle = panelColor;
+    const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + ribbonH);
+    panelGrad.addColorStop(0, panelTop);
+    panelGrad.addColorStop(1, panelBottom);
+
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 18 + (stage === 2 ? 20 : stage === 1 ? 14 : 8) + pulseKick * 14;
+    ctx.fillStyle = panelGrad;
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.fill();
 
     ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.save();
-    this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
-    ctx.clip();
-    ctx.fillStyle = headerColor;
-    ctx.fillRect(pillX, pillY, ribbonW, headerBandH);
-    ctx.fillStyle = flashBandColor;
-    ctx.fillRect(pillX, pillY, ribbonW, headerBandH);
-    ctx.restore();
-
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = compactPortrait ? 1.8 : 2.2;
+    ctx.lineWidth = 1.5;
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(pillX + 1, dividerY);
-    ctx.lineTo(pillX + ribbonW - 1, dividerY);
-    ctx.strokeStyle = dividerColor;
-    ctx.lineWidth = 1;
     ctx.stroke();
 
     const leftInset = pillX + (compactPortrait ? 20 : 26);
     const rightInset = pillX + ribbonW - (compactPortrait ? 20 : 26);
-    const topRowY = pillY + headerBandH / 2 + 1;
-    const bottomRowY = pillY + ribbonH - (compactPortrait ? 20 : 22);
-    const subStartX = -(subTotalWidth / 2);
+    const topRowY = pillY + (compactPortrait ? 26 : 31);
+    const bottomRowY = pillY + ribbonH - (compactPortrait ? 17 : 20);
 
-    ctx.fillStyle = labelColor;
+    ctx.fillStyle = accentColor;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(labelText, leftInset, topRowY);
 
-    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
+    ctx.fillStyle = textColor;
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 12 + (stage === 2 ? 16 : stage === 1 ? 12 : 8) + pressure * 12;
+    ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
     ctx.textAlign = "right";
-    ctx.lineWidth = compactPortrait ? 1.3 : 1.7;
-    ctx.strokeStyle = amountStrokeColor;
-    ctx.strokeText(mainText, rightInset, topRowY);
-    ctx.fillStyle = mainTextColor;
     ctx.fillText(mainText, rightInset, topRowY);
 
+    ctx.shadowBlur = 0;
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
-    ctx.textAlign = "left";
-    ctx.fillStyle = subPrefixColor;
-    ctx.fillText(subPrefixText, subStartX, bottomRowY);
-    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
-    ctx.lineWidth = 0.9;
-    ctx.strokeStyle = amountStrokeColor;
-    ctx.strokeText(subValueText, subStartX + subPrefixWidth + subGap, bottomRowY);
-    ctx.fillStyle = subValueColor;
-    ctx.fillText(subValueText, subStartX + subPrefixWidth + subGap, bottomRowY);
+    ctx.fillStyle =
+      stage === 2
+        ? `rgba(255, 160, 160, ${0.9 + pressure * 0.1})`
+        : stage === 1
+          ? `rgba(255, 177, 138, ${0.88 + pressure * 0.08})`
+          : `rgba(255, 208, 168, ${0.84 + pressure * 0.06})`;
+    ctx.textAlign = "center";
+    ctx.fillText(subText, 0, bottomRowY);
 
     ctx.restore();
   }
