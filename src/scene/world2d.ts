@@ -1,4 +1,13 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
+import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
+import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
+
+function loadCanvasImage(src: string): HTMLImageElement {
+  const img = new Image();
+  img.decoding = "async";
+  img.src = src;
+  return img;
+}
 
 /* Deterministic PRNG (mulberry32) for reproducible uneven spacing */
 function mulberry32(seed: number): () => number {
@@ -72,6 +81,8 @@ export class World2D {
   private figH = 0;
   private lastAvatarX = -1; // track movement to decide walk animation
   private smoothAvatarX = -1; // smoothed position to prevent jumps
+  private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
+  private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
   private fogFadeLeftX = -1;
   private fogFadeRightX = -1;
   private lastMoneyPulseStep: number | null = null;
@@ -266,6 +277,13 @@ export class World2D {
     side: "top" | "bottom",
     nowMs: number
   ): void {
+    const signalSprite =
+      color === "green" ? this.greenSignalSprite : color === "red" ? this.redSignalSprite : null;
+    if (signalSprite && this.isRenderableImage(signalSprite)) {
+      this.drawTrafficLightSprite(ctx, x, side, signalSprite);
+      return;
+    }
+
     const poleH = this.h * 0.14;
     const poleW = 3;
     const housingW = 20;
@@ -306,6 +324,27 @@ export class World2D {
     this.drawBulb(ctx, cx, redCY, bulbR, color === "red", "#ff4d4f", "#4a2020", pulse);
     // Green bulb
     this.drawBulb(ctx, cx, greenCY, bulbR, color === "green", "#52c41a", "#1e3a1f", pulse);
+  }
+
+  private drawTrafficLightSprite(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    side: "top" | "bottom",
+    sprite: HTMLImageElement
+  ): void {
+    const roadEdge =
+      side === "top"
+        ? this.roadY - this.roadH / 2
+        : this.roadY + this.roadH / 2;
+    const totalH = this.h * 0.14 + 42;
+    const totalW = totalH * (sprite.naturalWidth / sprite.naturalHeight);
+    const drawX = x - totalW / 2;
+    const drawY = side === "top" ? roadEdge - totalH + 4 : roadEdge - 4;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, drawX, drawY, totalW, totalH);
+    ctx.restore();
   }
 
   private getTrafficLightColor(
@@ -351,6 +390,10 @@ export class World2D {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+  }
+
+  private isRenderableImage(img: HTMLImageElement): boolean {
+    return img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
   }
 
   /* ------------------------------------------------------------------ */
