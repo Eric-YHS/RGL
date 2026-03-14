@@ -6,6 +6,10 @@ type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
 
 const RED_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 17, y: 8, w: 15, h: 35 };
 const GREEN_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 14, y: 52, w: 24, h: 28 };
+const SIGNAL_RED_ON = "#c32128";
+const SIGNAL_RED_OFF = "#35171a";
+const SIGNAL_GREEN_ON = "#1c7a3b";
+const SIGNAL_GREEN_OFF = "#162a1b";
 
 function loadCanvasImage(src: string): HTMLImageElement {
   const img = new Image();
@@ -322,9 +326,9 @@ export class World2D {
     const pulse = 0.7 + 0.3 * Math.abs(Math.sin(nowMs * 0.005));
 
     // Red bulb
-    this.drawBulb(ctx, cx, redCY, bulbR, color === "red", "#ff4d4f", "#4a2020", pulse);
+    this.drawBulb(ctx, cx, redCY, bulbR, color === "red", SIGNAL_RED_ON, SIGNAL_RED_OFF, pulse);
     // Green bulb
-    this.drawBulb(ctx, cx, greenCY, bulbR, color === "green", "#52c41a", "#1e3a1f", pulse);
+    this.drawBulb(ctx, cx, greenCY, bulbR, color === "green", SIGNAL_GREEN_ON, SIGNAL_GREEN_OFF, pulse);
 
     if (color === "red") {
       const glyph = this.getSignalGlyph("red");
@@ -367,7 +371,7 @@ export class World2D {
       ctx.shadowColor = onColor;
       ctx.shadowBlur = 18 * pulse;
       ctx.fillStyle = onColor;
-      ctx.globalAlpha = pulse;
+      ctx.globalAlpha = 0.96;
     } else {
       ctx.shadowColor = "transparent";
       ctx.shadowBlur = 0;
