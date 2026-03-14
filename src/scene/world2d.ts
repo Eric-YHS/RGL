@@ -716,26 +716,10 @@ export class World2D {
   }
 
   private getMoneyStress(
-    money: number,
-    startMoney: number
+    _money: number,
+    _startMoney: number
   ): { stage: 0 | 1 | 2; pressure: number } {
-    const lossPerSec = Math.max(this.config.moneyLossPerSec, 1e-6);
-    const elapsedSec = Math.max(0, (startMoney - money) / lossPerSec);
-    const lightCycleSec = this.config.segmentDurationSec + this.config.redWaitSec;
-    const stage1At = lightCycleSec;
-    const stage2At = lightCycleSec * 3;
-
-    if (elapsedSec < stage1At) {
-      const t = elapsedSec / Math.max(stage1At, 1e-6);
-      return { stage: 0, pressure: 0.1 + t * 0.18 };
-    }
-    if (elapsedSec < stage2At) {
-      const t = (elapsedSec - stage1At) / Math.max(stage2At - stage1At, 1e-6);
-      return { stage: 1, pressure: 0.35 + t * 0.28 };
-    }
-
-    const t = Math.min(1, (elapsedSec - stage2At) / Math.max(lightCycleSec * 1.2, 1e-6));
-    return { stage: 2, pressure: 0.68 + t * 0.32 };
+    return { stage: 2, pressure: 0.92 };
   }
 
   private isCompactPortraitLayout(): boolean {
