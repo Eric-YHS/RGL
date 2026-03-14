@@ -76,6 +76,7 @@ export class World2D {
   private config: ExperimentConfig;
   private disposed = false;
   private resizeHandler: () => void;
+  private resizeObserver: ResizeObserver | null = null;
 
   /* Layout constants (recomputed on resize) */
   private w = 0;
@@ -112,7 +113,21 @@ export class World2D {
 
     this.resizeHandler = () => this.recalcLayout();
     window.addEventListener("resize", this.resizeHandler);
+    if (typeof ResizeObserver !== "undefined") {
+      this.resizeObserver = new ResizeObserver(() => this.recalcLayout());
+      const parent = this.canvas.parentElement;
+      if (parent) this.resizeObserver.observe(parent);
+      this.resizeObserver.observe(this.canvas);
+    }
     this.recalcLayout();
+    requestAnimationFrame(() => {
+      if (this.disposed) return;
+      this.recalcLayout();
+      requestAnimationFrame(() => {
+        if (this.disposed) return;
+        this.recalcLayout();
+      });
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -159,12 +174,31 @@ export class World2D {
     this.resetFogTracking();
   }
 
+  private syncLayoutToCanvasSize(): void {
+    const parent = this.canvas.parentElement;
+    if (!parent) return;
+    const cssW = parent.clientWidth;
+    const cssH = parent.clientHeight;
+    const nextDpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    if (
+      cssW <= 0 ||
+      cssH <= 0 ||
+      cssW !== this.w ||
+      cssH !== this.h ||
+      nextDpr !== this.dpr
+    ) {
+      this.recalcLayout();
+    }
+  }
+
   /* ------------------------------------------------------------------ */
   /*  Main render                                                        */
   /* ------------------------------------------------------------------ */
 
   render(state: ExperimentState, progress01: number, nowMs: number): void {
     if (this.disposed) return;
+    this.syncLayoutToCanvasSize();
     const ctx = this.ctx;
     ctx.save();
     ctx.scale(this.dpr, this.dpr);
@@ -965,5 +999,6 @@ export class World2D {
   dispose(): void {
     this.disposed = true;
     window.removeEventListener("resize", this.resizeHandler);
+    this.resizeObserver?.disconnect();
   }
 }

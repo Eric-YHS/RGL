@@ -249,7 +249,7 @@ app.innerHTML = `
       <button class="btn danger" id="btnWalk" disabled>通行（WALK）</button>
     </div>
 
-    <div class="modal" id="modal">
+    <div class="modal" id="modal" style="display:none;">
       <div class="card" id="modalCard"></div>
     </div>
 
@@ -288,6 +288,7 @@ let desktopGateReady = false;
 let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateEnteredOnce = false;
+let desktopGateShowingPracticeIntro = false;
 
 function updateTopHints(): void {
   els.runHint.textContent = runKind === "practice" ? "练习" : "正式实验";
@@ -331,7 +332,6 @@ function renderDesktopPreflightGate(): void {
 
     if (!desktopGateReady) {
       desktopGateReady = true;
-      showPracticeIntro();
     }
     return;
   }
@@ -348,15 +348,49 @@ function renderDesktopPreflightGate(): void {
   const hoverLabel = hoverReady ? "检测到悬停能力" : "当前设备不具备桌面端悬停能力";
   const keyboardLabel = keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键";
   const mouseLabel = mouseReady ? "已检测到鼠标移动和点击" : "请移动鼠标并点击一次";
+
+  if (desktopGateShowingPracticeIntro && prerequisitesReady && !desktopGateEnteredOnce) {
+    els.desktopGate.innerHTML = `
+      <div class="card desktop-entry-card">
+        <h1>熟悉基本操作</h1>
+        <p>在该部分，您需要控制屏幕上的“虚拟人”行走。</p>
+        <ul>
+          <li>点击左侧的【开始】按钮，“虚拟人”将开始行走。</li>
+          <li>行走途中将遇到交通信号灯，红灯会阻止通行，等待一段时间后会变为绿灯。</li>
+          <li>您可以点击屏幕中央的【通行（WALK）】按钮在红灯时直接通行。</li>
+        </ul>
+        <p class="hint">阅读完后，请点击下方按钮进入练习页面。</p>
+        <h2>示例短片</h2>
+        <p class="hint">请将示例短片放到 <code>public/demo.mp4</code>。</p>
+        <video style="width:100%; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);" controls muted playsinline>
+          <source src="/demo.mp4" type="video/mp4" />
+        </video>
+        <div class="actions">
+          <button class="btn primary" id="btnDesktopGateBeginPractice">我已阅读，进入练习</button>
+        </div>
+      </div>
+    `;
+    els.desktopGate.style.display = "grid";
+    desktopGateVisible = true;
+    els.desktopGate
+      .querySelector<HTMLButtonElement>("#btnDesktopGateBeginPractice")
+      ?.addEventListener("click", () => {
+        desktopGateEnteredOnce = true;
+        desktopGateShowingPracticeIntro = false;
+        renderDesktopPreflightGate();
+      });
+    return;
+  }
+
   const readyNotice = prerequisitesReady
     ? `
-      <div class="desktop-preflight-ready">
-        桌面端校验已通过。请点击下方按钮进入实验说明。
-      </div>
-      <div class="desktop-preflight-actions">
-        <button class="btn primary" id="btnDesktopGateContinue">进入实验说明</button>
-      </div>
-    `
+        <div class="desktop-preflight-ready">
+          桌面端校验已通过。请点击下方按钮进入实验说明。
+        </div>
+        <div class="desktop-preflight-actions">
+          <button class="btn primary" id="btnDesktopGateContinue">进入实验说明</button>
+        </div>
+      `
     : "";
 
   els.desktopGate.innerHTML = `
@@ -381,7 +415,7 @@ function renderDesktopPreflightGate(): void {
     els.desktopGate
       .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
       ?.addEventListener("click", () => {
-        desktopGateEnteredOnce = true;
+        desktopGateShowingPracticeIntro = true;
         renderDesktopPreflightGate();
       });
   }

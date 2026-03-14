@@ -229,6 +229,11 @@ body.desktop-only-blocked {
   font-weight: 700;
 }
 
+.desktop-entry-card {
+  width: min(920px, calc(100vw - 56px));
+  max-height: min(80vh, 780px);
+}
+
 @supports (height: 100dvh) {
   #app,
   .stage {
