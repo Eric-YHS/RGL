@@ -204,25 +204,27 @@ canvas.webgl {
 }
 
 .btn.primary {
-  background: linear-gradient(180deg, rgba(0, 194, 255, 0.22), rgba(0, 194, 255, 0.08));
-  border-color: rgba(0, 194, 255, 0.28);
+  background: #1478c9;
+  border-color: #0f66ad;
+  color: #f5fbff;
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(0, 194, 255, 0.36), rgba(0, 194, 255, 0.16));
-  border-color: rgba(0, 194, 255, 0.5);
-  box-shadow: 0 4px 20px rgba(0, 194, 255, 0.18);
+  background: #1d8de4;
+  border-color: #1676bf;
+  box-shadow: 0 4px 20px rgba(20, 120, 201, 0.32);
 }
 
 .btn.danger {
-  background: linear-gradient(180deg, rgba(255, 77, 79, 0.22), rgba(255, 77, 79, 0.08));
-  border-color: rgba(255, 77, 79, 0.28);
+  background: #d92f3a;
+  border-color: #b92530;
+  color: #fff6f6;
 }
 
 .btn.danger:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(255, 77, 79, 0.36), rgba(255, 77, 79, 0.16));
-  border-color: rgba(255, 77, 79, 0.5);
-  box-shadow: 0 4px 20px rgba(255, 77, 79, 0.18);
+  background: #eb3e49;
+  border-color: #ca2d38;
+  box-shadow: 0 6px 24px rgba(217, 47, 58, 0.34);
 }
 
 .btn:disabled {
@@ -246,6 +248,18 @@ canvas.webgl {
   pointer-events: auto;
   min-width: 180px;
   font-weight: 700;
+}
+
+.center-controls .btn.danger {
+  background: #d52633;
+  border-color: #b61f2b;
+  box-shadow: 0 8px 26px rgba(213, 38, 51, 0.26);
+}
+
+.center-controls .btn.danger:hover:not(:disabled) {
+  background: #ec3946;
+  border-color: #c82934;
+  box-shadow: 0 10px 28px rgba(213, 38, 51, 0.4);
 }
 
 /* WALK 按钮呼吸脉冲动画 */
