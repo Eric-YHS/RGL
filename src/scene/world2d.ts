@@ -284,12 +284,13 @@ export class World2D {
     side: "top" | "bottom",
     nowMs: number
   ): void {
+    const trafficLightScale = this.getTrafficLightScale();
     const poleH = this.h * 0.14;
-    const poleW = 3;
-    const housingW = 20;
-    const housingH = 42;
-    const bulbR = 7;
-    const bulbSpacing = 18;
+    const poleW = 3 * trafficLightScale;
+    const housingW = 20 * trafficLightScale;
+    const housingH = 42 * trafficLightScale;
+    const bulbR = 7 * trafficLightScale;
+    const bulbSpacing = 18 * trafficLightScale;
 
     const roadEdge =
       side === "top"
@@ -309,7 +310,7 @@ export class World2D {
     const hy = side === "top" ? poleTop - housingH : poleTop;
 
     ctx.fillStyle = "#2a2a2a";
-    this.roundRect(ctx, hx, hy, housingW, housingH, 5);
+    this.roundRect(ctx, hx, hy, housingW, housingH, 5 * trafficLightScale);
     ctx.fill();
 
     // Bulbs: red on top, green on bottom within housing
@@ -426,18 +427,22 @@ export class World2D {
     bulbR: number,
     pulse: number
   ): void {
-    const scale = Math.min((bulbR * 1.65) / glyph.width, (bulbR * 1.78) / glyph.height);
+    const scale = Math.min((bulbR * 1.9) / glyph.width, (bulbR * 2.05) / glyph.height);
     const drawW = glyph.width * scale;
     const drawH = glyph.height * scale;
 
     ctx.save();
     ctx.globalAlpha = 0.9 + pulse * 0.1;
     ctx.beginPath();
-    ctx.arc(cx, cy, bulbR * 0.98, 0, Math.PI * 2);
+    ctx.arc(cx, cy, bulbR, 0, Math.PI * 2);
     ctx.clip();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(glyph, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
     ctx.restore();
+  }
+
+  private getTrafficLightScale(): number {
+    return this.isCompactPortraitLayout() ? 1 : 1.22;
   }
 
   private isRenderableImage(img: HTMLImageElement): boolean {
