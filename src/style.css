@@ -207,6 +207,28 @@ body.desktop-only-blocked {
   color: #cff6d6;
 }
 
+.desktop-preflight-ready {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(123, 149, 184, 0.12);
+  border: 1px solid rgba(154, 179, 212, 0.18);
+  color: rgba(242, 247, 255, 0.92);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.desktop-preflight-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.desktop-preflight-actions .btn {
+  min-width: 144px;
+  font-weight: 700;
+}
+
 @supports (height: 100dvh) {
   #app,
   .stage {

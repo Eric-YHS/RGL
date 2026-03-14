@@ -287,6 +287,7 @@ const desktopInputProof: DesktopInputProof = {
 let desktopGateReady = false;
 let desktopGateVisible = false;
 let pausedByDesktopGate = false;
+let desktopGateEnteredOnce = false;
 
 function updateTopHints(): void {
   els.runHint.textContent = runKind === "practice" ? "练习" : "正式实验";
@@ -314,7 +315,8 @@ function renderDesktopPreflightGate(): void {
   const hoverReady = hasDesktopHover();
   const keyboardReady = desktopInputProof.keyboard;
   const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
-  const canEnter = viewportReady && pointerReady && hoverReady && keyboardReady && mouseReady;
+  const prerequisitesReady = viewportReady && pointerReady && hoverReady && keyboardReady && mouseReady;
+  const canEnter = prerequisitesReady && desktopGateEnteredOnce;
 
   if (canEnter) {
     if (desktopGateVisible) {
@@ -346,6 +348,16 @@ function renderDesktopPreflightGate(): void {
   const hoverLabel = hoverReady ? "检测到悬停能力" : "当前设备不具备桌面端悬停能力";
   const keyboardLabel = keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键";
   const mouseLabel = mouseReady ? "已检测到鼠标移动和点击" : "请移动鼠标并点击一次";
+  const readyNotice = prerequisitesReady
+    ? `
+      <div class="desktop-preflight-ready">
+        桌面端校验已通过。请点击下方按钮进入实验说明。
+      </div>
+      <div class="desktop-preflight-actions">
+        <button class="btn primary" id="btnDesktopGateContinue">进入实验说明</button>
+      </div>
+    `
+    : "";
 
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card">
@@ -359,10 +371,20 @@ function renderDesktopPreflightGate(): void {
         <div class="${keyboardReady ? "ready" : ""}">${keyboardReady ? "✓" : "•"} ${keyboardLabel}</div>
         <div class="${mouseReady ? "ready" : ""}">${mouseReady ? "✓" : "•"} ${mouseLabel}</div>
       </div>
+      ${readyNotice}
     </section>
   `;
   els.desktopGate.style.display = "grid";
   desktopGateVisible = true;
+
+  if (prerequisitesReady) {
+    els.desktopGate
+      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
+      ?.addEventListener("click", () => {
+        desktopGateEnteredOnce = true;
+        renderDesktopPreflightGate();
+      });
+  }
 }
 
 function openModal(html: string): void {
