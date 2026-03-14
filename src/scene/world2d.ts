@@ -415,8 +415,52 @@ export class World2D {
         data[i + 3] = 0;
       }
     }
+
+    this.boldenSignalGlyphLines(data, crop.w, crop.h);
     ctx.putImageData(imgData, 0, 0);
     return canvas;
+  }
+
+  private boldenSignalGlyphLines(data: Uint8ClampedArray, width: number, height: number): void {
+    const source = new Uint8ClampedArray(data);
+    const offsets = [
+      [-1, -1],
+      [0, -1],
+      [1, -1],
+      [-1, 0],
+      [1, 0],
+      [-1, 1],
+      [0, 1],
+      [1, 1]
+    ] as const;
+
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const idx = (y * width + x) * 4;
+        const alpha = source[idx + 3];
+        if (alpha === 0) continue;
+
+        const r = source[idx];
+        const g = source[idx + 1];
+        const b = source[idx + 2];
+        const isStroke = r < 130 && g < 130 && b < 130;
+        if (!isStroke) continue;
+
+        for (const [dx, dy] of offsets) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+
+          const nIdx = (ny * width + nx) * 4;
+          if (source[nIdx + 3] !== 0) continue;
+
+          data[nIdx] = r;
+          data[nIdx + 1] = g;
+          data[nIdx + 2] = b;
+          data[nIdx + 3] = Math.max(data[nIdx + 3], 228);
+        }
+      }
+    }
   }
 
   private drawSignalGlyph(
@@ -427,7 +471,7 @@ export class World2D {
     bulbR: number,
     pulse: number
   ): void {
-    const scale = Math.min((bulbR * 1.9) / glyph.width, (bulbR * 2.05) / glyph.height);
+    const scale = Math.min((bulbR * 2.02) / glyph.width, (bulbR * 2.14) / glyph.height);
     const drawW = glyph.width * scale;
     const drawH = glyph.height * scale;
 
