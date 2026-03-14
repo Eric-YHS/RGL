@@ -10,16 +10,6 @@ const SIGNAL_RED_ON = "#c32128";
 const SIGNAL_RED_OFF = "#35171a";
 const SIGNAL_GREEN_ON = "#1c7a3b";
 const SIGNAL_GREEN_OFF = "#162a1b";
-const SCENE_SKY_TOP = "#f7ead6";
-const SCENE_SKY_BOTTOM = "#f2ddc3";
-const SCENE_GROUND = "#d3b49c";
-const SCENE_SIDEWALK = "#bea892";
-const SCENE_ROAD = "#6c5b50";
-const SCENE_LANE = "rgba(253, 240, 213, 0.54)";
-const SCENE_CROSSWALK = "rgba(253, 240, 213, 0.86)";
-const SCENE_POLE = "#4d3a32";
-const SCENE_HOUSING = "#2d221d";
-const SCENE_FIGURE = "#18110d";
 
 function loadCanvasImage(src: string): HTMLImageElement {
   const img = new Image();
@@ -264,13 +254,13 @@ export class World2D {
   private drawBackground(ctx: CanvasRenderingContext2D): void {
     // Sky gradient
     const skyGrad = ctx.createLinearGradient(0, 0, 0, this.roadY - this.roadH);
-    skyGrad.addColorStop(0, SCENE_SKY_TOP);
-    skyGrad.addColorStop(1, SCENE_SKY_BOTTOM);
+    skyGrad.addColorStop(0, "#b8dced");
+    skyGrad.addColorStop(1, "#ddeef6");
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, this.w, this.roadY - this.roadH / 2);
 
     // Ground
-    ctx.fillStyle = SCENE_GROUND;
+    ctx.fillStyle = "#c8d8c0";
     ctx.fillRect(0, this.roadY + this.roadH / 2, this.w, this.h - (this.roadY + this.roadH / 2));
   }
 
@@ -282,16 +272,16 @@ export class World2D {
     const top = this.roadY - this.roadH / 2;
 
     // Sidewalk edges
-    ctx.fillStyle = SCENE_SIDEWALK;
+    ctx.fillStyle = "#b0b0a8";
     ctx.fillRect(0, top - 4, this.w, this.roadH + 8);
 
     // Asphalt
-    ctx.fillStyle = SCENE_ROAD;
+    ctx.fillStyle = "#6b6b6b";
     ctx.fillRect(0, top, this.w, this.roadH);
 
     // Dashed center line
     ctx.save();
-    ctx.strokeStyle = SCENE_LANE;
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
     ctx.lineWidth = 2;
     ctx.setLineDash([18, 14]);
     ctx.beginPath();
@@ -313,7 +303,7 @@ export class World2D {
     const contentH = (numStripes - 1) * (stripeW + stripeGap) + stripeW;
     const startY = top + (this.roadH - contentH) / 2 + 1;
 
-    ctx.fillStyle = SCENE_CROSSWALK;
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
     const crossW = 22;
     for (let s = 0; s < numStripes; s++) {
       const sy = startY + s * (stripeW + stripeGap);
@@ -350,14 +340,14 @@ export class World2D {
     const poleBottom = roadEdge;
 
     // Pole
-    ctx.fillStyle = SCENE_POLE;
+    ctx.fillStyle = "#444";
     ctx.fillRect(x - poleW / 2, Math.min(poleTop, poleBottom), poleW, poleH);
 
     // Housing
     const hx = x - housingW / 2;
     const hy = side === "top" ? poleTop - housingH : poleTop;
 
-    ctx.fillStyle = SCENE_HOUSING;
+    ctx.fillStyle = "#2a2a2a";
     this.roundRect(ctx, hx, hy, housingW, housingH, 5 * trafficLightScale);
     ctx.fill();
 
@@ -569,9 +559,9 @@ export class World2D {
 
     // [r,g,b] for each band to build proper transparent→solid gradients
     const bands: Array<{ y: number; h: number; color: string; rgb: string }> = [
-      { y: 0, h: roadTop, color: SCENE_SKY_BOTTOM, rgb: "242,221,195" },
-      { y: roadTop, h: roadBot - roadTop, color: SCENE_SIDEWALK, rgb: "190,168,146" },
-      { y: roadBot, h: this.h - roadBot, color: SCENE_GROUND, rgb: "211,180,156" }
+      { y: 0, h: roadTop, color: "#ddeef6", rgb: "221,238,246" },
+      { y: roadTop, h: roadBot - roadTop, color: "#b0b0a8", rgb: "176,176,168" },
+      { y: roadBot, h: this.h - roadBot, color: "#c8d8c0", rgb: "200,216,192" }
     ];
 
     for (const band of bands) {
@@ -655,8 +645,8 @@ export class World2D {
     const walkDx = isActuallyMoving ? Math.sin(nowMs * 0.008) * armLen * 0.6 : 0;
 
     ctx.save();
-    ctx.strokeStyle = SCENE_FIGURE;
-    ctx.fillStyle = SCENE_FIGURE;
+    ctx.strokeStyle = "#1a1a1a";
+    ctx.fillStyle = "#1a1a1a";
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
 
@@ -728,16 +718,16 @@ export class World2D {
 
     grad.addColorStop(0, "rgba(0,0,0,0)");
     if (stage === 0) {
-      grad.addColorStop(0.62, `rgba(108, 59, 26, ${0.02 + pressure * 0.03})`);
-      grad.addColorStop(1, `rgba(66, 14, 3, ${0.05 + pressure * 0.06 + heartbeat * pressure * 0.02})`);
+      grad.addColorStop(0.62, `rgba(94, 10, 12, ${0.02 + pressure * 0.03})`);
+      grad.addColorStop(1, `rgba(38, 0, 0, ${0.05 + pressure * 0.06 + heartbeat * pressure * 0.02})`);
     } else if (stage === 1) {
-      grad.addColorStop(0.56, `rgba(144, 17, 24, ${0.04 + pressure * 0.05})`);
-      grad.addColorStop(0.8, `rgba(108, 59, 26, ${0.08 + pressure * 0.08 + heartbeat * pressure * 0.03})`);
-      grad.addColorStop(1, `rgba(66, 14, 3, ${0.12 + pressure * 0.1 + heartbeat * pressure * 0.05})`);
+      grad.addColorStop(0.56, `rgba(118, 28, 16, ${0.04 + pressure * 0.05})`);
+      grad.addColorStop(0.8, `rgba(78, 20, 12, ${0.08 + pressure * 0.08 + heartbeat * pressure * 0.03})`);
+      grad.addColorStop(1, `rgba(42, 8, 8, ${0.12 + pressure * 0.1 + heartbeat * pressure * 0.05})`);
     } else {
-      grad.addColorStop(0.52, `rgba(144, 17, 24, ${0.05 + pressure * 0.08})`);
-      grad.addColorStop(0.74, `rgba(102, 10, 12, ${0.10 + pressure * 0.1 + heartbeat * pressure * 0.05})`);
-      grad.addColorStop(1, `rgba(66, 14, 3, ${0.16 + pressure * 0.14 + heartbeat * pressure * 0.08})`);
+      grad.addColorStop(0.52, `rgba(94, 10, 12, ${0.05 + pressure * 0.08})`);
+      grad.addColorStop(0.74, `rgba(70, 0, 0, ${0.10 + pressure * 0.1 + heartbeat * pressure * 0.05})`);
+      grad.addColorStop(1, `rgba(38, 0, 0, ${0.16 + pressure * 0.14 + heartbeat * pressure * 0.08})`);
     }
 
     ctx.save();
@@ -779,34 +769,34 @@ export class World2D {
     const alpha = 0.97 + heartbeat * pressure * 0.03;
     const cardJoltY = pulseKick * (stage === 2 ? 4 : stage === 1 ? 2.5 : 1.5);
 
-    let textColor = "#fdf0d5";
-    let glowColor = "rgba(214, 40, 40, 0.18)";
-    let accentColor = "rgba(253, 240, 213, 0.72)";
-    let panelTop = "rgba(76, 35, 23, 0.94)";
-    let panelBottom = "rgba(66, 14, 3, 0.96)";
-    let borderColor = "rgba(181, 131, 87, 0.34)";
+    let textColor = "#f4f1e8";
+    let glowColor = "rgba(255,255,255,0.18)";
+    let accentColor = "rgba(255,255,255,0.68)";
+    let panelTop = "rgba(38, 26, 28, 0.92)";
+    let panelBottom = "rgba(20, 16, 18, 0.94)";
+    let borderColor = "rgba(255,255,255,0.12)";
 
     if (stage === 0) {
-      textColor = "#fdf0d5";
-      glowColor = "rgba(181, 131, 87, 0.28)";
-      accentColor = "rgba(253, 240, 213, 0.82)";
-      panelTop = "rgba(108, 59, 26, 0.94)";
-      panelBottom = "rgba(76, 35, 23, 0.98)";
-      borderColor = "rgba(211, 180, 156, 0.26)";
+      textColor = "#fff0d2";
+      glowColor = "rgba(255, 201, 106, 0.3)";
+      accentColor = "rgba(255, 205, 144, 0.82)";
+      panelTop = "rgba(60, 34, 24, 0.92)";
+      panelBottom = "rgba(26, 16, 12, 0.96)";
+      borderColor = "rgba(255, 189, 112, 0.2)";
     } else if (stage === 1) {
-      textColor = "#fdf0d5";
-      glowColor = "rgba(214, 40, 40, 0.32)";
-      accentColor = "rgba(253, 240, 213, 0.86)";
-      panelTop = "rgba(144, 17, 24, 0.92)";
-      panelBottom = "rgba(76, 35, 23, 0.98)";
-      borderColor = "rgba(214, 40, 40, 0.34)";
+      textColor = "#ffc070";
+      glowColor = "rgba(255, 132, 38, 0.44)";
+      accentColor = "rgba(255, 169, 104, 0.86)";
+      panelTop = "rgba(78, 28, 18, 0.94)";
+      panelBottom = "rgba(34, 12, 10, 0.98)";
+      borderColor = "rgba(255, 123, 60, 0.28)";
     } else {
-      textColor = "#fdf0d5";
-      glowColor = "rgba(214, 40, 40, 0.52)";
-      accentColor = "rgba(253, 240, 213, 0.98)";
-      panelTop = "rgba(214, 40, 40, 0.96)";
-      panelBottom = "rgba(144, 17, 24, 0.99)";
-      borderColor = "rgba(253, 240, 213, 0.28)";
+      textColor = "#ff7466";
+      glowColor = "rgba(255, 64, 64, 0.68)";
+      accentColor = "rgba(255, 151, 133, 0.98)";
+      panelTop = "rgba(88, 12, 14, 0.96)";
+      panelBottom = "rgba(34, 4, 6, 0.99)";
+      borderColor = "rgba(255, 96, 80, 0.42)";
     }
 
     const compactPortrait = this.isCompactPortraitLayout();
@@ -894,10 +884,10 @@ export class World2D {
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
     ctx.fillStyle =
       stage === 2
-        ? `rgba(253, 240, 213, ${0.9 + pressure * 0.1})`
+        ? `rgba(255, 160, 160, ${0.9 + pressure * 0.1})`
         : stage === 1
-          ? `rgba(253, 225, 198, ${0.88 + pressure * 0.08})`
-          : `rgba(244, 220, 198, ${0.84 + pressure * 0.06})`;
+          ? `rgba(255, 177, 138, ${0.88 + pressure * 0.08})`
+          : `rgba(255, 208, 168, ${0.84 + pressure * 0.06})`;
     ctx.textAlign = "center";
     ctx.fillText(subText, 0, bottomRowY);
 
