@@ -215,6 +215,18 @@ canvas.webgl {
   box-shadow: 0 4px 20px rgba(20, 120, 201, 0.32);
 }
 
+.btn.secondary {
+  background: #4b5f7a;
+  border-color: #3f5168;
+  color: #f3f8ff;
+}
+
+.btn.secondary:hover:not(:disabled) {
+  background: #5b7392;
+  border-color: #4a6280;
+  box-shadow: 0 4px 20px rgba(75, 95, 122, 0.28);
+}
+
 .btn.danger {
   background: #d92f3a;
   border-color: #b92530;

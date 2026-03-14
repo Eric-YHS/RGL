@@ -288,7 +288,7 @@ function showRevealModeSelect(): void {
     <p class="hint">请在开始前选择一种呈现方式（本次任务中将保持不变）。</p>
     <div class="actions" style="flex-direction:column; align-items:stretch; gap:12px;">
       <button class="btn primary" id="btnRevealFull">全呈现（一次性显示所有信号灯）</button>
-      <button class="btn" id="btnRevealSequential">逐个呈现（前方有雾，逐步揭示）</button>
+      <button class="btn secondary" id="btnRevealSequential">逐个呈现（前方有雾，逐步揭示）</button>
     </div>
   `);
 
