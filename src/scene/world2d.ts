@@ -775,12 +775,13 @@ export class World2D {
     );
     const ribbonH = compactPortrait ? 78 : 92;
     const cx = routeCenterX;
+    const overlayLift = compactPortrait ? 12 : 22;
     const cy = Math.max(
-      compactPortrait ? this.h * 0.24 : this.h * 0.225,
-      lightsTopY - (compactPortrait ? 42 : 48)
+      compactPortrait ? this.h * 0.228 : this.h * 0.208,
+      lightsTopY - (compactPortrait ? 54 : 70)
     );
 
-    ctx.translate(cx, cy - cardJoltY);
+    ctx.translate(cx, cy - overlayLift - cardJoltY);
     ctx.scale(cardScale, cardScale);
 
     const pillX = -ribbonW / 2;
@@ -802,10 +803,6 @@ export class World2D {
     ctx.lineWidth = 1.5;
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.stroke();
-
-    ctx.fillStyle = stage === 2 ? "rgba(255, 82, 82, 0.18)" : "rgba(255, 120, 92, 0.14)";
-    this.roundRect(ctx, pillX + 10, pillY + 10, ribbonW - 20, compactPortrait ? 24 : 28, 12);
-    ctx.fill();
 
     const leftInset = pillX + (compactPortrait ? 18 : 22);
     const rightInset = pillX + ribbonW - (compactPortrait ? 18 : 22);

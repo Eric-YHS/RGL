@@ -70,7 +70,7 @@ canvas.webgl {
   border: 1px solid var(--panel-border);
   box-shadow: 0 10px 26px var(--shadow);
   border-radius: 16px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   backdrop-filter: blur(10px);
   transition: opacity 0.3s ease, transform 0.3s ease;
   animation: panelSlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
@@ -95,8 +95,8 @@ canvas.webgl {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .panel-control .control-tip {
@@ -126,14 +126,14 @@ canvas.webgl {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(390px, calc(100vw - 40px));
+  width: min(344px, calc(100vw - 40px));
   min-width: 0;
 }
 
 .hud .status {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 7px;
   font-size: 13px;
 }
 
