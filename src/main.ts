@@ -276,32 +276,10 @@ function buildFormalSubmission(): SessionSubmission {
   });
 }
 
-function setRevealMode(mode: RevealMode): void {
-  formalConfig = makeConfig(mode, 5);
-  practiceConfig = makeConfig(mode, 2);
+function initializeFullRevealMode(): void {
+  formalConfig = makeConfig("full", 5);
+  practiceConfig = makeConfig("full", 2);
   switchRun("practice");
-}
-
-function showRevealModeSelect(): void {
-  openModal(`
-    <h1>请选择呈现方式</h1>
-    <p class="hint">请在开始前选择一种呈现方式（本次任务中将保持不变）。</p>
-    <div class="actions" style="flex-direction:column; align-items:stretch; gap:12px;">
-      <button class="btn primary" id="btnRevealFull">全呈现（一次性显示所有信号灯）</button>
-      <button class="btn secondary" id="btnRevealSequential">逐个呈现（前方有雾，逐步揭示）</button>
-    </div>
-  `);
-
-  document.querySelector<HTMLButtonElement>("#btnRevealFull")?.addEventListener("click", () => {
-    setRevealMode("full");
-    showPracticeIntro();
-  });
-  document
-    .querySelector<HTMLButtonElement>("#btnRevealSequential")
-    ?.addEventListener("click", () => {
-      setRevealMode("sequential");
-      showPracticeIntro();
-    });
 }
 
 function showPracticeIntro(): void {
@@ -594,7 +572,8 @@ const hudCache = {
 
 updateTopHints();
 void flushPendingSubmissions();
-showRevealModeSelect();
+initializeFullRevealMode();
+showPracticeIntro();
 
 window.addEventListener("online", () => {
   void flushPendingSubmissions();
