@@ -356,36 +356,31 @@ export class World2D {
 
   private drawFog(ctx: CanvasRenderingContext2D, state: ExperimentState, avatarX: number): void {
     const roadW = this.roadRight - this.roadLeft;
-    const baseFadeW = roadW * this.fogFadePx;
+    const baseFadeW = this.getFogFadeWidthPx(roadW);
     const clearEndX = avatarX + roadW * this.fogLeadPx;
-    let fogSolidX = clearEndX + baseFadeW;
+    let fadeLeft = Math.max(0, clearEndX);
+    let fogSolidX = fadeLeft + baseFadeW;
 
     if (state.phase !== "idle" && state.phase !== "finished") {
       const currentTargetX = this.lightXs[state.lightIndex - 1];
       const nextHiddenX = this.lightXs[state.lightIndex];
 
+      if (currentTargetX !== undefined) {
+        // Keep the currently relevant traffic light fully outside the fog fade zone.
+        fadeLeft = Math.max(fadeLeft, currentTargetX + this.getFogLightSafeHalfWidthPx());
+        fogSolidX = Math.max(fogSolidX, fadeLeft + baseFadeW);
+      }
+
       if (currentTargetX !== undefined && nextHiddenX !== undefined) {
-        const gap = nextHiddenX - currentTargetX;
-        const revealCapX = currentTargetX + gap * 0.46;
+        const revealCapX = nextHiddenX - this.getFogLightSafeHalfWidthPx();
         fogSolidX = Math.min(fogSolidX, revealCapX);
+        fogSolidX = Math.max(fogSolidX, fadeLeft);
       }
     }
 
     if (fogSolidX >= this.w) return;
 
     ctx.save();
-
-    let fadeLeft = Math.max(0, fogSolidX - baseFadeW);
-    if (state.phase !== "idle" && state.phase !== "finished") {
-      const currentTargetX = this.lightXs[state.lightIndex - 1];
-      const nextHiddenX = this.lightXs[state.lightIndex];
-      if (currentTargetX !== undefined && nextHiddenX !== undefined) {
-        const gap = nextHiddenX - currentTargetX;
-        const minFadeLeft = currentTargetX + gap * 0.18;
-        const cappedFadeW = Math.min(baseFadeW, gap * 0.28);
-        fadeLeft = Math.max(minFadeLeft, fogSolidX - cappedFadeW);
-      }
-    }
     const fadeRight = Math.min(this.w, fogSolidX);
 
     // Repaint background bands over the fogged area to fully hide scene elements.
@@ -733,6 +728,14 @@ export class World2D {
 
   private isCompactPortraitLayout(): boolean {
     return this.h > this.w && this.w <= 560;
+  }
+
+  private getFogFadeWidthPx(roadW: number): number {
+    return Math.max(roadW * this.fogFadePx, this.isCompactPortraitLayout() ? 18 : 14);
+  }
+
+  private getFogLightSafeHalfWidthPx(): number {
+    return this.isCompactPortraitLayout() ? 24 : 20;
   }
 
   /* ------------------------------------------------------------------ */
