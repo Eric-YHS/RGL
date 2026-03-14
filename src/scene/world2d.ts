@@ -103,6 +103,7 @@ export class World2D {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cssW = parent.clientWidth;
     const cssH = parent.clientHeight;
+    const compactPortrait = cssH > cssW && cssW <= 560;
     this.canvas.width = Math.round(cssW * this.dpr);
     this.canvas.height = Math.round(cssH * this.dpr);
     this.canvas.style.width = `${cssW}px`;
@@ -110,8 +111,8 @@ export class World2D {
     this.w = cssW;
     this.h = cssH;
 
-    this.roadY = this.h * 0.54;
-    this.roadH = this.h * 0.10;
+    this.roadY = this.h * (compactPortrait ? 0.6 : 0.59);
+    this.roadH = this.h * (compactPortrait ? 0.098 : 0.104);
     this.roadLeft = this.w * 0.08;
     this.roadRight = this.w * 0.92;
 
@@ -612,7 +613,7 @@ export class World2D {
     const cardScale =
       1 + pulseKick * (stage === 2 ? 0.085 : stage === 1 ? 0.06 : 0.035) + heartbeat * pressure * 0.025;
     const alpha = 0.97 + heartbeat * pressure * 0.03;
-    const cardJoltY = pulseKick * (stage === 2 ? 5 : stage === 1 ? 3 : 1.5);
+    const cardJoltY = pulseKick * (stage === 2 ? 4 : stage === 1 ? 2.5 : 1.5);
 
     let textColor = "#f4f1e8";
     let glowColor = "rgba(255,255,255,0.18)";
@@ -645,11 +646,15 @@ export class World2D {
     }
 
     const compactPortrait = this.isCompactPortraitLayout();
-    const fontSize = compactPortrait ? Math.min(58, this.w * 0.1) : Math.min(68, this.w * 0.085);
-    const labelFontSize = compactPortrait ? Math.min(16, this.w * 0.038) : Math.min(18, this.w * 0.024);
-    const subFontSize = compactPortrait ? Math.min(18, this.w * 0.045) : Math.min(21, this.w * 0.028);
-    const cx = this.w / 2;
-    const cy = compactPortrait ? this.h - Math.max(166, this.h * 0.21) : this.h * 0.11;
+    const routeCenterX =
+      this.lightXs.length > 0 ? (this.lightXs[0] + this.lightXs[this.lightXs.length - 1]) / 2 : this.w / 2;
+    const routeSpan =
+      this.lightXs.length > 1 ? this.lightXs[this.lightXs.length - 1] - this.lightXs[0] : this.w * 0.42;
+    const fontSize = compactPortrait ? Math.min(40, this.w * 0.085) : Math.min(54, this.w * 0.043);
+    const labelFontSize = compactPortrait ? Math.min(16, this.w * 0.034) : Math.min(20, this.w * 0.017);
+    const subFontSize = compactPortrait ? Math.min(16, this.w * 0.037) : Math.min(18, this.w * 0.015);
+    const roadTop = this.roadY - this.roadH / 2;
+    const lightsTopY = roadTop - this.h * 0.14 - 42;
 
     const mainText = `￥${money.toFixed(2)}`;
     const labelText = "剩余金额";
@@ -657,51 +662,73 @@ export class World2D {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.translate(cx, cy + (compactPortrait ? 0 : 8) - cardJoltY);
+    ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
+    const labelWidth = ctx.measureText(labelText).width;
+    ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
+    const mainWidth = ctx.measureText(mainText).width;
+    ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
+    const subWidth = ctx.measureText(subText).width;
+    const ribbonW = Math.min(
+      compactPortrait ? this.w - 44 : 420,
+      Math.max(
+        compactPortrait ? 238 : 312,
+        labelWidth + mainWidth + 86,
+        subWidth + 64,
+        routeSpan * (compactPortrait ? 0.54 : 0.34)
+      )
+    );
+    const ribbonH = compactPortrait ? 78 : 92;
+    const cx = routeCenterX;
+    const cy = Math.max(
+      compactPortrait ? this.h * 0.24 : this.h * 0.225,
+      lightsTopY - (compactPortrait ? 42 : 48)
+    );
+
+    ctx.translate(cx, cy - cardJoltY);
     ctx.scale(cardScale, cardScale);
 
-    // Measure text for background pill
-    ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
-    const mainMetrics = ctx.measureText(mainText);
-    const pillW = Math.min(
-      mainMetrics.width + (compactPortrait ? 64 : 78),
-      this.w - (compactPortrait ? 34 : 48)
-    );
-    const pillH = fontSize + labelFontSize + subFontSize + (compactPortrait ? 34 : 42);
-    const pillX = -pillW / 2;
-    const pillY = -pillH / 2;
-    const cornerRadius = compactPortrait ? 16 : 18;
+    const pillX = -ribbonW / 2;
+    const pillY = -ribbonH / 2;
+    const cornerRadius = compactPortrait ? 18 : 20;
 
-    const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
+    const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + ribbonH);
     panelGrad.addColorStop(0, panelTop);
     panelGrad.addColorStop(1, panelBottom);
 
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = 18 + (stage === 2 ? 20 : stage === 1 ? 14 : 8) + pulseKick * 14;
     ctx.fillStyle = panelGrad;
-    this.roundRect(ctx, pillX, pillY, pillW, pillH, cornerRadius);
+    this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.fill();
 
     ctx.shadowBlur = 0;
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = 1.5;
-    this.roundRect(ctx, pillX, pillY, pillW, pillH, cornerRadius);
+    this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.stroke();
+
+    ctx.fillStyle = stage === 2 ? "rgba(255, 82, 82, 0.18)" : "rgba(255, 120, 92, 0.14)";
+    this.roundRect(ctx, pillX + 10, pillY + 10, ribbonW - 20, compactPortrait ? 24 : 28, 12);
+    ctx.fill();
+
+    const leftInset = pillX + (compactPortrait ? 18 : 22);
+    const rightInset = pillX + ribbonW - (compactPortrait ? 18 : 22);
+    const topRowY = pillY + (compactPortrait ? 22 : 25);
+    const bottomRowY = pillY + ribbonH - (compactPortrait ? 16 : 18);
 
     ctx.fillStyle = accentColor;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
-    ctx.textAlign = "center";
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(labelText, 0, pillY + (compactPortrait ? 21 : 24));
+    ctx.fillText(labelText, leftInset, topRowY);
 
-    // Main money text
     ctx.fillStyle = textColor;
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = 12 + (stage === 2 ? 16 : stage === 1 ? 12 : 8) + pressure * 12;
     ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
-    ctx.fillText(mainText, 0, 6);
+    ctx.textAlign = "right";
+    ctx.fillText(mainText, rightInset, topRowY + (compactPortrait ? 2 : 3));
 
-    // Sub text (loss rate)
     ctx.shadowBlur = 0;
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
     ctx.fillStyle =
@@ -710,7 +737,8 @@ export class World2D {
         : stage === 1
           ? `rgba(255, 177, 138, ${0.88 + pressure * 0.08})`
           : `rgba(255, 208, 168, ${0.84 + pressure * 0.06})`;
-    ctx.fillText(subText, 0, pillY + pillH - (compactPortrait ? 19 : 24));
+    ctx.textAlign = "center";
+    ctx.fillText(subText, 0, bottomRowY);
 
     ctx.restore();
   }
