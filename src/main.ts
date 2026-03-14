@@ -600,6 +600,15 @@ window.addEventListener("online", () => {
   void flushPendingSubmissions();
 });
 
+document.addEventListener("visibilitychange", () => {
+  const nowMs = performance.now();
+  if (document.hidden) {
+    engine.pause(nowMs);
+    return;
+  }
+  engine.resume(nowMs);
+});
+
 function updateHud(): void {
   const s = engine.state;
   const nextWalkDisabled = s.phase === "idle" || s.phase === "finished";

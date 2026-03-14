@@ -10,6 +10,7 @@ export class ExperimentEngine {
 
   private startedAtMs: number | null = null;
   private lastTickMs: number | null = null;
+  private pausedAtMs: number | null = null;
 
   state: ExperimentState;
 
@@ -39,6 +40,7 @@ export class ExperimentEngine {
   reset(nowMs: number): void {
     this.startedAtMs = null;
     this.lastTickMs = null;
+    this.pausedAtMs = null;
     this.state = this.createInitialState();
 
     this.logger.log({
@@ -56,6 +58,7 @@ export class ExperimentEngine {
     if (this.state.phase !== "idle") return;
     this.startedAtMs = nowMs;
     this.lastTickMs = nowMs;
+    this.pausedAtMs = null;
     this.state.phase = "moving";
     this.state.elapsedSec = 0;
     this.state.money = this.config.startMoney;
@@ -106,14 +109,17 @@ export class ExperimentEngine {
 
   tick(nowMs: number): void {
     if (this.state.phase === "idle" || this.state.phase === "finished") return;
-    if (this.lastTickMs === null || this.startedAtMs === null) return;
+    if (this.lastTickMs === null || this.startedAtMs === null || this.pausedAtMs !== null) return;
 
     const rawDt = (nowMs - this.lastTickMs) / 1000;
     const dtSec = Math.max(0, Math.min(MAX_DT_SEC, rawDt));
     this.lastTickMs = nowMs;
 
     this.state.elapsedSec = this.getNowTsec(nowMs);
-    this.state.money = this.config.startMoney - this.config.moneyLossPerSec * this.state.elapsedSec;
+    this.state.money = Math.max(
+      0,
+      this.config.startMoney - this.config.moneyLossPerSec * this.state.elapsedSec
+    );
 
     if (this.state.phase === "moving") {
       this.state.segmentProgressSec += dtSec;
@@ -170,6 +176,22 @@ export class ExperimentEngine {
   getCurrentLightColor(): LightColor | null {
     if (this.state.phase === "waiting_red") return this.state.currentLightColor;
     return null;
+  }
+
+  pause(nowMs: number): void {
+    if (this.state.phase === "idle" || this.state.phase === "finished") return;
+    if (this.pausedAtMs !== null) return;
+    this.tick(nowMs);
+    this.pausedAtMs = nowMs;
+  }
+
+  resume(nowMs: number): void {
+    if (this.pausedAtMs === null) return;
+    if (this.startedAtMs !== null) {
+      this.startedAtMs += nowMs - this.pausedAtMs;
+    }
+    this.lastTickMs = nowMs;
+    this.pausedAtMs = null;
   }
 
   private arriveAtLight(nowMs: number): void {
