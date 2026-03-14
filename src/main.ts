@@ -9,6 +9,11 @@ import { World2D } from "./scene/world2d";
 
 type RunKind = "practice" | "formal";
 type SubmitOutcome = "sent" | "queued";
+type DesktopInputProof = {
+  keyboard: boolean;
+  mouseMove: boolean;
+  mouseClick: boolean;
+};
 
 const params = new URLSearchParams(window.location.search);
 const participantId = (params.get("pid") ?? "").trim();
@@ -189,6 +194,9 @@ function shouldBlockMobileAccess(): boolean {
   return isIpadLike || uaSaysMobile || uaDataSaysMobile || coarseTouchSmallScreen;
 }
 
+const DESKTOP_MIN_VIEWPORT_WIDTH = 1100;
+const DESKTOP_MIN_VIEWPORT_HEIGHT = 680;
+
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Missing #app");
 
@@ -244,6 +252,8 @@ app.innerHTML = `
     <div class="modal" id="modal">
       <div class="card" id="modalCard"></div>
     </div>
+
+    <div class="desktop-preflight" id="desktopGate" style="display:none;"></div>
   </div>
 `;
 
@@ -258,7 +268,8 @@ const els = {
   lightText: document.querySelector<HTMLDivElement>("#lightText")!,
   lightRow: document.querySelector<HTMLDivElement>("#lightRow")!,
   modal: document.querySelector<HTMLDivElement>("#modal")!,
-  modalCard: document.querySelector<HTMLDivElement>("#modalCard")!
+  modalCard: document.querySelector<HTMLDivElement>("#modalCard")!,
+  desktopGate: document.querySelector<HTMLDivElement>("#desktopGate")!
 };
 
 let runKind: RunKind = "practice";
@@ -268,9 +279,90 @@ let engine: ExperimentEngine = new ExperimentEngine(currentConfig, logger);
 let world: World2D | null = null;
 let formalClientSessionId = createClientSessionId();
 let formalSubmission: SessionSubmission | null = null;
+const desktopInputProof: DesktopInputProof = {
+  keyboard: false,
+  mouseMove: false,
+  mouseClick: false
+};
+let desktopGateReady = false;
+let desktopGateVisible = false;
+let pausedByDesktopGate = false;
 
 function updateTopHints(): void {
   els.runHint.textContent = runKind === "practice" ? "练习" : "正式实验";
+}
+
+function hasDesktopViewport(): boolean {
+  return window.innerWidth >= DESKTOP_MIN_VIEWPORT_WIDTH && window.innerHeight >= DESKTOP_MIN_VIEWPORT_HEIGHT;
+}
+
+function hasDesktopPointer(): boolean {
+  return window.matchMedia("(pointer: fine)").matches;
+}
+
+function hasDesktopHover(): boolean {
+  return window.matchMedia("(hover: hover)").matches;
+}
+
+function hasDesktopInteractionProof(): boolean {
+  return desktopInputProof.keyboard && desktopInputProof.mouseMove && desktopInputProof.mouseClick;
+}
+
+function renderDesktopPreflightGate(): void {
+  const viewportReady = hasDesktopViewport();
+  const pointerReady = hasDesktopPointer();
+  const hoverReady = hasDesktopHover();
+  const keyboardReady = desktopInputProof.keyboard;
+  const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
+  const canEnter = viewportReady && pointerReady && hoverReady && keyboardReady && mouseReady;
+
+  if (canEnter) {
+    if (desktopGateVisible) {
+      els.desktopGate.style.display = "none";
+      desktopGateVisible = false;
+    }
+
+    if (pausedByDesktopGate) {
+      engine.resume(performance.now());
+      pausedByDesktopGate = false;
+    }
+
+    if (!desktopGateReady) {
+      desktopGateReady = true;
+      showPracticeIntro();
+    }
+    return;
+  }
+
+  if (!pausedByDesktopGate && engine.state.phase !== "idle" && engine.state.phase !== "finished") {
+    engine.pause(performance.now());
+    pausedByDesktopGate = true;
+  }
+
+  const viewportLabel = viewportReady
+    ? `窗口尺寸已满足（至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}）`
+    : `请将浏览器窗口调整到至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}`;
+  const pointerLabel = pointerReady ? "检测到精细指针设备" : "请使用鼠标或触控板操作";
+  const hoverLabel = hoverReady ? "检测到悬停能力" : "当前设备不具备桌面端悬停能力";
+  const keyboardLabel = keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键";
+  const mouseLabel = mouseReady ? "已检测到鼠标移动和点击" : "请移动鼠标并点击一次";
+
+  els.desktopGate.innerHTML = `
+    <section class="desktop-preflight-card">
+      <div class="desktop-preflight-eyebrow">桌面端校验</div>
+      <h1>请使用电脑端完成实验</h1>
+      <p>为保证实验环境一致，进入实验前必须同时满足桌面窗口尺寸、精细指针、悬停能力，以及真实键盘和鼠标交互。</p>
+      <div class="desktop-preflight-checklist">
+        <div class="${viewportReady ? "ready" : ""}">${viewportReady ? "✓" : "•"} ${viewportLabel}</div>
+        <div class="${pointerReady ? "ready" : ""}">${pointerReady ? "✓" : "•"} ${pointerLabel}</div>
+        <div class="${hoverReady ? "ready" : ""}">${hoverReady ? "✓" : "•"} ${hoverLabel}</div>
+        <div class="${keyboardReady ? "ready" : ""}">${keyboardReady ? "✓" : "•"} ${keyboardLabel}</div>
+        <div class="${mouseReady ? "ready" : ""}">${mouseReady ? "✓" : "•"} ${mouseLabel}</div>
+      </div>
+    </section>
+  `;
+  els.desktopGate.style.display = "grid";
+  desktopGateVisible = true;
 }
 
 function openModal(html: string): void {
@@ -609,10 +701,41 @@ const hudCache = {
 updateTopHints();
 void flushPendingSubmissions();
 initializeFullRevealMode();
-showPracticeIntro();
+renderDesktopPreflightGate();
 
 window.addEventListener("online", () => {
   void flushPendingSubmissions();
+});
+
+window.addEventListener("resize", () => {
+  renderDesktopPreflightGate();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (
+    !desktopInputProof.keyboard &&
+    !e.metaKey &&
+    !e.ctrlKey &&
+    !e.altKey &&
+    !["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab"].includes(e.key)
+  ) {
+    desktopInputProof.keyboard = true;
+    renderDesktopPreflightGate();
+  }
+});
+
+window.addEventListener("mousemove", () => {
+  if (!desktopInputProof.mouseMove) {
+    desktopInputProof.mouseMove = true;
+    renderDesktopPreflightGate();
+  }
+});
+
+window.addEventListener("mousedown", () => {
+  if (!desktopInputProof.mouseClick) {
+    desktopInputProof.mouseClick = true;
+    renderDesktopPreflightGate();
+  }
 });
 
 document.addEventListener("visibilitychange", () => {
@@ -622,6 +745,7 @@ document.addEventListener("visibilitychange", () => {
     return;
   }
   engine.resume(nowMs);
+  renderDesktopPreflightGate();
 });
 
 function updateHud(): void {
