@@ -20,6 +20,7 @@ export type ExperimentState = {
   money: number;
   violations: number;
   passedOutcome: Array<"green" | "run_red" | null>;
+  lightGreenAtSecByIndex: Array<number | null>;
 
   segmentProgressSec: number; // moving 时有效
   waitingSinceSec: number | null; // waiting_red 时有效

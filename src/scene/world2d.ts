@@ -310,11 +310,10 @@ export class World2D {
   ): "red" | "green" | "off" {
     if (state.phase === "idle") return "red";
     if (state.phase === "finished") {
-      return state.passedOutcome[lightIdx] === "green" ? "green" : "red";
+      return this.getResolvedPassedLightColor(state, lightIdx);
     }
     if (lightIdx < state.lightIndex) {
-      const outcome = state.passedOutcome[lightIdx];
-      return outcome === "green" ? "green" : "red";
+      return this.getResolvedPassedLightColor(state, lightIdx);
     }
     if (lightIdx === state.lightIndex && state.phase === "waiting_red") {
       return state.currentLightColor;
@@ -357,19 +356,15 @@ export class World2D {
   private drawFog(ctx: CanvasRenderingContext2D, state: ExperimentState, avatarX: number): void {
     const roadW = this.roadRight - this.roadLeft;
     const baseFadeW = this.getFogFadeWidthPx(roadW);
-    const clearEndX = avatarX + roadW * this.fogLeadPx;
+    const currentTargetX = state.phase !== "idle" && state.phase !== "finished"
+      ? this.lightXs[state.lightIndex - 1]
+      : undefined;
+    const clearEndX = this.getFogClearEndX(state, avatarX, roadW, currentTargetX);
     let fadeLeft = Math.max(0, clearEndX);
     let fogSolidX = fadeLeft + baseFadeW;
 
     if (state.phase !== "idle" && state.phase !== "finished") {
-      const currentTargetX = this.lightXs[state.lightIndex - 1];
       const nextHiddenX = this.lightXs[state.lightIndex];
-
-      if (currentTargetX !== undefined) {
-        // Keep the currently relevant traffic light fully outside the fog fade zone.
-        fadeLeft = Math.max(fadeLeft, currentTargetX + this.getFogLightSafeHalfWidthPx());
-        fogSolidX = Math.max(fogSolidX, fadeLeft + baseFadeW);
-      }
 
       if (currentTargetX !== undefined && nextHiddenX !== undefined) {
         const revealCapX = nextHiddenX - this.getFogLightSafeHalfWidthPx();
@@ -730,12 +725,61 @@ export class World2D {
     return this.h > this.w && this.w <= 560;
   }
 
+  private getResolvedPassedLightColor(
+    state: ExperimentState,
+    lightIdx: number
+  ): "red" | "green" {
+    const outcome = state.passedOutcome[lightIdx];
+    if (outcome === "green") return "green";
+
+    const greenAtSec = state.lightGreenAtSecByIndex[lightIdx];
+    if (outcome === "run_red" && greenAtSec !== null && state.elapsedSec >= greenAtSec) {
+      return "green";
+    }
+    return "red";
+  }
+
+  private getFogClearEndX(
+    state: ExperimentState,
+    avatarX: number,
+    roadW: number,
+    currentTargetX: number | undefined
+  ): number {
+    const baseClearEndX = avatarX + roadW * this.fogLeadPx;
+    if (currentTargetX === undefined) return baseClearEndX;
+
+    const safeClearEndX = currentTargetX + this.getFogLightSafeHalfWidthPx();
+    const extraRevealNeeded = Math.max(0, safeClearEndX - baseClearEndX);
+    if (extraRevealNeeded <= 0) return baseClearEndX;
+
+    const distanceToTarget = Math.max(0, currentTargetX - avatarX);
+    const revealStartDist = this.getFogApproachRevealDistancePx(roadW);
+    const fullRevealDist = this.getFogApproachFullRevealDistancePx();
+    const revealT =
+      state.phase === "waiting_red"
+        ? 1
+        : Math.max(
+            0,
+            Math.min(1, (revealStartDist - distanceToTarget) / Math.max(revealStartDist - fullRevealDist, 1))
+          );
+
+    return baseClearEndX + extraRevealNeeded * revealT;
+  }
+
   private getFogFadeWidthPx(roadW: number): number {
     return Math.max(roadW * this.fogFadePx, this.isCompactPortraitLayout() ? 18 : 14);
   }
 
   private getFogLightSafeHalfWidthPx(): number {
     return this.isCompactPortraitLayout() ? 24 : 20;
+  }
+
+  private getFogApproachRevealDistancePx(roadW: number): number {
+    return this.isCompactPortraitLayout() ? Math.max(roadW * 0.22, 84) : Math.max(roadW * 0.18, 72);
+  }
+
+  private getFogApproachFullRevealDistancePx(): number {
+    return this.isCompactPortraitLayout() ? 34 : 30;
   }
 
   /* ------------------------------------------------------------------ */

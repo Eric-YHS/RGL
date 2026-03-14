@@ -27,6 +27,7 @@ export class ExperimentEngine {
       money: this.config.startMoney,
       violations: 0,
       passedOutcome: Array.from({ length: this.config.numLights + 1 }, () => null),
+      lightGreenAtSecByIndex: Array.from({ length: this.config.numLights + 1 }, () => null),
       segmentProgressSec: 0,
       waitingSinceSec: null,
       greenAtSec: null,
@@ -60,6 +61,7 @@ export class ExperimentEngine {
     this.state.money = this.config.startMoney;
     this.state.lightIndex = 1;
     this.state.passedOutcome = Array.from({ length: this.config.numLights + 1 }, () => null);
+    this.state.lightGreenAtSecByIndex = Array.from({ length: this.config.numLights + 1 }, () => null);
     this.state.segmentProgressSec = 0;
     this.state.waitingSinceSec = null;
     this.state.greenAtSec = null;
@@ -174,6 +176,7 @@ export class ExperimentEngine {
     this.state.phase = "waiting_red";
     this.state.waitingSinceSec = this.state.elapsedSec;
     this.state.greenAtSec = this.state.elapsedSec + this.config.redWaitSec;
+    this.state.lightGreenAtSecByIndex[this.state.lightIndex] = this.state.greenAtSec;
     this.state.autoPassAtSec = null;
     this.state.currentLightColor = "red";
 
