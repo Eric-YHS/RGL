@@ -285,7 +285,7 @@ export class World2D {
     nowMs: number
   ): void {
     const trafficLightScale = this.getTrafficLightScale();
-    const poleH = this.h * 0.14;
+    const poleH = this.h * 0.14 * (this.isCompactPortraitLayout() ? 1 : 1.12);
     const poleW = 3 * trafficLightScale;
     const housingW = 20 * trafficLightScale;
     const housingH = 42 * trafficLightScale;
@@ -442,7 +442,7 @@ export class World2D {
   }
 
   private getTrafficLightScale(): number {
-    return this.isCompactPortraitLayout() ? 1 : 1.22;
+    return this.isCompactPortraitLayout() ? 1 : 1.52;
   }
 
   private isRenderableImage(img: HTMLImageElement): boolean {
