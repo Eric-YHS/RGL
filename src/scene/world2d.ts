@@ -804,9 +804,9 @@ export class World2D {
       this.lightXs.length > 0 ? (this.lightXs[0] + this.lightXs[this.lightXs.length - 1]) / 2 : this.w / 2;
     const routeSpan =
       this.lightXs.length > 1 ? this.lightXs[this.lightXs.length - 1] - this.lightXs[0] : this.w * 0.42;
-    const fontSize = compactPortrait ? Math.min(42, this.w * 0.089) : Math.min(60, this.w * 0.047);
-    const labelFontSize = compactPortrait ? Math.min(16, this.w * 0.034) : Math.min(20, this.w * 0.017);
-    const subFontSize = compactPortrait ? Math.min(16, this.w * 0.037) : Math.min(18, this.w * 0.015);
+    const fontSize = compactPortrait ? Math.min(46, this.w * 0.094) : Math.min(68, this.w * 0.053);
+    const labelFontSize = compactPortrait ? Math.min(18, this.w * 0.038) : Math.min(24, this.w * 0.02);
+    const subFontSize = compactPortrait ? Math.min(17, this.w * 0.039) : Math.min(21, this.w * 0.017);
     const roadTop = this.roadY - this.roadH / 2;
     const lightsTopY = roadTop - this.h * 0.14 - 42;
 
@@ -823,17 +823,17 @@ export class World2D {
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
     const subWidth = ctx.measureText(subText).width;
     const ribbonW = Math.min(
-      compactPortrait ? this.w - 44 : 420,
+      compactPortrait ? this.w - 36 : 468,
       Math.max(
-        compactPortrait ? 238 : 312,
-        labelWidth + mainWidth + 86,
-        subWidth + 64,
-        routeSpan * (compactPortrait ? 0.54 : 0.34)
+        compactPortrait ? 252 : 344,
+        labelWidth + mainWidth + 98,
+        subWidth + 76,
+        routeSpan * (compactPortrait ? 0.58 : 0.38)
       )
     );
-    const ribbonH = compactPortrait ? 78 : 92;
+    const ribbonH = compactPortrait ? 84 : 104;
     const cx = routeCenterX;
-    const overlayLift = compactPortrait ? 20 : 42;
+    const overlayLift = compactPortrait ? 22 : 46;
     const cy = Math.max(
       compactPortrait ? this.h * 0.228 : this.h * 0.208,
       lightsTopY - (compactPortrait ? 54 : 70)
@@ -844,7 +844,7 @@ export class World2D {
 
     const pillX = -ribbonW / 2;
     const pillY = -ribbonH / 2;
-    const cornerRadius = compactPortrait ? 18 : 20;
+    const cornerRadius = compactPortrait ? 19 : 22;
 
     const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + ribbonH);
     panelGrad.addColorStop(0, panelTop);
@@ -862,10 +862,10 @@ export class World2D {
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.stroke();
 
-    const leftInset = pillX + (compactPortrait ? 18 : 22);
-    const rightInset = pillX + ribbonW - (compactPortrait ? 18 : 22);
-    const topRowY = pillY + (compactPortrait ? 24 : 28);
-    const bottomRowY = pillY + ribbonH - (compactPortrait ? 16 : 18);
+    const leftInset = pillX + (compactPortrait ? 20 : 26);
+    const rightInset = pillX + ribbonW - (compactPortrait ? 20 : 26);
+    const topRowY = pillY + (compactPortrait ? 26 : 31);
+    const bottomRowY = pillY + ribbonH - (compactPortrait ? 17 : 20);
 
     ctx.fillStyle = accentColor;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
