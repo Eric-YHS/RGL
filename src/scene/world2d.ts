@@ -160,6 +160,7 @@ export class World2D {
       defaultRoadY +
       this.getDesktopSceneDownShift(parent, compactPortrait, defaultRoadY) +
       manualSceneDownShiftPx;
+    this.syncStageAnchors(parent, compactPortrait);
 
     const n = this.config.numLights;
     const isSequential = this.config.revealMode === "sequential";
@@ -216,6 +217,14 @@ export class World2D {
       poleH: this.h * 0.14 * (compactPortrait ? 1 : 1.12),
       housingH: 42 * trafficLightScale
     };
+  }
+
+  private syncStageAnchors(parent: HTMLElement, compactPortrait: boolean): void {
+    const roadBottomY = this.roadY + this.roadH / 2;
+    const lowerBlankHeight = Math.max(0, this.h - roadBottomY);
+    const walkCenterFactor = compactPortrait ? 0.48 : 0.44;
+    const walkCenterY = roadBottomY + lowerBlankHeight * walkCenterFactor;
+    parent.style.setProperty("--walk-center-y", `${walkCenterY}px`);
   }
 
   private syncLayoutToCanvasSize(): void {
@@ -888,7 +897,8 @@ export class World2D {
     const labelFontSize = compactPortrait ? Math.min(18, this.w * 0.038) : Math.min(24, this.w * 0.02);
     const subFontSize = compactPortrait ? Math.min(17, this.w * 0.039) : Math.min(21, this.w * 0.017);
     const roadTop = this.roadY - this.roadH / 2;
-    const lightsTopY = roadTop - this.h * 0.14 - 42;
+    const { poleH, housingH } = this.getTrafficLightMetrics(compactPortrait);
+    const lightsTopY = roadTop - poleH - housingH;
 
     const displayTickMs = 80;
     const displayMoneyStep = Math.max(this.config.moneyLossPerSec * (displayTickMs / 1000), 0.001);
@@ -922,13 +932,14 @@ export class World2D {
     );
     const ribbonH = compactPortrait ? 84 : 104;
     const cx = routeCenterX;
-    const overlayLift = compactPortrait ? 22 : 66;
-    const cy = Math.max(
-      compactPortrait ? this.h * 0.228 : this.h * 0.208,
-      lightsTopY - (compactPortrait ? 54 : 70)
+    const topBlankCenterY = lightsTopY * 0.5;
+    const overlayMargin = compactPortrait ? 16 : 20;
+    const overlayCenterY = Math.min(
+      lightsTopY - ribbonH / 2 - overlayMargin,
+      Math.max(ribbonH / 2 + overlayMargin, topBlankCenterY)
     );
 
-    ctx.translate(cx, cy - overlayLift - cardJoltY);
+    ctx.translate(cx, overlayCenterY - cardJoltY);
     ctx.scale(cardScale, cardScale);
 
     const pillX = -ribbonW / 2;

@@ -67,6 +67,7 @@
   --hud-offset-top: 20px;
   --hud-offset-side: 14px;
   --walk-bottom: 102px;
+  --walk-center-y: 78vh;
   font-family: "Experiment Sans", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
     Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
     "Noto Sans SC", sans-serif;
@@ -519,8 +520,8 @@ canvas.webgl {
 .center-controls {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--walk-bottom) + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
+  top: var(--walk-center-y);
+  transform: translate(-50%, -50%);
   display: flex;
   gap: 12px;
   align-items: center;
