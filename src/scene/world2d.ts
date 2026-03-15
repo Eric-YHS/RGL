@@ -68,14 +68,14 @@ const WALK_PED_POSES: PedestrianPoseFrame[] = [
       { x: -13, y: -62 }
     ],
     leftArm: [
-      { x: -7, y: -81 },
-      { x: -17, y: -68 },
-      { x: -18, y: -48 }
+      { x: -6, y: -81 },
+      { x: -12, y: -66 },
+      { x: -11, y: -46 }
     ],
     rightArm: [
-      { x: 7, y: -79 },
-      { x: 20, y: -70 },
-      { x: 31, y: -63 }
+      { x: 6, y: -79 },
+      { x: 13, y: -64 },
+      { x: 16, y: -47 }
     ],
     leftLeg: [
       { x: -4, y: -38 },
@@ -101,14 +101,14 @@ const WALK_PED_POSES: PedestrianPoseFrame[] = [
       { x: -11, y: -59 }
     ],
     leftArm: [
-      { x: -7, y: -81 },
-      { x: -12, y: -60 },
-      { x: -8, y: -43 }
+      { x: -6, y: -81 },
+      { x: -10, y: -62 },
+      { x: -8, y: -44 }
     ],
     rightArm: [
-      { x: 7, y: -80 },
-      { x: 14, y: -60 },
-      { x: 9, y: -43 }
+      { x: 6, y: -80 },
+      { x: 11, y: -62 },
+      { x: 9, y: -44 }
     ],
     leftLeg: [
       { x: -4, y: -38 },
@@ -134,14 +134,14 @@ const WALK_PED_POSES: PedestrianPoseFrame[] = [
       { x: -11, y: -58 }
     ],
     leftArm: [
-      { x: -7, y: -79 },
-      { x: -20, y: -70 },
-      { x: -31, y: -63 }
+      { x: -6, y: -79 },
+      { x: -13, y: -64 },
+      { x: -16, y: -47 }
     ],
     rightArm: [
-      { x: 7, y: -81 },
-      { x: 17, y: -68 },
-      { x: 18, y: -48 }
+      { x: 6, y: -81 },
+      { x: 12, y: -66 },
+      { x: 11, y: -46 }
     ],
     leftLeg: [
       { x: -4, y: -38 },
@@ -167,14 +167,14 @@ const WALK_PED_POSES: PedestrianPoseFrame[] = [
       { x: -11, y: -58 }
     ],
     leftArm: [
-      { x: -7, y: -80 },
-      { x: -14, y: -60 },
-      { x: -9, y: -43 }
+      { x: -6, y: -80 },
+      { x: -11, y: -62 },
+      { x: -9, y: -44 }
     ],
     rightArm: [
-      { x: 7, y: -81 },
-      { x: 12, y: -60 },
-      { x: 8, y: -43 }
+      { x: 6, y: -81 },
+      { x: 10, y: -62 },
+      { x: 8, y: -44 }
     ],
     leftLeg: [
       { x: -4, y: -38 },
