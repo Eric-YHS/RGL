@@ -3,6 +3,7 @@ import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
 type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
+type SignalGlyphKind = "red" | "green";
 
 const RED_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 17, y: 8, w: 15, h: 35 };
 const GREEN_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 14, y: 52, w: 24, h: 28 };
@@ -422,19 +423,20 @@ export class World2D {
     if (kind === "red") {
       if (this.redSignalGlyph) return this.redSignalGlyph;
       if (!this.isRenderableImage(this.redSignalSprite)) return null;
-      this.redSignalGlyph = this.prepareSignalGlyph(this.redSignalSprite, RED_SIGNAL_GLYPH_CROP);
+      this.redSignalGlyph = this.prepareSignalGlyph(this.redSignalSprite, RED_SIGNAL_GLYPH_CROP, "red");
       return this.redSignalGlyph;
     }
 
     if (this.greenSignalGlyph) return this.greenSignalGlyph;
     if (!this.isRenderableImage(this.greenSignalSprite)) return null;
-    this.greenSignalGlyph = this.prepareSignalGlyph(this.greenSignalSprite, GREEN_SIGNAL_GLYPH_CROP);
+    this.greenSignalGlyph = this.prepareSignalGlyph(this.greenSignalSprite, GREEN_SIGNAL_GLYPH_CROP, "green");
     return this.greenSignalGlyph;
   }
 
   private prepareSignalGlyph(
     sprite: HTMLImageElement,
-    crop: SignalGlyphCrop
+    crop: SignalGlyphCrop,
+    kind: SignalGlyphKind
   ): HTMLCanvasElement | null {
     const canvas = document.createElement("canvas");
     canvas.width = crop.w;
@@ -445,16 +447,44 @@ export class World2D {
     ctx.drawImage(sprite, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
     const imgData = ctx.getImageData(0, 0, crop.w, crop.h);
     const data = imgData.data;
+    const keepMask = new Uint8Array(crop.w * crop.h);
+    let seedCount = 0;
+
+    for (let y = 0; y < crop.h; y += 1) {
+      for (let x = 0; x < crop.w; x += 1) {
+        const idx = (y * crop.w + x) * 4;
+        const a = data[idx + 3];
+        if (a < 10) continue;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        if (!this.isSignalForegroundPixel(r, g, b, kind)) continue;
+        seedCount += 1;
+        for (let dy = -1; dy <= 1; dy += 1) {
+          for (let dx = -1; dx <= 1; dx += 1) {
+            const ny = y + dy;
+            const nx = x + dx;
+            if (ny < 0 || ny >= crop.h || nx < 0 || nx >= crop.w) continue;
+            keepMask[ny * crop.w + nx] = 1;
+          }
+        }
+      }
+    }
+
+    if (seedCount === 0) return this.inflateSignalGlyph(canvas);
+
     for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      if (r < 40 && g < 40 && b < 40) {
+      if (!keepMask[i / 4]) {
         data[i + 3] = 0;
       }
     }
     ctx.putImageData(imgData, 0, 0);
     return this.inflateSignalGlyph(canvas);
+  }
+
+  private isSignalForegroundPixel(r: number, g: number, b: number, kind: SignalGlyphKind): boolean {
+    if (kind === "red") return r > 110 && r > g + 35 && r > b + 35;
+    return g > 70 && g > r + 20 && g > b + 15;
   }
 
   private inflateSignalGlyph(source: HTMLCanvasElement): HTMLCanvasElement {
