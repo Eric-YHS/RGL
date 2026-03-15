@@ -769,42 +769,42 @@ export class World2D {
 
     const moneyFontFamily = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
     const flashStrength = 0.08 + pressure * 0.05 + pulseKick * 0.22;
-    let mainTextColor = "#ff4a3a";
-    let labelColor = "#fff5f5";
-    let subPrefixColor = "#ffb000";
-    let subValueColor = "#ff8a00";
-    let panelTop = "#3a0000";
-    let panelMid = "#260000";
-    let panelBottom = "#120000";
-    let borderColor = "#ff2a2a";
+    let mainTextColor = "#ff5c5c";
+    let labelColor = "#ffd0d0";
+    let subPrefixColor = "#efb8b8";
+    let subValueColor = "#ffdede";
+    let panelTop = "#690000";
+    let panelMid = "#460000";
+    let panelBottom = "#180000";
+    let borderColor = "#9f0909";
 
     if (stage === 0) {
-      mainTextColor = "#ff6254";
-      labelColor = "#fff0f0";
-      subPrefixColor = "#ffb94a";
-      subValueColor = "#ff9624";
-      panelTop = "#300000";
-      panelMid = "#210000";
-      panelBottom = "#100000";
-      borderColor = "#d51f1f";
+      mainTextColor = "#ff7474";
+      labelColor = "#ffe0e0";
+      subPrefixColor = "#f4c8c8";
+      subValueColor = "#ffe8e8";
+      panelTop = "#5e0202";
+      panelMid = "#410101";
+      panelBottom = "#160000";
+      borderColor = "#861010";
     } else if (stage === 1) {
-      mainTextColor = "#ff4b3c";
-      labelColor = "#fff2f2";
-      subPrefixColor = "#ffb228";
-      subValueColor = "#ff8d10";
-      panelTop = "#340000";
-      panelMid = "#230000";
-      panelBottom = "#110000";
-      borderColor = "#ea2323";
+      mainTextColor = "#ff5555";
+      labelColor = "#ffd1d1";
+      subPrefixColor = "#efb4b4";
+      subValueColor = "#ffdfdf";
+      panelTop = "#670000";
+      panelMid = "#470000";
+      panelBottom = "#170000";
+      borderColor = "#ad0808";
     } else {
-      mainTextColor = pulseKick > 0 ? "#ff675c" : "#ff3b30";
-      labelColor = "#ffffff";
-      subPrefixColor = "#ffb000";
-      subValueColor = pulseKick > 0 ? "#ffb940" : "#ff8a00";
-      panelTop = "#3a0000";
-      panelMid = "#240000";
-      panelBottom = "#0f0000";
-      borderColor = pulseKick > 0 ? "#ff4a4a" : "#ff2a2a";
+      mainTextColor = pulseKick > 0 ? "#ff7070" : "#ff4a4a";
+      labelColor = "#ffd3d3";
+      subPrefixColor = "#f0bcbc";
+      subValueColor = pulseKick > 0 ? "#fff0f0" : "#ffe0e0";
+      panelTop = "#720000";
+      panelMid = "#4b0000";
+      panelBottom = "#140000";
+      borderColor = pulseKick > 0 ? "#d20c0c" : "#bc0000";
     }
 
     const compactPortrait = this.isCompactPortraitLayout();
@@ -897,7 +897,7 @@ export class World2D {
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.stroke();
 
-    ctx.strokeStyle = `rgba(255, 173, 173, ${0.05 + flashStrength * 0.12})`;
+    ctx.strokeStyle = `rgba(255, 210, 210, ${0.08 + flashStrength * 0.16})`;
     ctx.lineWidth = 0.9;
     this.roundRect(ctx, pillX + 2, pillY + 2, ribbonW - 4, ribbonH - 4, 0);
     ctx.stroke();
@@ -910,12 +910,12 @@ export class World2D {
     const labelX = indicatorX + indicatorSize / 2 + labelGap;
     const subLeft = -subWidth / 2;
 
-    ctx.fillStyle = pulseKick > 0 ? "#ff5a5a" : "#ff2a2a";
+    ctx.fillStyle = pulseKick > 0 ? "#ff7676" : SIGNAL_RED_ON;
     ctx.beginPath();
     ctx.arc(indicatorX, topRowY, indicatorSize / 2, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = `rgba(255, 238, 238, ${0.22 + flashStrength * 0.22})`;
+    ctx.fillStyle = `rgba(255, 226, 226, ${0.32 + flashStrength * 0.3})`;
     ctx.beginPath();
     ctx.arc(indicatorX - indicatorSize * 0.14, topRowY - indicatorSize * 0.14, indicatorSize * 0.18, 0, Math.PI * 2);
     ctx.fill();
