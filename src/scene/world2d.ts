@@ -825,7 +825,7 @@ export class World2D {
     const labelText = "剩余补贴";
     const subPrefixText = "每秒正在减少";
     const subValueText = `-￥${this.config.moneyLossPerSec.toFixed(2)}`;
-    const indicatorSize = compactPortrait ? 8 : 10;
+    const warningIconSize = compactPortrait ? 16 : 18;
     const labelGap = compactPortrait ? 10 : 12;
 
     ctx.save();
@@ -843,7 +843,7 @@ export class World2D {
       compactPortrait ? this.w - 36 : 468,
       Math.max(
         compactPortrait ? 252 : 344,
-        indicatorSize + labelGap + labelWidth + mainWidth + 112,
+        warningIconSize + labelGap + labelWidth + mainWidth + 112,
         subWidth + 76,
         routeSpan * (compactPortrait ? 0.58 : 0.38)
       )
@@ -906,19 +906,11 @@ export class World2D {
     const rightInset = pillX + ribbonW - (compactPortrait ? 20 : 26);
     const topRowY = pillY + (compactPortrait ? 26 : 31);
     const bottomRowY = pillY + ribbonH - (compactPortrait ? 17 : 20);
-    const indicatorX = leftInset + indicatorSize / 2;
-    const labelX = indicatorX + indicatorSize / 2 + labelGap;
+    const warningIconX = leftInset + warningIconSize / 2;
+    const labelX = leftInset + warningIconSize + labelGap;
     const subLeft = -subWidth / 2;
 
-    ctx.fillStyle = pulseKick > 0 ? "#ff7676" : SIGNAL_RED_ON;
-    ctx.beginPath();
-    ctx.arc(indicatorX, topRowY, indicatorSize / 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = `rgba(255, 226, 226, ${0.32 + flashStrength * 0.3})`;
-    ctx.beginPath();
-    ctx.arc(indicatorX - indicatorSize * 0.14, topRowY - indicatorSize * 0.14, indicatorSize * 0.18, 0, Math.PI * 2);
-    ctx.fill();
+    this.drawWarningTriangleIcon(ctx, warningIconX, topRowY, warningIconSize, flashStrength, pulseKick);
 
     ctx.fillStyle = labelColor;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
@@ -1024,6 +1016,50 @@ export class World2D {
   /* ------------------------------------------------------------------ */
   /*  Utilities                                                          */
   /* ------------------------------------------------------------------ */
+
+  private drawWarningTriangleIcon(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    size: number,
+    flashStrength: number,
+    pulseKick: number
+  ): void {
+    const halfW = size * 0.56;
+    const halfH = size * 0.52;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    ctx.beginPath();
+    ctx.moveTo(0, -halfH);
+    ctx.lineTo(halfW, halfH);
+    ctx.lineTo(-halfW, halfH);
+    ctx.closePath();
+
+    ctx.fillStyle = pulseKick > 0 ? "#ffe36b" : "#ffd43b";
+    ctx.fill();
+
+    ctx.lineWidth = Math.max(1.2, size * 0.11);
+    ctx.strokeStyle = pulseKick > 0 ? "#ff4545" : "#a60d12";
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(255, 246, 181, ${0.26 + flashStrength * 0.28})`;
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.08, -halfH + size * 0.13);
+    ctx.lineTo(size * 0.18, -halfH + size * 0.24);
+    ctx.lineTo(size * 0.03, -halfH + size * 0.42);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#2d0505";
+    ctx.fillRect(-size * 0.08, -size * 0.12, size * 0.16, size * 0.44);
+    ctx.beginPath();
+    ctx.arc(0, size * 0.43, size * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
 
   private roundRect(
     ctx: CanvasRenderingContext2D,
