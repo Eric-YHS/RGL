@@ -1,7 +1,10 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
-import manWalkBmpUrl from "../assets/kimbrough-rf/man.bmp";
 import manStandSvgUrl from "../assets/kimbrough-rf/man-stand.svg";
+import manWalk1SvgUrl from "../assets/kimbrough-rf/man-walk-1.svg";
+import manWalk2SvgUrl from "../assets/kimbrough-rf/man-walk-2.svg";
+import manWalk3SvgUrl from "../assets/kimbrough-rf/man-walk-3.svg";
+import manWalk4SvgUrl from "../assets/kimbrough-rf/man-walk-4.svg";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
 type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
@@ -276,11 +279,15 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
-  private readonly walkPedSprite = loadCanvasImage(manWalkBmpUrl);
   private readonly standPedSprite = loadCanvasImage(manStandSvgUrl);
+  private readonly walkPedSprites = [
+    loadCanvasImage(manWalk1SvgUrl),
+    loadCanvasImage(manWalk2SvgUrl),
+    loadCanvasImage(manWalk3SvgUrl),
+    loadCanvasImage(manWalk4SvgUrl)
+  ];
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
-  private walkPedGlyph: HTMLCanvasElement | null = null;
   private fogFadeLeftX = -1;
   private fogFadeRightX = -1;
   private lastMoneyPulseStep: number | null = null;
@@ -897,7 +904,9 @@ export class World2D {
     const footY = this.roadY + this.roadH / 2 + 8;
     const pose = phase === "moving" || isActuallyMoving ? "walk" : "stand";
     const u = h / 116;
-    const pedSprite = this.getPedestrianSprite(pose);
+    const pedSprite = this.getPedestrianSprite(pose, nowMs);
+    const spriteCycle01 = pose === "walk" ? this.getWalkSpriteCycle(nowMs) : 0;
+    const spriteBobY = pose === "walk" ? this.getWalkSpriteBob(spriteCycle01, h) : 0;
 
     ctx.save();
     ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
@@ -915,7 +924,7 @@ export class World2D {
     ctx.restore();
 
     if (pedSprite) {
-      this.drawPedestrianSprite(ctx, pedSprite, x, footY, h, pose);
+      this.drawPedestrianSprite(ctx, pedSprite, x, footY + spriteBobY, h, pose);
       return;
     }
 
@@ -924,40 +933,23 @@ export class World2D {
     this.drawPedestrianSilhouette(ctx, x, footY, u, poseFrame);
   }
 
-  private getPedestrianSprite(pose: "stand" | "walk"): CanvasImageSource | null {
+  private getPedestrianSprite(pose: "stand" | "walk", nowMs: number): CanvasImageSource | null {
     if (pose === "stand") {
       return this.isRenderableImage(this.standPedSprite) ? this.standPedSprite : null;
     }
 
-    if (this.walkPedGlyph) return this.walkPedGlyph;
-    if (!this.isRenderableImage(this.walkPedSprite)) return null;
-    this.walkPedGlyph = this.preparePedestrianGlyph(this.walkPedSprite);
-    return this.walkPedGlyph;
+    const frameIndex = Math.floor(this.getWalkSpriteCycle(nowMs) * this.walkPedSprites.length);
+    const sprite = this.walkPedSprites[frameIndex % this.walkPedSprites.length];
+    return this.isRenderableImage(sprite) ? sprite : null;
   }
 
-  private preparePedestrianGlyph(sprite: HTMLImageElement): HTMLCanvasElement | null {
-    const canvas = document.createElement("canvas");
-    canvas.width = sprite.naturalWidth;
-    canvas.height = sprite.naturalHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
+  private getWalkSpriteCycle(nowMs: number): number {
+    return (nowMs * 0.0056) % 1;
+  }
 
-    ctx.drawImage(sprite, 0, 0);
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imgData.data;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      if (luminance > 216 && Math.max(r, g, b) - Math.min(r, g, b) < 18) {
-        data[i + 3] = 0;
-      }
-    }
-
-    ctx.putImageData(imgData, 0, 0);
-    return canvas;
+  private getWalkSpriteBob(cycle01: number, h: number): number {
+    const wave = Math.sin(cycle01 * Math.PI * 2);
+    return Math.round(Math.max(0, wave) * h * 0.012);
   }
 
   private drawPedestrianSprite(
