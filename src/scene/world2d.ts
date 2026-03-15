@@ -155,7 +155,11 @@ export class World2D {
     this.roadH = this.h * (compactPortrait ? 0.098 : 0.104);
     this.roadLeft = this.w * 0.08;
     this.roadRight = this.w * 0.92;
-    this.roadY = defaultRoadY + this.getDesktopSceneDownShift(parent, compactPortrait, defaultRoadY);
+    const manualSceneDownShiftPx = 20;
+    this.roadY =
+      defaultRoadY +
+      this.getDesktopSceneDownShift(parent, compactPortrait, defaultRoadY) +
+      manualSceneDownShiftPx;
 
     const n = this.config.numLights;
     const isSequential = this.config.revealMode === "sequential";
