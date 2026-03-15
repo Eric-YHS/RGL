@@ -151,14 +151,10 @@ export class World2D {
     this.w = cssW;
     this.h = cssH;
 
-    const defaultRoadY = this.h * (compactPortrait ? 0.6 : 0.59);
+    this.roadY = this.h * (compactPortrait ? 0.6 : 0.59);
     this.roadH = this.h * (compactPortrait ? 0.098 : 0.104);
     this.roadLeft = this.w * 0.08;
     this.roadRight = this.w * 0.92;
-
-    const lightMetrics = this.getTrafficLightMetrics(compactPortrait);
-    const alignedRoadY = this.getAlignedRoadY(parent, defaultRoadY, lightMetrics.poleH + lightMetrics.housingH);
-    this.roadY = compactPortrait ? defaultRoadY : alignedRoadY;
 
     const n = this.config.numLights;
     const isSequential = this.config.revealMode === "sequential";
@@ -179,19 +175,6 @@ export class World2D {
 
     this.figH = Math.min(70, this.h * 0.12);
     this.resetFogTracking();
-  }
-
-  private getAlignedRoadY(parent: HTMLElement, fallbackRoadY: number, lightOffset: number): number {
-    const statusPanel = parent.querySelector<HTMLElement>(".panel-status");
-    if (!statusPanel) return fallbackRoadY;
-
-    const parentRect = parent.getBoundingClientRect();
-    const statusRect = statusPanel.getBoundingClientRect();
-    const targetLightTopY = statusRect.bottom - parentRect.top;
-    const alignedRoadY = targetLightTopY + this.roadH / 2 + lightOffset;
-    const minRoadY = this.h * 0.57;
-    const maxRoadY = this.h * 0.68;
-    return Math.min(maxRoadY, Math.max(minRoadY, alignedRoadY));
   }
 
   private syncLayoutToCanvasSize(): void {
@@ -342,9 +325,13 @@ export class World2D {
     side: "top" | "bottom",
     nowMs: number
   ): void {
-    const { poleH, poleW, housingW, housingH, bulbR, bulbSpacing } = this.getTrafficLightMetrics(
-      this.isCompactPortraitLayout()
-    );
+    const trafficLightScale = this.getTrafficLightScale();
+    const poleH = this.h * 0.14 * (this.isCompactPortraitLayout() ? 1 : 1.12);
+    const poleW = 3 * trafficLightScale;
+    const housingW = 20 * trafficLightScale;
+    const housingH = 42 * trafficLightScale;
+    const bulbR = 7 * trafficLightScale;
+    const bulbSpacing = 18 * trafficLightScale;
 
     const roadEdge =
       side === "top"
@@ -387,25 +374,6 @@ export class World2D {
       const glyph = this.getSignalGlyph("green");
       if (glyph) this.drawSignalGlyph(ctx, glyph, cx, greenCY, bulbR, pulse);
     }
-  }
-
-  private getTrafficLightMetrics(compactPortrait: boolean): {
-    poleH: number;
-    poleW: number;
-    housingW: number;
-    housingH: number;
-    bulbR: number;
-    bulbSpacing: number;
-  } {
-    const trafficLightScale = this.getTrafficLightScale();
-    return {
-      poleH: this.h * 0.14 * (compactPortrait ? 1 : 1.12),
-      poleW: 3 * trafficLightScale,
-      housingW: 20 * trafficLightScale,
-      housingH: 42 * trafficLightScale,
-      bulbR: 7 * trafficLightScale,
-      bulbSpacing: 18 * trafficLightScale
-    };
   }
 
   private getTrafficLightColor(
