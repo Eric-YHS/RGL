@@ -995,7 +995,7 @@ export class World2D {
   }
 
   private getWalkSpriteCycle(nowMs: number): number {
-    return (nowMs * 0.00155) % 1;
+    return (nowMs * 0.0012) % 1;
   }
 
   private getWalkSpriteBob(cycle01: number, h: number): number {
