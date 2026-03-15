@@ -832,11 +832,11 @@ export class World2D {
     ctx.globalAlpha = alpha;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
     const labelWidth = ctx.measureText(labelText).width;
-    ctx.font = `italic 900 ${fontSize}px ${moneyFontFamily}`;
+    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
     const mainWidth = ctx.measureText(mainText).width;
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
     const subPrefixWidth = ctx.measureText(subPrefixText).width;
-    ctx.font = `italic 900 ${subFontSize}px ${moneyFontFamily}`;
+    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
     const subValueWidth = ctx.measureText(subValueText).width;
     const subWidth = subPrefixWidth + subValueWidth + (compactPortrait ? 10 : 12);
     const ribbonW = Math.min(
@@ -926,7 +926,7 @@ export class World2D {
     ctx.textBaseline = "middle";
     ctx.fillText(labelText, labelX, topRowY);
 
-    ctx.font = `italic 900 ${fontSize}px ${moneyFontFamily}`;
+    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
     ctx.textAlign = "right";
     ctx.lineWidth = compactPortrait ? 1.4 : 1.6;
     ctx.strokeStyle = "rgba(28, 0, 0, 0.65)";
@@ -938,7 +938,7 @@ export class World2D {
     ctx.textAlign = "left";
     ctx.fillStyle = subPrefixColor;
     ctx.fillText(subPrefixText, subLeft, bottomRowY);
-    ctx.font = `italic 900 ${subFontSize}px ${moneyFontFamily}`;
+    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
     ctx.lineWidth = 1;
     ctx.strokeStyle = "rgba(28, 0, 0, 0.6)";
     ctx.strokeText(subValueText, subLeft + subPrefixWidth + (compactPortrait ? 10 : 12), bottomRowY);
