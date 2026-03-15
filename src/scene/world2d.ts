@@ -706,68 +706,146 @@ export class World2D {
   private drawStickFigure(
     ctx: CanvasRenderingContext2D,
     x: number,
-    _phase: Phase,
+    phase: Phase,
     nowMs: number,
     isActuallyMoving: boolean
   ): void {
     const h = this.figH;
-    const headR = h * 0.12;
-    const neckY = this.roadY + this.roadH / 2 + 8;
-    const headCY = neckY - h + headR;
-    const shoulderY = headCY + headR + h * 0.06;
-    const hipY = shoulderY + h * 0.35;
-    const footY = hipY + h * 0.35;
-    const armLen = h * 0.25;
-    const legLen = footY - hipY;
-
-    // Static spread so limbs are always visible (even when standing still)
-    const spread = 6; // pixels outward for each side
-
-    // Walk animation: extra horizontal displacement on top of spread
-    const walkDx = isActuallyMoving ? Math.sin(nowMs * 0.008) * armLen * 0.6 : 0;
+    const footY = this.roadY + this.roadH / 2 + 8;
+    const walkSwing = isActuallyMoving ? Math.sin(nowMs * 0.008) : 0;
+    const pose = phase === "moving" || isActuallyMoving ? "walk" : "stand";
 
     ctx.save();
-    ctx.strokeStyle = "#1a1a1a";
-    ctx.fillStyle = "#1a1a1a";
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-
-    // Head
+    ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
     ctx.beginPath();
-    ctx.arc(x, headCY, headR, 0, Math.PI * 2);
+    ctx.ellipse(x, footY + 3, h * 0.16, h * 0.04, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    this.drawPedestrianSilhouette(ctx, x, footY, h, pose, walkSwing);
+  }
+
+  private drawPedestrianSilhouette(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    footY: number,
+    h: number,
+    pose: "stand" | "walk",
+    walkSwing: number
+  ): void {
+    const u = h / 116;
+    const limbWidth = Math.max(4, 11 * u);
+    const headR = 10 * u;
+    const silhouetteColor = "#161616";
+    const torso = pose === "walk"
+      ? [
+          { x: -9 * u, y: footY - 86 * u },
+          { x: 7 * u, y: footY - 82 * u },
+          { x: 10 * u, y: footY - 58 * u },
+          { x: 3 * u, y: footY - 40 * u },
+          { x: -5 * u, y: footY - 42 * u },
+          { x: -12 * u, y: footY - 62 * u }
+        ]
+      : [
+          { x: -8 * u, y: footY - 86 * u },
+          { x: 8 * u, y: footY - 86 * u },
+          { x: 11 * u, y: footY - 60 * u },
+          { x: 4 * u, y: footY - 38 * u },
+          { x: -4 * u, y: footY - 38 * u },
+          { x: -11 * u, y: footY - 60 * u }
+        ];
+
+    const leftArm =
+      pose === "walk"
+        ? [
+            { x: -7 * u, y: footY - 81 * u },
+            { x: (-17 + walkSwing * 2.2) * u, y: footY - 64 * u },
+            { x: (-14 + walkSwing * 1.5) * u, y: footY - 47 * u }
+          ]
+        : [
+            { x: -7 * u, y: footY - 82 * u },
+            { x: -14 * u, y: footY - 62 * u },
+            { x: -10 * u, y: footY - 42 * u }
+          ];
+
+    const rightArm =
+      pose === "walk"
+        ? [
+            { x: 7 * u, y: footY - 79 * u },
+            { x: (20 + walkSwing * 1.8) * u, y: footY - 70 * u },
+            { x: (32 + walkSwing * 2.4) * u, y: footY - 63 * u }
+          ]
+        : [
+            { x: 7 * u, y: footY - 82 * u },
+            { x: 13 * u, y: footY - 60 * u },
+            { x: 9 * u, y: footY - 42 * u }
+          ];
+
+    const leftLeg =
+      pose === "walk"
+        ? [
+            { x: -4 * u, y: footY - 38 * u },
+            { x: (-7 - walkSwing * 1.2) * u, y: footY - 16 * u },
+            { x: (-22 - walkSwing * 2.5) * u, y: footY }
+          ]
+        : [
+            { x: -4 * u, y: footY - 38 * u },
+            { x: -7 * u, y: footY - 15 * u },
+            { x: -13 * u, y: footY }
+          ];
+
+    const rightLeg =
+      pose === "walk"
+        ? [
+            { x: 4 * u, y: footY - 38 * u },
+            { x: (8 + walkSwing * 1.6) * u, y: footY - 15 * u },
+            { x: (15 + walkSwing * 2.1) * u, y: footY }
+          ]
+        : [
+            { x: 4 * u, y: footY - 38 * u },
+            { x: 8 * u, y: footY - 15 * u },
+            { x: 12 * u, y: footY }
+          ];
+
+    ctx.save();
+    ctx.translate(x, 0);
+    ctx.strokeStyle = silhouetteColor;
+    ctx.fillStyle = silhouetteColor;
+    ctx.lineWidth = limbWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    this.drawPedestrianLimb(ctx, leftArm);
+    this.drawPedestrianLimb(ctx, rightArm);
+    this.drawPedestrianLimb(ctx, leftLeg);
+    this.drawPedestrianLimb(ctx, rightLeg);
+
+    ctx.beginPath();
+    ctx.moveTo(torso[0].x, torso[0].y);
+    for (let i = 1; i < torso.length; i += 1) {
+      ctx.lineTo(torso[i].x, torso[i].y);
+    }
+    ctx.closePath();
     ctx.fill();
 
-    // Body
     ctx.beginPath();
-    ctx.moveTo(x, shoulderY);
-    ctx.lineTo(x, hipY);
-    ctx.stroke();
-
-    // Left arm: base spread left + walk swing
-    ctx.beginPath();
-    ctx.moveTo(x, shoulderY);
-    ctx.lineTo(x - spread + walkDx, shoulderY + armLen * 0.85);
-    ctx.stroke();
-
-    // Right arm: base spread right - walk swing (contralateral)
-    ctx.beginPath();
-    ctx.moveTo(x, shoulderY);
-    ctx.lineTo(x + spread - walkDx, shoulderY + armLen * 0.85);
-    ctx.stroke();
-
-    // Left leg: base spread left - walk swing (opposite to left arm)
-    ctx.beginPath();
-    ctx.moveTo(x, hipY);
-    ctx.lineTo(x - spread - walkDx, hipY + legLen * 0.95);
-    ctx.stroke();
-
-    // Right leg: base spread right + walk swing (opposite to right arm)
-    ctx.beginPath();
-    ctx.moveTo(x, hipY);
-    ctx.lineTo(x + spread + walkDx, hipY + legLen * 0.95);
-    ctx.stroke();
+    ctx.arc(0, footY - 102 * u, headR, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
+  }
+
+  private drawPedestrianLimb(
+    ctx: CanvasRenderingContext2D,
+    points: Array<{ x: number; y: number }>
+  ): void {
+    if (points.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i += 1) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
   }
 
   /* ------------------------------------------------------------------ */
