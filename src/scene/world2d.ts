@@ -1,12 +1,6 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
-import manStandSvgUrl from "../assets/kimbrough-rf/man-stand.svg";
-import manWalk1SvgUrl from "../assets/kimbrough-rf/man-walk-1.svg";
-import manWalk2SvgUrl from "../assets/kimbrough-rf/man-walk-2.svg";
-import manWalk3SvgUrl from "../assets/kimbrough-rf/man-walk-3.svg";
-import manWalk4SvgUrl from "../assets/kimbrough-rf/man-walk-4.svg";
-import manWalk5SvgUrl from "../assets/kimbrough-rf/man-walk-5.svg";
-import manWalk6SvgUrl from "../assets/kimbrough-rf/man-walk-6.svg";
+import humanMaleWalkingSpriteSheetUrl from "../assets/pedestrian/human-male-walking.png";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
 type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
@@ -29,6 +23,10 @@ const SIGNAL_RED_ON = "#c32128";
 const SIGNAL_RED_OFF = "#35171a";
 const SIGNAL_GREEN_ON = "#1c7a3b";
 const SIGNAL_GREEN_OFF = "#162a1b";
+const PED_SPRITE_FRAME_WIDTH = 16;
+const PED_SPRITE_FRAME_HEIGHT = 32;
+const PED_STAND_FRAME_INDEX = 6;
+const PED_WALK_SEQUENCE = [0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1];
 const UI_FONT_FAMILY = '"Experiment Sans", sans-serif';
 const MONEY_FONT_FAMILY = '"Experiment Mono", monospace';
 const STAND_PED_POSE: PedestrianPoseFrame = {
@@ -281,20 +279,10 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
-  private readonly standPedSprite = loadCanvasImage(manStandSvgUrl);
-  private readonly walkPedSprites = [
-    loadCanvasImage(manWalk1SvgUrl),
-    loadCanvasImage(manWalk2SvgUrl),
-    loadCanvasImage(manWalk3SvgUrl),
-    loadCanvasImage(manWalk4SvgUrl),
-    loadCanvasImage(manWalk5SvgUrl),
-    loadCanvasImage(manWalk6SvgUrl)
-  ];
-  private readonly walkPedSequence = [0, 1, 2, 3, 4, 5];
+  private readonly pedestrianSpriteSheet = loadCanvasImage(humanMaleWalkingSpriteSheetUrl);
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
-  private standPedGlyph: HTMLCanvasElement | null = null;
-  private walkPedGlyphs: (HTMLCanvasElement | null)[] = [];
+  private pedestrianGlyphFrames: (HTMLCanvasElement | null)[] = [];
   private fogFadeLeftX = -1;
   private fogFadeRightX = -1;
   private lastMoneyPulseStep: number | null = null;
@@ -910,7 +898,6 @@ export class World2D {
     const h = this.figH;
     const footY = this.roadY + this.roadH / 2 + 8;
     const pose = phase === "moving" || isActuallyMoving ? "walk" : "stand";
-    const u = h / 116;
     const spriteCycle01 = pose === "walk" ? this.getWalkSpriteCycle(nowMs) : 0;
     const spriteBobY = pose === "walk" ? this.getWalkSpriteBob(spriteCycle01, h) : 0;
     const pedFrame = this.getPedestrianSpriteFrame(pose, nowMs);
@@ -932,111 +919,78 @@ export class World2D {
 
     if (pedFrame) {
       this.drawPedestrianSpriteFrame(ctx, pedFrame, x, footY + spriteBobY, h, pose);
-      return;
     }
-
-    const walkCycle01 = isActuallyMoving ? (nowMs * 0.00105) % 1 : 0;
-    const poseFrame = this.getPedestrianPoseFrame(pose, walkCycle01);
-    this.drawPedestrianSilhouette(ctx, x, footY, u, poseFrame);
   }
 
   private getPedestrianSpriteFrame(
     pose: "stand" | "walk",
     nowMs: number
   ): { current: CanvasImageSource; next: CanvasImageSource | null; mix01: number } | null {
-    if (pose === "stand") {
-      if (this.standPedGlyph) {
-        return { current: this.standPedGlyph, next: null, mix01: 0 };
-      }
-      if (!this.isRenderableImage(this.standPedSprite)) return null;
-      this.standPedGlyph = this.preparePedestrianSprite(this.standPedSprite);
-      return this.standPedGlyph ? { current: this.standPedGlyph, next: null, mix01: 0 } : null;
-    }
-
-    const glyphs = this.getWalkPedGlyphs();
+    const glyphs = this.getPedestrianGlyphFrames();
     if (glyphs.length === 0) return null;
 
-    const scaled = this.getWalkSpriteCycle(nowMs) * glyphs.length;
-    const index = Math.floor(scaled) % glyphs.length;
+    if (pose === "stand") {
+      const standGlyph = glyphs[Math.min(PED_STAND_FRAME_INDEX, glyphs.length - 1)];
+      return standGlyph ? { current: standGlyph, next: null, mix01: 0 } : null;
+    }
+
+    const scaled = this.getWalkSpriteCycle(nowMs) * PED_WALK_SEQUENCE.length;
+    const sequenceIndex = Math.floor(scaled) % PED_WALK_SEQUENCE.length;
+    const index = PED_WALK_SEQUENCE[sequenceIndex];
+    const glyph = glyphs[index];
+    if (!glyph) return null;
 
     return {
-      current: glyphs[index],
+      current: glyph,
       next: null,
       mix01: 0
     };
   }
 
-  private getWalkPedGlyphs(): HTMLCanvasElement[] {
-    if (this.walkPedGlyphs.length !== this.walkPedSequence.length) {
-      this.walkPedGlyphs = new Array(this.walkPedSequence.length).fill(null);
+  private getPedestrianGlyphFrames(): HTMLCanvasElement[] {
+    const frameCount = Math.max(
+      1,
+      Math.floor(this.pedestrianSpriteSheet.naturalWidth / PED_SPRITE_FRAME_WIDTH)
+    );
+
+    if (this.pedestrianGlyphFrames.length !== frameCount) {
+      this.pedestrianGlyphFrames = new Array(frameCount).fill(null);
     }
 
-    this.walkPedSequence.forEach((spriteIndex, index) => {
-      if (this.walkPedGlyphs[index]) return;
-      const sprite = this.walkPedSprites[spriteIndex];
-      if (!this.isRenderableImage(sprite)) return;
-      this.walkPedGlyphs[index] = this.preparePedestrianSprite(sprite);
-    });
+    if (!this.isRenderableImage(this.pedestrianSpriteSheet)) return [];
 
-    return this.walkPedGlyphs.filter((glyph): glyph is HTMLCanvasElement => !!glyph);
+    for (let index = 0; index < frameCount; index += 1) {
+      if (this.pedestrianGlyphFrames[index]) continue;
+      this.pedestrianGlyphFrames[index] = this.extractPedestrianSpriteFrame(index);
+    }
+
+    return this.pedestrianGlyphFrames.filter((glyph): glyph is HTMLCanvasElement => !!glyph);
   }
 
-  private preparePedestrianSprite(sprite: HTMLImageElement): HTMLCanvasElement | null {
+  private extractPedestrianSpriteFrame(frameIndex: number): HTMLCanvasElement | null {
+    if (!this.isRenderableImage(this.pedestrianSpriteSheet)) return null;
+
+    const frameCount = Math.floor(this.pedestrianSpriteSheet.naturalWidth / PED_SPRITE_FRAME_WIDTH);
+    if (frameIndex < 0 || frameIndex >= frameCount) return null;
+
     const canvas = document.createElement("canvas");
-    canvas.width = sprite.naturalWidth;
-    canvas.height = sprite.naturalHeight;
+    canvas.width = PED_SPRITE_FRAME_WIDTH;
+    canvas.height = PED_SPRITE_FRAME_HEIGHT;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    ctx.drawImage(sprite, 0, 0);
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imgData.data;
-    const opaqueMask = new Uint8Array(canvas.width * canvas.height);
-
-    for (let y = 0; y < canvas.height; y += 1) {
-      for (let x = 0; x < canvas.width; x += 1) {
-        const idx = (y * canvas.width + x) * 4;
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-        const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        if (luminance > 216 && Math.max(r, g, b) - Math.min(r, g, b) < 18) {
-          data[idx + 3] = 0;
-        } else if (data[idx + 3] > 0) {
-          opaqueMask[y * canvas.width + x] = 1;
-        }
-      }
-    }
-
-    const expandedMask = new Uint8Array(opaqueMask);
-    const closeRadius = 2;
-    for (let y = 0; y < canvas.height; y += 1) {
-      for (let x = 0; x < canvas.width; x += 1) {
-        if (!opaqueMask[y * canvas.width + x]) continue;
-        for (let dy = -closeRadius; dy <= closeRadius; dy += 1) {
-          for (let dx = -closeRadius; dx <= closeRadius; dx += 1) {
-            const nx = x + dx;
-            const ny = y + dy;
-            if (nx < 0 || nx >= canvas.width || ny < 0 || ny >= canvas.height) continue;
-            expandedMask[ny * canvas.width + nx] = 1;
-          }
-        }
-      }
-    }
-
-    for (let i = 0; i < data.length; i += 4) {
-      const pixelIndex = i / 4;
-      if (!expandedMask[pixelIndex]) {
-        data[i + 3] = 0;
-        continue;
-      }
-      data[i] = 22;
-      data[i + 1] = 22;
-      data[i + 2] = 22;
-      data[i + 3] = Math.max(data[i + 3], 250);
-    }
-
-    ctx.putImageData(imgData, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      this.pedestrianSpriteSheet,
+      frameIndex * PED_SPRITE_FRAME_WIDTH,
+      0,
+      PED_SPRITE_FRAME_WIDTH,
+      PED_SPRITE_FRAME_HEIGHT,
+      0,
+      0,
+      PED_SPRITE_FRAME_WIDTH,
+      PED_SPRITE_FRAME_HEIGHT
+    );
     return canvas;
   }
 
