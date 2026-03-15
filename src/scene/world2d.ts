@@ -1009,11 +1009,12 @@ export class World2D {
     }
 
     const expandedMask = new Uint8Array(opaqueMask);
+    const closeRadius = 2;
     for (let y = 0; y < canvas.height; y += 1) {
       for (let x = 0; x < canvas.width; x += 1) {
         if (!opaqueMask[y * canvas.width + x]) continue;
-        for (let dy = -1; dy <= 1; dy += 1) {
-          for (let dx = -1; dx <= 1; dx += 1) {
+        for (let dy = -closeRadius; dy <= closeRadius; dy += 1) {
+          for (let dx = -closeRadius; dx <= closeRadius; dx += 1) {
             const nx = x + dx;
             const ny = y + dy;
             if (nx < 0 || nx >= canvas.width || ny < 0 || ny >= canvas.height) continue;
@@ -1061,16 +1062,18 @@ export class World2D {
         ? (h * frame.current.width) / Math.max(frame.current.height, 1)
         : h * 0.6;
     const anchorRatio = pose === "walk" ? 0.46 : 0.48;
-    const drawX = x - spriteW * anchorRatio;
-    const drawY = footY - h;
+    const drawW = Math.round(spriteW);
+    const drawH = Math.round(h);
+    const drawX = Math.round(x - drawW * anchorRatio);
+    const drawY = Math.round(footY - drawH);
 
     ctx.save();
-    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = frame.next ? 1 - frame.mix01 : 1;
-    ctx.drawImage(frame.current, drawX, drawY, spriteW, h);
+    ctx.drawImage(frame.current, drawX, drawY, drawW, drawH);
     if (frame.next) {
       ctx.globalAlpha = frame.mix01;
-      ctx.drawImage(frame.next, drawX, drawY, spriteW, h);
+      ctx.drawImage(frame.next, drawX, drawY, drawW, drawH);
     }
     ctx.restore();
   }
