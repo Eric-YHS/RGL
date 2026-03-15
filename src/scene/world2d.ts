@@ -4,6 +4,17 @@ import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
 type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
 type SignalGlyphKind = "red" | "green";
+type CanvasPoint = { x: number; y: number };
+type PedestrianPoseFrame = {
+  torso: CanvasPoint[];
+  leftArm: CanvasPoint[];
+  rightArm: CanvasPoint[];
+  leftLeg: CanvasPoint[];
+  rightLeg: CanvasPoint[];
+  headCenter: CanvasPoint;
+  headR: number;
+  shadowScaleX: number;
+};
 
 const RED_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 17, y: 8, w: 15, h: 35 };
 const GREEN_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 14, y: 52, w: 24, h: 28 };
@@ -13,6 +24,173 @@ const SIGNAL_GREEN_ON = "#1c7a3b";
 const SIGNAL_GREEN_OFF = "#162a1b";
 const UI_FONT_FAMILY = '"Experiment Sans", sans-serif';
 const MONEY_FONT_FAMILY = '"Experiment Mono", monospace';
+const STAND_PED_POSE: PedestrianPoseFrame = {
+  torso: [
+    { x: -8, y: -86 },
+    { x: 8, y: -86 },
+    { x: 11, y: -60 },
+    { x: 4, y: -38 },
+    { x: -4, y: -38 },
+    { x: -11, y: -60 }
+  ],
+  leftArm: [
+    { x: -7, y: -82 },
+    { x: -14, y: -62 },
+    { x: -10, y: -42 }
+  ],
+  rightArm: [
+    { x: 7, y: -82 },
+    { x: 13, y: -60 },
+    { x: 9, y: -42 }
+  ],
+  leftLeg: [
+    { x: -4, y: -38 },
+    { x: -7, y: -15 },
+    { x: -13, y: 0 }
+  ],
+  rightLeg: [
+    { x: 4, y: -38 },
+    { x: 8, y: -15 },
+    { x: 12, y: 0 }
+  ],
+  headCenter: { x: 0, y: -102 },
+  headR: 10,
+  shadowScaleX: 1
+};
+const WALK_PED_POSES: PedestrianPoseFrame[] = [
+  {
+    torso: [
+      { x: -10, y: -86 },
+      { x: 7, y: -82 },
+      { x: 11, y: -58 },
+      { x: 3, y: -38 },
+      { x: -6, y: -40 },
+      { x: -13, y: -62 }
+    ],
+    leftArm: [
+      { x: -7, y: -81 },
+      { x: -17, y: -68 },
+      { x: -18, y: -48 }
+    ],
+    rightArm: [
+      { x: 7, y: -79 },
+      { x: 20, y: -70 },
+      { x: 31, y: -63 }
+    ],
+    leftLeg: [
+      { x: -4, y: -38 },
+      { x: -9, y: -17 },
+      { x: -24, y: 0 }
+    ],
+    rightLeg: [
+      { x: 4, y: -38 },
+      { x: 9, y: -14 },
+      { x: 17, y: 0 }
+    ],
+    headCenter: { x: -1, y: -103 },
+    headR: 10,
+    shadowScaleX: 1.08
+  },
+  {
+    torso: [
+      { x: -9, y: -85 },
+      { x: 8, y: -84 },
+      { x: 11, y: -58 },
+      { x: 4, y: -38 },
+      { x: -4, y: -38 },
+      { x: -11, y: -59 }
+    ],
+    leftArm: [
+      { x: -7, y: -81 },
+      { x: -12, y: -60 },
+      { x: -8, y: -43 }
+    ],
+    rightArm: [
+      { x: 7, y: -80 },
+      { x: 14, y: -60 },
+      { x: 9, y: -43 }
+    ],
+    leftLeg: [
+      { x: -4, y: -38 },
+      { x: -8, y: -17 },
+      { x: -11, y: 0 }
+    ],
+    rightLeg: [
+      { x: 4, y: -38 },
+      { x: 7, y: -17 },
+      { x: 12, y: 0 }
+    ],
+    headCenter: { x: 0, y: -101 },
+    headR: 10,
+    shadowScaleX: 0.94
+  },
+  {
+    torso: [
+      { x: -7, y: -82 },
+      { x: 10, y: -86 },
+      { x: 13, y: -62 },
+      { x: 6, y: -40 },
+      { x: -3, y: -38 },
+      { x: -11, y: -58 }
+    ],
+    leftArm: [
+      { x: -7, y: -79 },
+      { x: -20, y: -70 },
+      { x: -31, y: -63 }
+    ],
+    rightArm: [
+      { x: 7, y: -81 },
+      { x: 17, y: -68 },
+      { x: 18, y: -48 }
+    ],
+    leftLeg: [
+      { x: -4, y: -38 },
+      { x: -9, y: -14 },
+      { x: -17, y: 0 }
+    ],
+    rightLeg: [
+      { x: 4, y: -38 },
+      { x: 9, y: -17 },
+      { x: 24, y: 0 }
+    ],
+    headCenter: { x: 1, y: -103 },
+    headR: 10,
+    shadowScaleX: 1.08
+  },
+  {
+    torso: [
+      { x: -8, y: -84 },
+      { x: 9, y: -85 },
+      { x: 12, y: -59 },
+      { x: 4, y: -38 },
+      { x: -4, y: -38 },
+      { x: -11, y: -58 }
+    ],
+    leftArm: [
+      { x: -7, y: -80 },
+      { x: -14, y: -60 },
+      { x: -9, y: -43 }
+    ],
+    rightArm: [
+      { x: 7, y: -81 },
+      { x: 12, y: -60 },
+      { x: 8, y: -43 }
+    ],
+    leftLeg: [
+      { x: -4, y: -38 },
+      { x: -7, y: -17 },
+      { x: -12, y: 0 }
+    ],
+    rightLeg: [
+      { x: 4, y: -38 },
+      { x: 8, y: -17 },
+      { x: 11, y: 0 }
+    ],
+    headCenter: { x: 0, y: -101 },
+    headR: 10,
+    shadowScaleX: 0.94
+  }
+];
 
 function loadCanvasImage(src: string): HTMLImageElement {
   const img = new Image();
@@ -712,100 +890,38 @@ export class World2D {
   ): void {
     const h = this.figH;
     const footY = this.roadY + this.roadH / 2 + 8;
-    const walkSwing = isActuallyMoving ? Math.sin(nowMs * 0.008) : 0;
     const pose = phase === "moving" || isActuallyMoving ? "walk" : "stand";
+    const walkCycle01 = isActuallyMoving ? (nowMs * 0.00105) % 1 : 0;
+    const poseFrame = this.getPedestrianPoseFrame(pose, walkCycle01);
+    const u = h / 116;
 
     ctx.save();
     ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
     ctx.beginPath();
-    ctx.ellipse(x, footY + 3, h * 0.16, h * 0.04, 0, 0, Math.PI * 2);
+    ctx.ellipse(
+      x,
+      footY + 3,
+      h * 0.16 * poseFrame.shadowScaleX,
+      h * 0.04,
+      0,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
     ctx.restore();
 
-    this.drawPedestrianSilhouette(ctx, x, footY, h, pose, walkSwing);
+    this.drawPedestrianSilhouette(ctx, x, footY, u, poseFrame);
   }
 
   private drawPedestrianSilhouette(
     ctx: CanvasRenderingContext2D,
     x: number,
     footY: number,
-    h: number,
-    pose: "stand" | "walk",
-    walkSwing: number
+    u: number,
+    poseFrame: PedestrianPoseFrame
   ): void {
-    const u = h / 116;
     const limbWidth = Math.max(4, 11 * u);
-    const headR = 10 * u;
     const silhouetteColor = "#161616";
-    const torso = pose === "walk"
-      ? [
-          { x: -9 * u, y: footY - 86 * u },
-          { x: 7 * u, y: footY - 82 * u },
-          { x: 10 * u, y: footY - 58 * u },
-          { x: 3 * u, y: footY - 40 * u },
-          { x: -5 * u, y: footY - 42 * u },
-          { x: -12 * u, y: footY - 62 * u }
-        ]
-      : [
-          { x: -8 * u, y: footY - 86 * u },
-          { x: 8 * u, y: footY - 86 * u },
-          { x: 11 * u, y: footY - 60 * u },
-          { x: 4 * u, y: footY - 38 * u },
-          { x: -4 * u, y: footY - 38 * u },
-          { x: -11 * u, y: footY - 60 * u }
-        ];
-
-    const leftArm =
-      pose === "walk"
-        ? [
-            { x: -7 * u, y: footY - 81 * u },
-            { x: (-17 + walkSwing * 2.2) * u, y: footY - 64 * u },
-            { x: (-14 + walkSwing * 1.5) * u, y: footY - 47 * u }
-          ]
-        : [
-            { x: -7 * u, y: footY - 82 * u },
-            { x: -14 * u, y: footY - 62 * u },
-            { x: -10 * u, y: footY - 42 * u }
-          ];
-
-    const rightArm =
-      pose === "walk"
-        ? [
-            { x: 7 * u, y: footY - 79 * u },
-            { x: (20 + walkSwing * 1.8) * u, y: footY - 70 * u },
-            { x: (32 + walkSwing * 2.4) * u, y: footY - 63 * u }
-          ]
-        : [
-            { x: 7 * u, y: footY - 82 * u },
-            { x: 13 * u, y: footY - 60 * u },
-            { x: 9 * u, y: footY - 42 * u }
-          ];
-
-    const leftLeg =
-      pose === "walk"
-        ? [
-            { x: -4 * u, y: footY - 38 * u },
-            { x: (-7 - walkSwing * 1.2) * u, y: footY - 16 * u },
-            { x: (-22 - walkSwing * 2.5) * u, y: footY }
-          ]
-        : [
-            { x: -4 * u, y: footY - 38 * u },
-            { x: -7 * u, y: footY - 15 * u },
-            { x: -13 * u, y: footY }
-          ];
-
-    const rightLeg =
-      pose === "walk"
-        ? [
-            { x: 4 * u, y: footY - 38 * u },
-            { x: (8 + walkSwing * 1.6) * u, y: footY - 15 * u },
-            { x: (15 + walkSwing * 2.1) * u, y: footY }
-          ]
-        : [
-            { x: 4 * u, y: footY - 38 * u },
-            { x: 8 * u, y: footY - 15 * u },
-            { x: 12 * u, y: footY }
-          ];
 
     ctx.save();
     ctx.translate(x, 0);
@@ -815,21 +931,27 @@ export class World2D {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    this.drawPedestrianLimb(ctx, leftArm);
-    this.drawPedestrianLimb(ctx, rightArm);
-    this.drawPedestrianLimb(ctx, leftLeg);
-    this.drawPedestrianLimb(ctx, rightLeg);
+    this.drawPedestrianLimb(ctx, poseFrame.leftArm, u, footY);
+    this.drawPedestrianLimb(ctx, poseFrame.rightArm, u, footY);
+    this.drawPedestrianLimb(ctx, poseFrame.leftLeg, u, footY);
+    this.drawPedestrianLimb(ctx, poseFrame.rightLeg, u, footY);
 
     ctx.beginPath();
-    ctx.moveTo(torso[0].x, torso[0].y);
-    for (let i = 1; i < torso.length; i += 1) {
-      ctx.lineTo(torso[i].x, torso[i].y);
+    ctx.moveTo(poseFrame.torso[0].x * u, footY + poseFrame.torso[0].y * u);
+    for (let i = 1; i < poseFrame.torso.length; i += 1) {
+      ctx.lineTo(poseFrame.torso[i].x * u, footY + poseFrame.torso[i].y * u);
     }
     ctx.closePath();
     ctx.fill();
 
     ctx.beginPath();
-    ctx.arc(0, footY - 102 * u, headR, 0, Math.PI * 2);
+    ctx.arc(
+      poseFrame.headCenter.x * u,
+      footY + poseFrame.headCenter.y * u,
+      poseFrame.headR * u,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
 
     ctx.restore();
@@ -837,15 +959,72 @@ export class World2D {
 
   private drawPedestrianLimb(
     ctx: CanvasRenderingContext2D,
-    points: Array<{ x: number; y: number }>
+    points: CanvasPoint[],
+    u: number,
+    footY: number
   ): void {
     if (points.length < 2) return;
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
+    ctx.moveTo(points[0].x * u, footY + points[0].y * u);
     for (let i = 1; i < points.length; i += 1) {
-      ctx.lineTo(points[i].x, points[i].y);
+      ctx.lineTo(points[i].x * u, footY + points[i].y * u);
     }
     ctx.stroke();
+  }
+
+  private getPedestrianPoseFrame(
+    pose: "stand" | "walk",
+    cycle01: number
+  ): PedestrianPoseFrame {
+    if (pose === "stand") return STAND_PED_POSE;
+
+    const frameCount = WALK_PED_POSES.length;
+    const scaled = cycle01 * frameCount;
+    const index = Math.floor(scaled) % frameCount;
+    const nextIndex = (index + 1) % frameCount;
+    const t = this.easePedestrianCycle(scaled - Math.floor(scaled));
+
+    return this.interpolatePedestrianPose(WALK_PED_POSES[index], WALK_PED_POSES[nextIndex], t);
+  }
+
+  private interpolatePedestrianPose(
+    from: PedestrianPoseFrame,
+    to: PedestrianPoseFrame,
+    t: number
+  ): PedestrianPoseFrame {
+    return {
+      torso: this.interpolatePedestrianPoints(from.torso, to.torso, t),
+      leftArm: this.interpolatePedestrianPoints(from.leftArm, to.leftArm, t),
+      rightArm: this.interpolatePedestrianPoints(from.rightArm, to.rightArm, t),
+      leftLeg: this.interpolatePedestrianPoints(from.leftLeg, to.leftLeg, t),
+      rightLeg: this.interpolatePedestrianPoints(from.rightLeg, to.rightLeg, t),
+      headCenter: this.interpolatePedestrianPoint(from.headCenter, to.headCenter, t),
+      headR: this.lerp(from.headR, to.headR, t),
+      shadowScaleX: this.lerp(from.shadowScaleX, to.shadowScaleX, t)
+    };
+  }
+
+  private interpolatePedestrianPoints(
+    from: CanvasPoint[],
+    to: CanvasPoint[],
+    t: number
+  ): CanvasPoint[] {
+    return from.map((point, index) => this.interpolatePedestrianPoint(point, to[index], t));
+  }
+
+  private interpolatePedestrianPoint(from: CanvasPoint, to: CanvasPoint, t: number): CanvasPoint {
+    return {
+      x: this.lerp(from.x, to.x, t),
+      y: this.lerp(from.y, to.y, t)
+    };
+  }
+
+  private easePedestrianCycle(t: number): number {
+    return 0.5 - Math.cos(t * Math.PI) * 0.5;
+  }
+
+  private lerp(from: number, to: number, t: number): number {
+    return from + (to - from) * t;
   }
 
   /* ------------------------------------------------------------------ */
