@@ -5,6 +5,8 @@ import manWalk1SvgUrl from "../assets/kimbrough-rf/man-walk-1.svg";
 import manWalk2SvgUrl from "../assets/kimbrough-rf/man-walk-2.svg";
 import manWalk3SvgUrl from "../assets/kimbrough-rf/man-walk-3.svg";
 import manWalk4SvgUrl from "../assets/kimbrough-rf/man-walk-4.svg";
+import manWalk5SvgUrl from "../assets/kimbrough-rf/man-walk-5.svg";
+import manWalk6SvgUrl from "../assets/kimbrough-rf/man-walk-6.svg";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
 type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
@@ -284,9 +286,11 @@ export class World2D {
     loadCanvasImage(manWalk1SvgUrl),
     loadCanvasImage(manWalk2SvgUrl),
     loadCanvasImage(manWalk3SvgUrl),
-    loadCanvasImage(manWalk4SvgUrl)
+    loadCanvasImage(manWalk4SvgUrl),
+    loadCanvasImage(manWalk5SvgUrl),
+    loadCanvasImage(manWalk6SvgUrl)
   ];
-  private readonly walkPedSequence = [0, 1, 2, 3, 2, 1];
+  private readonly walkPedSequence = [0, 1, 2, 3, 4, 5];
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
   private standPedGlyph: HTMLCanvasElement | null = null;
@@ -954,13 +958,11 @@ export class World2D {
 
     const scaled = this.getWalkSpriteCycle(nowMs) * glyphs.length;
     const index = Math.floor(scaled) % glyphs.length;
-    const nextIndex = (index + 1) % glyphs.length;
-    const mix01 = this.easePedestrianCycle(scaled - Math.floor(scaled));
 
     return {
       current: glyphs[index],
-      next: glyphs[nextIndex],
-      mix01
+      next: null,
+      mix01: 0
     };
   }
 
@@ -1038,12 +1040,12 @@ export class World2D {
   }
 
   private getWalkSpriteCycle(nowMs: number): number {
-    return (nowMs * 0.0012) % 1;
+    return (nowMs * 0.00155) % 1;
   }
 
   private getWalkSpriteBob(cycle01: number, h: number): number {
     const wave = Math.sin(cycle01 * Math.PI * 2);
-    return Math.round((0.5 - 0.5 * wave) * h * 0.018);
+    return Math.round((0.5 - 0.5 * wave) * h * 0.012);
   }
 
   private drawPedestrianSpriteFrame(
