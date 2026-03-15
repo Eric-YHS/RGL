@@ -818,7 +818,7 @@ export class World2D {
     const roadTop = this.roadY - this.roadH / 2;
     const lightsTopY = roadTop - this.h * 0.14 - 42;
 
-    const mainText = `￥${money.toFixed(2)}`;
+    const mainText = `￥${Math.max(0, money).toFixed(3)}`;
     const labelText = "剩余补贴";
     const subPrefixText = "每秒正在减少";
     const subValueText = `-￥${this.config.moneyLossPerSec.toFixed(2)}`;
@@ -829,11 +829,11 @@ export class World2D {
     ctx.globalAlpha = alpha;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
     const labelWidth = ctx.measureText(labelText).width;
-    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
+    ctx.font = `italic 900 ${fontSize}px ${moneyFontFamily}`;
     const mainWidth = ctx.measureText(mainText).width;
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
     const subPrefixWidth = ctx.measureText(subPrefixText).width;
-    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
+    ctx.font = `italic 900 ${subFontSize}px ${moneyFontFamily}`;
     const subValueWidth = ctx.measureText(subValueText).width;
     const subWidth = subPrefixWidth + subValueWidth + (compactPortrait ? 10 : 12);
     const ribbonW = Math.min(
@@ -858,7 +858,7 @@ export class World2D {
 
     const pillX = -ribbonW / 2;
     const pillY = -ribbonH / 2;
-    const cornerRadius = compactPortrait ? 16 : 18;
+    const cornerRadius = 0;
 
     const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + ribbonH);
     panelGrad.addColorStop(0, panelTop);
@@ -896,7 +896,7 @@ export class World2D {
 
     ctx.strokeStyle = `rgba(255, 214, 214, ${0.12 + flashStrength * 0.22})`;
     ctx.lineWidth = 0.9;
-    this.roundRect(ctx, pillX + 2, pillY + 2, ribbonW - 4, ribbonH - 4, Math.max(4, cornerRadius - 2));
+    this.roundRect(ctx, pillX + 2, pillY + 2, ribbonW - 4, ribbonH - 4, 0);
     ctx.stroke();
 
     const leftInset = pillX + (compactPortrait ? 20 : 26);
@@ -923,7 +923,7 @@ export class World2D {
     ctx.textBaseline = "middle";
     ctx.fillText(labelText, labelX, topRowY);
 
-    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
+    ctx.font = `italic 900 ${fontSize}px ${moneyFontFamily}`;
     ctx.textAlign = "right";
     ctx.lineWidth = compactPortrait ? 1.4 : 1.6;
     ctx.strokeStyle = "rgba(28, 0, 0, 0.65)";
@@ -935,7 +935,7 @@ export class World2D {
     ctx.textAlign = "left";
     ctx.fillStyle = subPrefixColor;
     ctx.fillText(subPrefixText, subLeft, bottomRowY);
-    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
+    ctx.font = `italic 900 ${subFontSize}px ${moneyFontFamily}`;
     ctx.lineWidth = 1;
     ctx.strokeStyle = "rgba(28, 0, 0, 0.6)";
     ctx.strokeText(subValueText, subLeft + subPrefixWidth + (compactPortrait ? 10 : 12), bottomRowY);
@@ -1030,6 +1030,13 @@ export class World2D {
     h: number,
     r: number
   ): void {
+    if (r <= 0) {
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.closePath();
+      return;
+    }
+
     ctx.beginPath();
     ctx.moveTo(x + r, y);
     ctx.lineTo(x + w - r, y);
