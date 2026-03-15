@@ -99,8 +99,6 @@ export class World2D {
   private fogFadeRightX = -1;
   private lastMoneyPulseStep: number | null = null;
   private moneyPulseUntilMs = 0;
-  private moneyStripePatternCompact: CanvasPattern | null = null;
-  private moneyStripePatternDesktop: CanvasPattern | null = null;
 
   /* Fog parameters for sequential mode */
   private readonly fogLeadPx = 0.03; // how far ahead of avatar (as fraction of road width) is clear
@@ -894,21 +892,6 @@ export class World2D {
     ctx.fillRect(pillX, pillY + ribbonH * 0.4, ribbonW, ribbonH * 0.6);
     ctx.restore();
 
-    const cautionPattern = this.getMoneyStripePattern(compactPortrait);
-    if (cautionPattern) {
-      ctx.strokeStyle = cautionPattern;
-      ctx.lineWidth = compactPortrait ? 5 : 6;
-      this.roundRect(
-        ctx,
-        pillX + 3,
-        pillY + 3,
-        ribbonW - 6,
-        ribbonH - 6,
-        Math.max(8, cornerRadius - 2)
-      );
-      ctx.stroke();
-    }
-
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = compactPortrait ? 1.8 : 2;
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
@@ -1041,40 +1024,6 @@ export class World2D {
   /* ------------------------------------------------------------------ */
   /*  Utilities                                                          */
   /* ------------------------------------------------------------------ */
-
-  private getMoneyStripePattern(compactPortrait: boolean): CanvasPattern | null {
-    const cached = compactPortrait ? this.moneyStripePatternCompact : this.moneyStripePatternDesktop;
-    if (cached) return cached;
-
-    const stripeWidth = compactPortrait ? 6 : 8;
-    const tileSize = stripeWidth * 4;
-    const tile = document.createElement("canvas");
-    tile.width = tileSize;
-    tile.height = tileSize;
-    const tileCtx = tile.getContext("2d");
-    if (!tileCtx) return null;
-
-    tileCtx.fillStyle = "#ffd400";
-    tileCtx.fillRect(0, 0, tileSize, tileSize);
-    tileCtx.strokeStyle = "#111111";
-    tileCtx.lineWidth = stripeWidth;
-
-    for (let offset = -tileSize; offset <= tileSize * 1.5; offset += stripeWidth * 2) {
-      tileCtx.beginPath();
-      tileCtx.moveTo(offset, tileSize);
-      tileCtx.lineTo(offset + tileSize, 0);
-      tileCtx.stroke();
-    }
-
-    const pattern = this.ctx.createPattern(tile, "repeat");
-    if (!pattern) return null;
-    if (compactPortrait) {
-      this.moneyStripePatternCompact = pattern;
-    } else {
-      this.moneyStripePatternDesktop = pattern;
-    }
-    return pattern;
-  }
 
   private roundRect(
     ctx: CanvasRenderingContext2D,
