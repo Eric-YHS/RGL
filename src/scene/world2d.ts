@@ -819,7 +819,7 @@ export class World2D {
     const lightsTopY = roadTop - this.h * 0.14 - 42;
 
     const mainText = `￥${money.toFixed(2)}`;
-    const labelText = "剩余金额";
+    const labelText = "剩余补贴";
     const subPrefixText = "每秒正在减少";
     const subValueText = `-￥${this.config.moneyLossPerSec.toFixed(2)}`;
     const indicatorSize = compactPortrait ? 8 : 10;
