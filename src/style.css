@@ -1,3 +1,51 @@
+@font-face {
+  font-family: "Experiment Sans";
+  src: url("./assets/fonts/ExperimentSans.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Experiment Sans";
+  src: url("./assets/fonts/ExperimentSans.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Experiment Sans";
+  src: url("./assets/fonts/ExperimentSans.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 800;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Experiment Sans";
+  src: url("./assets/fonts/ExperimentSans.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Experiment Mono";
+  src: url("./assets/fonts/ExperimentMono.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Experiment Mono";
+  src: url("./assets/fonts/ExperimentMono.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+}
+
 :root {
   color-scheme: light;
   --bg: #0b1020;
@@ -19,9 +67,10 @@
   --hud-offset-top: 20px;
   --hud-offset-side: 14px;
   --walk-bottom: 34px;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
-    Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
+  font-family: "Experiment Sans", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+    Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
     "Noto Sans SC", sans-serif;
+  font-synthesis: none;
 }
 
 html,
@@ -35,6 +84,10 @@ body {
 #app {
   height: 100%;
   min-height: 100vh;
+}
+
+body.app-fonts-loading #app {
+  visibility: hidden;
 }
 
 body.desktop-only-blocked {

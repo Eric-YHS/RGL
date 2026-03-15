@@ -11,6 +11,8 @@ const SIGNAL_RED_ON = "#c32128";
 const SIGNAL_RED_OFF = "#35171a";
 const SIGNAL_GREEN_ON = "#1c7a3b";
 const SIGNAL_GREEN_OFF = "#162a1b";
+const UI_FONT_FAMILY = '"Experiment Sans", sans-serif';
+const MONEY_FONT_FAMILY = '"Experiment Mono", monospace';
 
 function loadCanvasImage(src: string): HTMLImageElement {
   const img = new Image();
@@ -797,7 +799,6 @@ export class World2D {
     const alpha = 1;
     const cardJoltY = pulseKick * (stage === 2 ? 1.8 : 1.2);
 
-    const moneyFontFamily = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
     const flashStrength = 0.08 + pressure * 0.05 + pulseKick * 0.22;
     let mainTextColor = "#ff5c5c";
     let labelColor = "#ffd0d0";
@@ -860,13 +861,13 @@ export class World2D {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
+    ctx.font = `700 ${labelFontSize}px ${UI_FONT_FAMILY}`;
     const labelWidth = ctx.measureText(labelText).width;
-    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
+    ctx.font = `900 ${fontSize}px ${MONEY_FONT_FAMILY}`;
     const mainWidth = ctx.measureText(mainText).width;
-    ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
+    ctx.font = `800 ${subFontSize}px ${UI_FONT_FAMILY}`;
     const subPrefixWidth = ctx.measureText(subPrefixText).width;
-    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
+    ctx.font = `900 ${subFontSize}px ${MONEY_FONT_FAMILY}`;
     const subValueWidth = ctx.measureText(subValueText).width;
     const subWidth = subPrefixWidth + subValueWidth + (compactPortrait ? 10 : 12);
     const ribbonW = Math.min(
@@ -951,12 +952,12 @@ export class World2D {
     ctx.fill();
 
     ctx.fillStyle = labelColor;
-    ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
+    ctx.font = `700 ${labelFontSize}px ${UI_FONT_FAMILY}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(labelText, labelX, topRowY);
 
-    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
+    ctx.font = `900 ${fontSize}px ${MONEY_FONT_FAMILY}`;
     ctx.textAlign = "right";
     ctx.lineWidth = compactPortrait ? 1.4 : 1.6;
     ctx.strokeStyle = "rgba(28, 0, 0, 0.65)";
@@ -964,11 +965,11 @@ export class World2D {
     ctx.fillStyle = mainTextColor;
     ctx.fillText(mainText, rightInset, topRowY);
 
-    ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
+    ctx.font = `800 ${subFontSize}px ${UI_FONT_FAMILY}`;
     ctx.textAlign = "left";
     ctx.fillStyle = subPrefixColor;
     ctx.fillText(subPrefixText, subLeft, bottomRowY);
-    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
+    ctx.font = `900 ${subFontSize}px ${MONEY_FONT_FAMILY}`;
     ctx.lineWidth = 1;
     ctx.strokeStyle = "rgba(28, 0, 0, 0.6)";
     ctx.strokeText(subValueText, subLeft + subPrefixWidth + (compactPortrait ? 10 : 12), bottomRowY);

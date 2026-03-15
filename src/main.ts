@@ -19,6 +19,8 @@ const params = new URLSearchParams(window.location.search);
 const participantId = (params.get("pid") ?? "").trim();
 const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 const PENDING_SUBMISSIONS_KEY = "honglvdeng_pending_submissions_v1";
+const EXPERIMENT_UI_FONT = '"Experiment Sans"';
+const EXPERIMENT_MONEY_FONT = '"Experiment Mono"';
 
 function normalizeApiBaseUrl(raw: string | undefined): string {
   if (!raw) return "";
@@ -174,6 +176,28 @@ function collectDeviceInfo(): ClientDeviceInfo {
   };
 }
 
+async function waitForExperimentFonts(): Promise<void> {
+  if (!("fonts" in document)) return;
+
+  const timeoutMs = 2500;
+  const fontLoads = Promise.all([
+    document.fonts.load(`400 16px ${EXPERIMENT_UI_FONT}`, "控制剩余补贴正式实验"),
+    document.fonts.load(`700 16px ${EXPERIMENT_UI_FONT}`, "开始通行每秒正在减少"),
+    document.fonts.load(`800 16px ${EXPERIMENT_UI_FONT}`, "提示交通信号灯"),
+    document.fonts.load(`900 16px ${EXPERIMENT_MONEY_FONT}`, "￥0123456789.-"),
+    document.fonts.load(`700 16px ${EXPERIMENT_MONEY_FONT}`, "￥0123456789.-")
+  ]).then(() => undefined);
+
+  await Promise.race([
+    fontLoads.catch(() => undefined),
+    new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs))
+  ]);
+
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
 function shouldBlockMobileAccess(): boolean {
   const nav = navigator as Navigator & {
     userAgentData?: {
@@ -216,6 +240,7 @@ if (shouldBlockMobileAccess()) {
     </main>
   `;
 } else {
+document.body.classList.add("app-fonts-loading");
 app.innerHTML = `
   <div class="stage">
     <canvas class="webgl" aria-label="实验场景"></canvas>
@@ -754,10 +779,18 @@ const hudCache = {
   lightGreen: null as boolean | null
 };
 
-updateTopHints();
-void flushPendingSubmissions();
-initializeFullRevealMode();
-renderDesktopPreflightGate();
+async function bootstrapDesktopApp(): Promise<void> {
+  updateTopHints();
+  await waitForExperimentFonts();
+  document.body.classList.remove("app-fonts-loading");
+  document.body.classList.add("app-fonts-ready");
+  void flushPendingSubmissions();
+  initializeFullRevealMode();
+  renderDesktopPreflightGate();
+  loop();
+}
+
+void bootstrapDesktopApp();
 
 window.addEventListener("online", () => {
   void flushPendingSubmissions();
@@ -905,5 +938,4 @@ function loop(): void {
   requestAnimationFrame(loop);
 }
 
-loop();
 }
