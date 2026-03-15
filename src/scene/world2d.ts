@@ -1,5 +1,7 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
+import manWalkBmpUrl from "../assets/kimbrough-rf/man.bmp";
+import manStandSvgUrl from "../assets/kimbrough-rf/man-stand.svg";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
 type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
@@ -274,8 +276,11 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
+  private readonly walkPedSprite = loadCanvasImage(manWalkBmpUrl);
+  private readonly standPedSprite = loadCanvasImage(manStandSvgUrl);
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
+  private walkPedGlyph: HTMLCanvasElement | null = null;
   private fogFadeLeftX = -1;
   private fogFadeRightX = -1;
   private lastMoneyPulseStep: number | null = null;
@@ -891,9 +896,8 @@ export class World2D {
     const h = this.figH;
     const footY = this.roadY + this.roadH / 2 + 8;
     const pose = phase === "moving" || isActuallyMoving ? "walk" : "stand";
-    const walkCycle01 = isActuallyMoving ? (nowMs * 0.00105) % 1 : 0;
-    const poseFrame = this.getPedestrianPoseFrame(pose, walkCycle01);
     const u = h / 116;
+    const pedSprite = this.getPedestrianSprite(pose);
 
     ctx.save();
     ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
@@ -901,7 +905,7 @@ export class World2D {
     ctx.ellipse(
       x,
       footY + 3,
-      h * 0.16 * poseFrame.shadowScaleX,
+      h * 0.16 * (pose === "walk" ? 1.05 : 0.96),
       h * 0.04,
       0,
       0,
@@ -910,7 +914,72 @@ export class World2D {
     ctx.fill();
     ctx.restore();
 
+    if (pedSprite) {
+      this.drawPedestrianSprite(ctx, pedSprite, x, footY, h, pose);
+      return;
+    }
+
+    const walkCycle01 = isActuallyMoving ? (nowMs * 0.00105) % 1 : 0;
+    const poseFrame = this.getPedestrianPoseFrame(pose, walkCycle01);
     this.drawPedestrianSilhouette(ctx, x, footY, u, poseFrame);
+  }
+
+  private getPedestrianSprite(pose: "stand" | "walk"): CanvasImageSource | null {
+    if (pose === "stand") {
+      return this.isRenderableImage(this.standPedSprite) ? this.standPedSprite : null;
+    }
+
+    if (this.walkPedGlyph) return this.walkPedGlyph;
+    if (!this.isRenderableImage(this.walkPedSprite)) return null;
+    this.walkPedGlyph = this.preparePedestrianGlyph(this.walkPedSprite);
+    return this.walkPedGlyph;
+  }
+
+  private preparePedestrianGlyph(sprite: HTMLImageElement): HTMLCanvasElement | null {
+    const canvas = document.createElement("canvas");
+    canvas.width = sprite.naturalWidth;
+    canvas.height = sprite.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.drawImage(sprite, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      if (luminance > 216 && Math.max(r, g, b) - Math.min(r, g, b) < 18) {
+        data[i + 3] = 0;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+  }
+
+  private drawPedestrianSprite(
+    ctx: CanvasRenderingContext2D,
+    sprite: CanvasImageSource,
+    x: number,
+    footY: number,
+    h: number,
+    pose: "stand" | "walk"
+  ): void {
+    const spriteW =
+      "width" in sprite && "height" in sprite
+        ? (h * sprite.width) / Math.max(sprite.height, 1)
+        : h * 0.6;
+    const anchorRatio = pose === "walk" ? 0.46 : 0.48;
+    const drawX = x - spriteW * anchorRatio;
+    const drawY = footY - h;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(sprite, drawX, drawY, spriteW, h);
+    ctx.restore();
   }
 
   private drawPedestrianSilhouette(
