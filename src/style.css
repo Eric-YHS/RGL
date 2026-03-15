@@ -1,14 +1,14 @@
 :root {
   color-scheme: light;
   --bg: #0b1020;
-  --panel: rgba(12, 18, 35, 0.82);
-  --panel-border: rgba(255, 255, 255, 0.12);
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.66);
+  --panel: rgba(8, 12, 22, 0.9);
+  --panel-border: rgba(178, 192, 215, 0.1);
+  --text: rgba(236, 241, 248, 0.88);
+  --muted: rgba(191, 202, 220, 0.58);
   --danger: #ff4d4f;
   --ok: #52c41a;
   --accent: #00c2ff;
-  --shadow: rgba(0, 0, 0, 0.35);
+  --shadow: rgba(0, 0, 0, 0.5);
   --modal-surface: rgba(24, 31, 46, 0.95);
   --modal-surface-strong: rgba(15, 21, 32, 0.98);
   --modal-border: rgba(154, 178, 209, 0.28);
@@ -272,10 +272,10 @@ canvas.webgl {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--panel-border);
-  box-shadow: 0 10px 26px var(--shadow);
+  box-shadow: 0 12px 30px var(--shadow);
   border-radius: 16px;
   padding: 14px 16px;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(8px);
   transition: opacity 0.3s ease, transform 0.3s ease;
   animation: panelSlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
@@ -367,7 +367,7 @@ canvas.webgl {
 
 .hud .money.urgent {
   color: var(--danger);
-  text-shadow: 0 0 24px rgba(255, 77, 79, 0.62);
+  text-shadow: 0 0 10px rgba(255, 77, 79, 0.28);
   animation: moneyShake 0.72s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -412,27 +412,27 @@ canvas.webgl {
 }
 
 .btn.primary {
-  background: #1478c9;
-  border-color: #0f66ad;
-  color: #f5fbff;
+  background: #0f5f9f;
+  border-color: #0c4f85;
+  color: #eef7ff;
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: #1d8de4;
-  border-color: #1676bf;
-  box-shadow: 0 4px 20px rgba(20, 120, 201, 0.32);
+  background: #1770bb;
+  border-color: #0f609d;
+  box-shadow: 0 4px 18px rgba(15, 95, 159, 0.24);
 }
 
 .btn.secondary {
-  background: #4b5f7a;
-  border-color: #3f5168;
-  color: #f3f8ff;
+  background: #3e4f67;
+  border-color: #344459;
+  color: #eef3fb;
 }
 
 .btn.secondary:hover:not(:disabled) {
-  background: #5b7392;
-  border-color: #4a6280;
-  box-shadow: 0 4px 20px rgba(75, 95, 122, 0.28);
+  background: #4c617d;
+  border-color: #40556f;
+  box-shadow: 0 4px 16px rgba(62, 79, 103, 0.22);
 }
 
 .btn.danger {
@@ -471,15 +471,15 @@ canvas.webgl {
 }
 
 .center-controls .btn.danger {
-  background: #d52633;
-  border-color: #b61f2b;
-  box-shadow: 0 8px 26px rgba(213, 38, 51, 0.26);
+  background: #be2330;
+  border-color: #9d1c28;
+  box-shadow: 0 6px 18px rgba(190, 35, 48, 0.18);
 }
 
 .center-controls .btn.danger:hover:not(:disabled) {
-  background: #ec3946;
-  border-color: #c82934;
-  box-shadow: 0 10px 28px rgba(213, 38, 51, 0.4);
+  background: #d4303d;
+  border-color: #af2530;
+  box-shadow: 0 8px 22px rgba(190, 35, 48, 0.26);
 }
 
 /* WALK 按钮呼吸脉冲动画 */
@@ -493,10 +493,10 @@ canvas.webgl {
 
 @keyframes walkPulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.35), 0 4px 14px rgba(255, 77, 79, 0.12);
+    box-shadow: 0 0 0 0 rgba(190, 35, 48, 0.18), 0 3px 10px rgba(190, 35, 48, 0.08);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(255, 77, 79, 0), 0 4px 22px rgba(255, 77, 79, 0.25);
+    box-shadow: 0 0 0 6px rgba(190, 35, 48, 0), 0 3px 14px rgba(190, 35, 48, 0.14);
   }
 }
 

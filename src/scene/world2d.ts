@@ -768,43 +768,43 @@ export class World2D {
     const cardJoltY = pulseKick * (stage === 2 ? 1.8 : 1.2);
 
     const moneyFontFamily = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
-    const flashStrength = 0.08 + pressure * 0.05 + pulseKick * 0.2;
-    let mainTextColor = "#ff6a6a";
-    let labelColor = "#ffd9d9";
-    let subPrefixColor = "#f3c1c1";
-    let subValueColor = "#ffd9d9";
-    let panelTop = "#7a0000";
-    let panelMid = "#5c0000";
-    let panelBottom = "#2a0000";
-    let borderColor = "#8f0f12";
+    const flashStrength = 0.08 + pressure * 0.05 + pulseKick * 0.22;
+    let mainTextColor = "#ff5c5c";
+    let labelColor = "#ffd0d0";
+    let subPrefixColor = "#efb8b8";
+    let subValueColor = "#ffdede";
+    let panelTop = "#690000";
+    let panelMid = "#460000";
+    let panelBottom = "#180000";
+    let borderColor = "#9f0909";
 
     if (stage === 0) {
-      mainTextColor = "#ff8080";
-      labelColor = "#ffe3e3";
-      subPrefixColor = "#f9cece";
-      subValueColor = "#ffe6e6";
-      panelTop = "#6d0505";
-      panelMid = "#4f0303";
-      panelBottom = "#290101";
-      borderColor = "#7e1414";
+      mainTextColor = "#ff7474";
+      labelColor = "#ffe0e0";
+      subPrefixColor = "#f4c8c8";
+      subValueColor = "#ffe8e8";
+      panelTop = "#5e0202";
+      panelMid = "#410101";
+      panelBottom = "#160000";
+      borderColor = "#861010";
     } else if (stage === 1) {
-      mainTextColor = "#ff6464";
-      labelColor = "#ffd6d6";
-      subPrefixColor = "#f2bbbb";
-      subValueColor = "#ffe0e0";
-      panelTop = "#760303";
-      panelMid = "#590101";
-      panelBottom = "#280000";
-      borderColor = "#9c1010";
+      mainTextColor = "#ff5555";
+      labelColor = "#ffd1d1";
+      subPrefixColor = "#efb4b4";
+      subValueColor = "#ffdfdf";
+      panelTop = "#670000";
+      panelMid = "#470000";
+      panelBottom = "#170000";
+      borderColor = "#ad0808";
     } else {
-      mainTextColor = pulseKick > 0 ? "#ff7b7b" : "#ff5a5a";
-      labelColor = "#ffd9d9";
-      subPrefixColor = "#f4c7c7";
-      subValueColor = pulseKick > 0 ? "#fff0f0" : "#ffe3e3";
-      panelTop = "#8b0000";
-      panelMid = "#5c0000";
-      panelBottom = "#2a0000";
-      borderColor = pulseKick > 0 ? "#c91414" : "#b30000";
+      mainTextColor = pulseKick > 0 ? "#ff7070" : "#ff4a4a";
+      labelColor = "#ffd3d3";
+      subPrefixColor = "#f0bcbc";
+      subValueColor = pulseKick > 0 ? "#fff0f0" : "#ffe0e0";
+      panelTop = "#720000";
+      panelMid = "#4b0000";
+      panelBottom = "#140000";
+      borderColor = pulseKick > 0 ? "#d20c0c" : "#bc0000";
     }
 
     const compactPortrait = this.isCompactPortraitLayout();
@@ -868,9 +868,9 @@ export class World2D {
     panelGrad.addColorStop(0.52, panelMid);
     panelGrad.addColorStop(1, panelBottom);
 
-    ctx.shadowColor = `rgba(34, 0, 0, ${0.22 + pulseKick * 0.08})`;
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 6;
+    ctx.shadowColor = `rgba(18, 0, 0, ${0.34 + pulseKick * 0.1})`;
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 9;
     ctx.fillStyle = panelGrad;
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.fill();
@@ -881,13 +881,13 @@ export class World2D {
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.clip();
     const topShade = ctx.createLinearGradient(0, pillY, 0, pillY + ribbonH * 0.48);
-    topShade.addColorStop(0, `rgba(0, 0, 0, ${0.3 + pulseKick * 0.06})`);
+    topShade.addColorStop(0, `rgba(0, 0, 0, ${0.38 + pulseKick * 0.08})`);
     topShade.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = topShade;
     ctx.fillRect(pillX, pillY, ribbonW, ribbonH * 0.48);
     const innerPress = ctx.createLinearGradient(0, pillY + ribbonH * 0.4, 0, pillY + ribbonH);
     innerPress.addColorStop(0, "rgba(0, 0, 0, 0)");
-    innerPress.addColorStop(1, `rgba(0, 0, 0, ${0.18 + pulseKick * 0.08})`);
+    innerPress.addColorStop(1, `rgba(0, 0, 0, ${0.26 + pulseKick * 0.1})`);
     ctx.fillStyle = innerPress;
     ctx.fillRect(pillX, pillY + ribbonH * 0.4, ribbonW, ribbonH * 0.6);
     ctx.restore();
@@ -897,7 +897,7 @@ export class World2D {
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.stroke();
 
-    ctx.strokeStyle = `rgba(255, 214, 214, ${0.12 + flashStrength * 0.22})`;
+    ctx.strokeStyle = `rgba(255, 210, 210, ${0.08 + flashStrength * 0.16})`;
     ctx.lineWidth = 0.9;
     this.roundRect(ctx, pillX + 2, pillY + 2, ribbonW - 4, ribbonH - 4, 0);
     ctx.stroke();
