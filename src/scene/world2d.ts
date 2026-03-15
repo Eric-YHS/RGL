@@ -818,7 +818,10 @@ export class World2D {
     const roadTop = this.roadY - this.roadH / 2;
     const lightsTopY = roadTop - this.h * 0.14 - 42;
 
-    const mainText = `￥${Math.max(0, money).toFixed(3)}`;
+    const displayTickMs = 80;
+    const displayMoneyStep = Math.max(this.config.moneyLossPerSec * (displayTickMs / 1000), 0.001);
+    const displayedMoney = Math.max(0, Math.round(Math.max(0, money) / displayMoneyStep) * displayMoneyStep);
+    const mainText = `￥${displayedMoney.toFixed(3)}`;
     const labelText = "剩余补贴";
     const subPrefixText = "每秒正在减少";
     const subValueText = `-￥${this.config.moneyLossPerSec.toFixed(2)}`;
