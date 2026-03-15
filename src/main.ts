@@ -181,7 +181,7 @@ async function waitForExperimentFonts(): Promise<void> {
 
   const timeoutMs = 2500;
   const fontLoads = Promise.all([
-    document.fonts.load(`400 16px ${EXPERIMENT_UI_FONT}`, "控制剩余补贴正式实验"),
+    document.fonts.load(`400 16px ${EXPERIMENT_UI_FONT}`, "控制剩余报酬正式实验"),
     document.fonts.load(`700 16px ${EXPERIMENT_UI_FONT}`, "开始通行每秒正在减少"),
     document.fonts.load(`800 16px ${EXPERIMENT_UI_FONT}`, "提示交通信号灯"),
     document.fonts.load(`900 16px ${EXPERIMENT_MONEY_FONT}`, "￥0123456789.-"),
@@ -264,7 +264,7 @@ app.innerHTML = `
         <div class="panel status panel-status">
           <div class="row"><div class="label">当前位置</div><div class="value" id="posText">—</div></div>
           <div class="row"><div class="label">耗费时间</div><div class="value" id="timeText">0.0s</div></div>
-          <div class="row"><div class="label">剩余补贴</div><div class="value money" id="moneyText">￥10.00</div></div>
+          <div class="row"><div class="label">剩余报酬</div><div class="value money" id="moneyText">￥10.00</div></div>
           <div class="row" id="lightRow" style="display:none;"><div class="label">信号灯</div><div class="value" id="lightText">—</div></div>
         </div>
 
