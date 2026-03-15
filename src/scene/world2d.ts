@@ -976,7 +976,7 @@ export class World2D {
 
     const leftInset = pillX + (compactPortrait ? 20 : 26);
     const rightInset = pillX + ribbonW - (compactPortrait ? 20 : 26);
-    const topRowY = pillY + (compactPortrait ? 26 : 31);
+    const topRowY = pillY + (compactPortrait ? 28 : 37);
     const bottomRowY = pillY + ribbonH - (compactPortrait ? 17 : 20);
     const indicatorX = leftInset + indicatorSize / 2;
     const labelX = indicatorX + indicatorSize / 2 + labelGap;
