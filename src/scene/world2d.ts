@@ -196,9 +196,11 @@ export class World2D {
     const { poleH, housingH } = this.getTrafficLightMetrics(compactPortrait);
     const currentLightTopY = defaultRoadY - this.roadH / 2 - poleH - housingH;
     const rawShift = statusBottomY - currentLightTopY;
-    const maxShift = this.h * 0.06;
+    const alignmentBias = Math.min(10, this.h * 0.012);
+    const desiredShift = Math.max(0, rawShift) + alignmentBias;
+    const maxShift = this.h * 0.075;
 
-    return Math.min(maxShift, Math.max(0, rawShift));
+    return Math.min(maxShift, desiredShift);
   }
 
   private getTrafficLightMetrics(compactPortrait: boolean): {
