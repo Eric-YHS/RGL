@@ -151,10 +151,11 @@ export class World2D {
     this.w = cssW;
     this.h = cssH;
 
-    this.roadY = this.h * (compactPortrait ? 0.6 : 0.59);
+    const defaultRoadY = this.h * (compactPortrait ? 0.6 : 0.59);
     this.roadH = this.h * (compactPortrait ? 0.098 : 0.104);
     this.roadLeft = this.w * 0.08;
     this.roadRight = this.w * 0.92;
+    this.roadY = defaultRoadY + this.getDesktopSceneDownShift(parent, compactPortrait, defaultRoadY);
 
     const n = this.config.numLights;
     const isSequential = this.config.revealMode === "sequential";
@@ -175,6 +176,40 @@ export class World2D {
 
     this.figH = Math.min(70, this.h * 0.12);
     this.resetFogTracking();
+  }
+
+  private getDesktopSceneDownShift(
+    parent: HTMLElement,
+    compactPortrait: boolean,
+    defaultRoadY: number
+  ): number {
+    if (compactPortrait) return 0;
+
+    const statusPanel = parent.querySelector<HTMLElement>(".panel-status");
+    if (!statusPanel) return 0;
+
+    const parentRect = parent.getBoundingClientRect();
+    const statusRect = statusPanel.getBoundingClientRect();
+    const statusBottomY = statusRect.bottom - parentRect.top;
+    if (!Number.isFinite(statusBottomY)) return 0;
+
+    const { poleH, housingH } = this.getTrafficLightMetrics(compactPortrait);
+    const currentLightTopY = defaultRoadY - this.roadH / 2 - poleH - housingH;
+    const rawShift = statusBottomY - currentLightTopY;
+    const maxShift = this.h * 0.06;
+
+    return Math.min(maxShift, Math.max(0, rawShift));
+  }
+
+  private getTrafficLightMetrics(compactPortrait: boolean): {
+    poleH: number;
+    housingH: number;
+  } {
+    const trafficLightScale = compactPortrait ? 1 : 1.52;
+    return {
+      poleH: this.h * 0.14 * (compactPortrait ? 1 : 1.12),
+      housingH: 42 * trafficLightScale
+    };
   }
 
   private syncLayoutToCanvasSize(): void {
