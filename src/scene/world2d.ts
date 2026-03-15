@@ -922,7 +922,7 @@ export class World2D {
     );
     const ribbonH = compactPortrait ? 84 : 104;
     const cx = routeCenterX;
-    const overlayLift = compactPortrait ? 22 : 46;
+    const overlayLift = compactPortrait ? 22 : 66;
     const cy = Math.max(
       compactPortrait ? this.h * 0.228 : this.h * 0.208,
       lightsTopY - (compactPortrait ? 54 : 70)
