@@ -751,52 +751,60 @@ export class World2D {
 
     const { stage, pressure } = this.getMoneyStress(money, startMoney);
     const pulseStep = Math.floor((money + 1e-6) * 10);
+    const pulseWindowMs = stage >= 2 ? 220 : stage === 1 ? 190 : 170;
     if (this.lastMoneyPulseStep === null) {
       this.lastMoneyPulseStep = pulseStep;
     } else if (pulseStep < this.lastMoneyPulseStep) {
-      this.moneyPulseUntilMs = nowMs + (stage >= 2 ? 420 : stage === 1 ? 320 : 240);
+      this.moneyPulseUntilMs = nowMs + pulseWindowMs;
       this.lastMoneyPulseStep = pulseStep;
     } else if (pulseStep > this.lastMoneyPulseStep) {
       this.lastMoneyPulseStep = pulseStep;
     }
 
-    const pulseWindowMs = stage >= 2 ? 420 : stage === 1 ? 320 : 240;
     const pulseProgress = Math.max(0, this.moneyPulseUntilMs - nowMs) / pulseWindowMs;
     const pulseKick = pulseProgress > 0 ? Math.sin((1 - pulseProgress) * Math.PI) : 0;
-    const heartbeat = Math.pow((Math.sin(nowMs * (0.002 + stage * 0.0006 + pressure * 0.0022)) + 1) / 2, 2.1);
-    const cardScale =
-      1 + pulseKick * (stage === 2 ? 0.085 : stage === 1 ? 0.06 : 0.035) + heartbeat * pressure * 0.025;
-    const alpha = 0.97 + heartbeat * pressure * 0.03;
-    const cardJoltY = pulseKick * (stage === 2 ? 4 : stage === 1 ? 2.5 : 1.5);
+    const cardScale = 1 + pulseKick * (stage === 2 ? 0.042 : stage === 1 ? 0.032 : 0.024);
+    const alpha = 1;
+    const cardJoltY = pulseKick * (stage === 2 ? 1.8 : 1.2);
 
-    let textColor = "#f4f1e8";
-    let glowColor = "rgba(255,255,255,0.18)";
-    let accentColor = "rgba(255,255,255,0.68)";
-    let panelTop = "rgba(38, 26, 28, 0.92)";
-    let panelBottom = "rgba(20, 16, 18, 0.94)";
-    let borderColor = "rgba(255,255,255,0.12)";
+    const moneyFontFamily = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
+    const flashStrength = 0.08 + pressure * 0.05 + pulseKick * 0.2;
+    let mainTextColor = "#ff6a6a";
+    let labelColor = "#ffd9d9";
+    let subPrefixColor = "#f3c1c1";
+    let subValueColor = "#ffd9d9";
+    let panelTop = "#7a0000";
+    let panelMid = "#5c0000";
+    let panelBottom = "#2a0000";
+    let borderColor = "#8f0f12";
 
     if (stage === 0) {
-      textColor = "#fff0d2";
-      glowColor = "rgba(255, 201, 106, 0.3)";
-      accentColor = "rgba(255, 205, 144, 0.82)";
-      panelTop = "rgba(60, 34, 24, 0.92)";
-      panelBottom = "rgba(26, 16, 12, 0.96)";
-      borderColor = "rgba(255, 189, 112, 0.2)";
+      mainTextColor = "#ff8080";
+      labelColor = "#ffe3e3";
+      subPrefixColor = "#f9cece";
+      subValueColor = "#ffe6e6";
+      panelTop = "#6d0505";
+      panelMid = "#4f0303";
+      panelBottom = "#290101";
+      borderColor = "#7e1414";
     } else if (stage === 1) {
-      textColor = "#ffc070";
-      glowColor = "rgba(255, 132, 38, 0.44)";
-      accentColor = "rgba(255, 169, 104, 0.86)";
-      panelTop = "rgba(78, 28, 18, 0.94)";
-      panelBottom = "rgba(34, 12, 10, 0.98)";
-      borderColor = "rgba(255, 123, 60, 0.28)";
+      mainTextColor = "#ff6464";
+      labelColor = "#ffd6d6";
+      subPrefixColor = "#f2bbbb";
+      subValueColor = "#ffe0e0";
+      panelTop = "#760303";
+      panelMid = "#590101";
+      panelBottom = "#280000";
+      borderColor = "#9c1010";
     } else {
-      textColor = "#ff7466";
-      glowColor = "rgba(255, 64, 64, 0.68)";
-      accentColor = "rgba(255, 151, 133, 0.98)";
-      panelTop = "rgba(88, 12, 14, 0.96)";
-      panelBottom = "rgba(34, 4, 6, 0.99)";
-      borderColor = "rgba(255, 96, 80, 0.42)";
+      mainTextColor = pulseKick > 0 ? "#ff7b7b" : "#ff5a5a";
+      labelColor = "#ffd9d9";
+      subPrefixColor = "#f4c7c7";
+      subValueColor = pulseKick > 0 ? "#fff0f0" : "#ffe3e3";
+      panelTop = "#8b0000";
+      panelMid = "#5c0000";
+      panelBottom = "#2a0000";
+      borderColor = pulseKick > 0 ? "#c91414" : "#b30000";
     }
 
     const compactPortrait = this.isCompactPortraitLayout();
@@ -812,21 +820,27 @@ export class World2D {
 
     const mainText = `￥${money.toFixed(2)}`;
     const labelText = "剩余金额";
-    const subText = `每秒 -￥${this.config.moneyLossPerSec.toFixed(2)}`;
+    const subPrefixText = "每秒正在减少";
+    const subValueText = `-￥${this.config.moneyLossPerSec.toFixed(2)}`;
+    const indicatorSize = compactPortrait ? 8 : 10;
+    const labelGap = compactPortrait ? 10 : 12;
 
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
     const labelWidth = ctx.measureText(labelText).width;
-    ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
+    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
     const mainWidth = ctx.measureText(mainText).width;
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
-    const subWidth = ctx.measureText(subText).width;
+    const subPrefixWidth = ctx.measureText(subPrefixText).width;
+    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
+    const subValueWidth = ctx.measureText(subValueText).width;
+    const subWidth = subPrefixWidth + subValueWidth + (compactPortrait ? 10 : 12);
     const ribbonW = Math.min(
       compactPortrait ? this.w - 36 : 468,
       Math.max(
         compactPortrait ? 252 : 344,
-        labelWidth + mainWidth + 98,
+        indicatorSize + labelGap + labelWidth + mainWidth + 112,
         subWidth + 76,
         routeSpan * (compactPortrait ? 0.58 : 0.38)
       )
@@ -844,52 +858,89 @@ export class World2D {
 
     const pillX = -ribbonW / 2;
     const pillY = -ribbonH / 2;
-    const cornerRadius = compactPortrait ? 19 : 22;
+    const cornerRadius = compactPortrait ? 16 : 18;
 
     const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + ribbonH);
     panelGrad.addColorStop(0, panelTop);
+    panelGrad.addColorStop(0.52, panelMid);
     panelGrad.addColorStop(1, panelBottom);
 
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 18 + (stage === 2 ? 20 : stage === 1 ? 14 : 8) + pulseKick * 14;
+    ctx.shadowColor = `rgba(34, 0, 0, ${0.22 + pulseKick * 0.08})`;
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 6;
     ctx.fillStyle = panelGrad;
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
     ctx.fill();
 
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 1.5;
+    ctx.shadowOffsetY = 0;
+    ctx.save();
     this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
+    ctx.clip();
+    const topShade = ctx.createLinearGradient(0, pillY, 0, pillY + ribbonH * 0.48);
+    topShade.addColorStop(0, `rgba(0, 0, 0, ${0.3 + pulseKick * 0.06})`);
+    topShade.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = topShade;
+    ctx.fillRect(pillX, pillY, ribbonW, ribbonH * 0.48);
+    const innerPress = ctx.createLinearGradient(0, pillY + ribbonH * 0.4, 0, pillY + ribbonH);
+    innerPress.addColorStop(0, "rgba(0, 0, 0, 0)");
+    innerPress.addColorStop(1, `rgba(0, 0, 0, ${0.18 + pulseKick * 0.08})`);
+    ctx.fillStyle = innerPress;
+    ctx.fillRect(pillX, pillY + ribbonH * 0.4, ribbonW, ribbonH * 0.6);
+    ctx.restore();
+
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = compactPortrait ? 1.8 : 2;
+    this.roundRect(ctx, pillX, pillY, ribbonW, ribbonH, cornerRadius);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255, 214, 214, ${0.12 + flashStrength * 0.22})`;
+    ctx.lineWidth = 0.9;
+    this.roundRect(ctx, pillX + 2, pillY + 2, ribbonW - 4, ribbonH - 4, Math.max(4, cornerRadius - 2));
     ctx.stroke();
 
     const leftInset = pillX + (compactPortrait ? 20 : 26);
     const rightInset = pillX + ribbonW - (compactPortrait ? 20 : 26);
     const topRowY = pillY + (compactPortrait ? 26 : 31);
     const bottomRowY = pillY + ribbonH - (compactPortrait ? 17 : 20);
+    const indicatorX = leftInset + indicatorSize / 2;
+    const labelX = indicatorX + indicatorSize / 2 + labelGap;
+    const subLeft = -subWidth / 2;
 
-    ctx.fillStyle = accentColor;
+    ctx.fillStyle = pulseKick > 0 ? "#ff7676" : SIGNAL_RED_ON;
+    ctx.beginPath();
+    ctx.arc(indicatorX, topRowY, indicatorSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(255, 226, 226, ${0.32 + flashStrength * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(indicatorX - indicatorSize * 0.14, topRowY - indicatorSize * 0.14, indicatorSize * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = labelColor;
     ctx.font = `700 ${labelFontSize}px system-ui, sans-serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(labelText, leftInset, topRowY);
+    ctx.fillText(labelText, labelX, topRowY);
 
-    ctx.fillStyle = textColor;
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 12 + (stage === 2 ? 16 : stage === 1 ? 12 : 8) + pressure * 12;
-    ctx.font = `italic 900 ${fontSize}px system-ui, sans-serif`;
+    ctx.font = `900 ${fontSize}px ${moneyFontFamily}`;
     ctx.textAlign = "right";
+    ctx.lineWidth = compactPortrait ? 1.4 : 1.6;
+    ctx.strokeStyle = "rgba(28, 0, 0, 0.65)";
+    ctx.strokeText(mainText, rightInset, topRowY);
+    ctx.fillStyle = mainTextColor;
     ctx.fillText(mainText, rightInset, topRowY);
 
-    ctx.shadowBlur = 0;
     ctx.font = `800 ${subFontSize}px system-ui, sans-serif`;
-    ctx.fillStyle =
-      stage === 2
-        ? `rgba(255, 160, 160, ${0.9 + pressure * 0.1})`
-        : stage === 1
-          ? `rgba(255, 177, 138, ${0.88 + pressure * 0.08})`
-          : `rgba(255, 208, 168, ${0.84 + pressure * 0.06})`;
-    ctx.textAlign = "center";
-    ctx.fillText(subText, 0, bottomRowY);
+    ctx.textAlign = "left";
+    ctx.fillStyle = subPrefixColor;
+    ctx.fillText(subPrefixText, subLeft, bottomRowY);
+    ctx.font = `900 ${subFontSize}px ${moneyFontFamily}`;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(28, 0, 0, 0.6)";
+    ctx.strokeText(subValueText, subLeft + subPrefixWidth + (compactPortrait ? 10 : 12), bottomRowY);
+    ctx.fillStyle = subValueColor;
+    ctx.fillText(subValueText, subLeft + subPrefixWidth + (compactPortrait ? 10 : 12), bottomRowY);
 
     ctx.restore();
   }
