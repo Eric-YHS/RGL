@@ -363,8 +363,9 @@ canvas.webgl {
 .panel-control .control-tip {
   margin: 0;
   min-width: 0;
+  width: 100%;
   line-height: 1.25;
-  max-width: 24ch;
+  max-width: 100%;
 }
 
 
