@@ -861,7 +861,7 @@ export class World2D {
 
     const pillX = -ribbonW / 2;
     const pillY = -ribbonH / 2;
-    const cornerRadius = 0;
+    const cornerRadius = compactPortrait ? 16 : 18;
 
     const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + ribbonH);
     panelGrad.addColorStop(0, panelTop);
@@ -899,7 +899,7 @@ export class World2D {
 
     ctx.strokeStyle = `rgba(255, 210, 210, ${0.08 + flashStrength * 0.16})`;
     ctx.lineWidth = 0.9;
-    this.roundRect(ctx, pillX + 2, pillY + 2, ribbonW - 4, ribbonH - 4, 0);
+    this.roundRect(ctx, pillX + 2, pillY + 2, ribbonW - 4, ribbonH - 4, Math.max(6, cornerRadius - 2));
     ctx.stroke();
 
     const leftInset = pillX + (compactPortrait ? 20 : 26);
