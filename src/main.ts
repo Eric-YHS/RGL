@@ -255,7 +255,7 @@ app.innerHTML = `
           <div class="control-actions">
             <button class="btn primary" id="btnStart">开始</button>
             <div class="hint control-tip">
-              提示：仅在<strong>红灯等待</strong>时点击“通行（WALK）”才会闯红灯。
+              提示：仅在<strong>红灯等待</strong>时点击“通行（WALK）”<br />才会闯红灯。
             </div>
           </div>
         </div>
