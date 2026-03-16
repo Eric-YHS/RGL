@@ -618,7 +618,9 @@ function showFormalComprehensionTest(): void {
   });
 }
 
-async function submitFormalResultsSilently(): Promise<void> {
+type CompletionScreenState = "saving" | SubmitOutcome;
+
+async function submitFormalResultsSilently(): Promise<SubmitOutcome> {
   if (!formalSubmission) {
     formalSubmission = buildFormalSubmission();
   }
@@ -627,6 +629,32 @@ async function submitFormalResultsSilently(): Promise<void> {
   if (outcome === "sent") {
     void flushPendingSubmissions();
   }
+  return outcome;
+}
+
+function showCompletionScreen(state: CompletionScreenState): void {
+  const statusBlock =
+    state === "saving"
+      ? `
+        <div class="completion-status saving">数据正在保存，请稍候…</div>
+      `
+      : state === "sent"
+        ? `
+          <div class="completion-status success">数据已成功保存。</div>
+        `
+        : `
+          <div class="completion-status queued">网络暂时不稳定，数据已保存并会继续尝试提交。</div>
+        `;
+
+  openModal(`
+    <div class="completion-card-body">
+      <div class="completion-eyebrow">正式决策结束</div>
+      <h1>感谢您的参与</h1>
+      <p>本次正式决策任务已经结束。</p>
+      ${statusBlock}
+      <p class="completion-close-note">请关闭本页面。</p>
+    </div>
+  `);
 }
 
 function showPostQuestion(): void {
@@ -694,8 +722,10 @@ function showPostQuestion(): void {
       });
     }
 
-    closeModal();
-    void submitFormalResultsSilently();
+    showCompletionScreen("saving");
+    void submitFormalResultsSilently().then((outcome) => {
+      showCompletionScreen(outcome);
+    });
   });
 }
 

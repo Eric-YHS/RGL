@@ -677,6 +677,68 @@ canvas.webgl {
   font-size: 12px;
 }
 
+.completion-card-body {
+  text-align: center;
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  padding: 6px 0 4px;
+}
+
+.completion-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(109, 141, 181, 0.12);
+  border: 1px solid rgba(139, 170, 207, 0.2);
+  color: rgba(232, 239, 248, 0.9);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.completion-card-body h1 {
+  margin-bottom: 0;
+}
+
+.completion-card-body p {
+  max-width: 520px;
+  margin: 0;
+}
+
+.completion-status {
+  width: min(520px, 100%);
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  border: 1px solid rgba(176, 193, 217, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.completion-status.saving {
+  color: rgba(242, 247, 255, 0.94);
+}
+
+.completion-status.success {
+  color: #d9f4de;
+  border-color: rgba(112, 176, 128, 0.3);
+  background: rgba(73, 118, 82, 0.16);
+}
+
+.completion-status.queued {
+  color: rgba(255, 239, 214, 0.96);
+  border-color: rgba(193, 152, 92, 0.28);
+  background: rgba(106, 76, 28, 0.18);
+}
+
+.completion-close-note {
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(241, 246, 251, 0.96);
+}
+
 .desktop-only-card > *,
 .desktop-preflight-card > *,
 .card > * {
