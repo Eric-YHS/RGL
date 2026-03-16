@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Experiment Sans";
-  src: url("./assets/fonts/ExperimentSans.ttf") format("truetype");
+  src: url("./assets/fonts/ExperimentSans-Regular.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
   font-display: block;
@@ -8,7 +8,7 @@
 
 @font-face {
   font-family: "Experiment Sans";
-  src: url("./assets/fonts/ExperimentSans.ttf") format("truetype");
+  src: url("./assets/fonts/ExperimentSans-Bold.ttf") format("truetype");
   font-style: normal;
   font-weight: 700;
   font-display: block;
@@ -16,7 +16,7 @@
 
 @font-face {
   font-family: "Experiment Sans";
-  src: url("./assets/fonts/ExperimentSans.ttf") format("truetype");
+  src: url("./assets/fonts/ExperimentSans-Bold.ttf") format("truetype");
   font-style: normal;
   font-weight: 800;
   font-display: block;
@@ -24,7 +24,7 @@
 
 @font-face {
   font-family: "Experiment Sans";
-  src: url("./assets/fonts/ExperimentSans.ttf") format("truetype");
+  src: url("./assets/fonts/ExperimentSans-Bold.ttf") format("truetype");
   font-style: normal;
   font-weight: 900;
   font-display: block;
