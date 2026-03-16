@@ -1,4 +1,6 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
+import candidateAWalkingGifUrl from "../assets/pedestrian/candidate-a-icons8-ios7-walking.gif";
+import candidateAStandPngUrl from "../assets/pedestrian/candidate-a-icons8-ios7-walking-stand.png";
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
 import manBmpUrl from "../assets/kimbrough-rf/man.bmp";
 import humanMaleWalkingSpriteSheetUrl from "../assets/pedestrian/human-male-walking.png";
@@ -280,10 +282,14 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
+  private readonly candidatePedestrianStandSprite = loadCanvasImage(candidateAStandPngUrl);
+  private readonly candidatePedestrianWalkSprite = loadCanvasImage(candidateAWalkingGifUrl);
   private readonly originalPedestrianSprite = loadCanvasImage(manBmpUrl);
   private readonly pedestrianSpriteSheet = loadCanvasImage(humanMaleWalkingSpriteSheetUrl);
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
+  private candidatePedestrianStandGlyph: HTMLCanvasElement | null = null;
+  private candidatePedestrianUnavailable = false;
   private originalPedestrianGlyph: HTMLCanvasElement | null = null;
   private originalPedestrianUnavailable = false;
   private pedestrianGlyphFrames: (HTMLCanvasElement | null)[] = [];
@@ -903,12 +909,10 @@ export class World2D {
     const h = this.figH;
     const footY = this.roadY + this.roadH / 2 + 8;
     const pose = phase === "moving" || isActuallyMoving ? "walk" : "stand";
-    const originalPedFrame = this.getOriginalPedestrianGlyph();
-    const spriteCycle01 = !originalPedFrame && pose === "walk" ? this.getWalkSpriteCycle(nowMs) : 0;
-    const spriteBobY = !originalPedFrame && pose === "walk" ? this.getWalkSpriteBob(spriteCycle01, h) : 0;
-    const pedFrame = originalPedFrame
-      ? { current: originalPedFrame, next: null, mix01: 0 }
-      : this.getPedestrianSpriteFrame(pose, nowMs);
+    const pedFrame = this.getPreferredPedestrianFrame(pose, nowMs);
+    const usesLegacySprite = pedFrame?.source === "legacy";
+    const spriteCycle01 = usesLegacySprite && pose === "walk" ? this.getWalkSpriteCycle(nowMs) : 0;
+    const spriteBobY = usesLegacySprite && pose === "walk" ? this.getWalkSpriteBob(spriteCycle01, h) : 0;
 
     ctx.save();
     ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
@@ -930,12 +934,79 @@ export class World2D {
     }
   }
 
+  private getPreferredPedestrianFrame(
+    pose: "stand" | "walk",
+    nowMs: number
+  ): {
+    current: CanvasImageSource;
+    next: CanvasImageSource | null;
+    mix01: number;
+    source: "candidate" | "original" | "legacy";
+  } | null {
+    if (pose === "walk") {
+      const candidateWalkGlyph = this.getCandidateAnimatedPedestrianGlyph();
+      if (candidateWalkGlyph) {
+        return { current: candidateWalkGlyph, next: null, mix01: 0, source: "candidate" };
+      }
+    }
+
+    const candidateStandGlyph = this.getCandidateStandPedestrianGlyph();
+    if (candidateStandGlyph) {
+      return { current: candidateStandGlyph, next: null, mix01: 0, source: "candidate" };
+    }
+
+    const originalPedFrame = this.getOriginalPedestrianGlyph();
+    if (originalPedFrame) {
+      return { current: originalPedFrame, next: null, mix01: 0, source: "original" };
+    }
+
+    const legacyFrame = this.getPedestrianSpriteFrame(pose, nowMs);
+    return legacyFrame ? { ...legacyFrame, source: "legacy" } : null;
+  }
+
+  private getCandidateStandPedestrianGlyph(): HTMLCanvasElement | null {
+    if (this.candidatePedestrianUnavailable) return null;
+    if (this.candidatePedestrianStandGlyph) return this.candidatePedestrianStandGlyph;
+    if (!this.isRenderableImage(this.candidatePedestrianStandSprite)) return null;
+    try {
+      this.candidatePedestrianStandGlyph = this.preparePedestrianSprite(
+        this.candidatePedestrianStandSprite,
+        false
+      );
+    } catch (error) {
+      console.error("[World2D] failed to prepare candidate stand pedestrian sprite", error);
+      this.candidatePedestrianUnavailable = true;
+      return null;
+    }
+    if (!this.candidatePedestrianStandGlyph) {
+      this.candidatePedestrianUnavailable = true;
+      return null;
+    }
+    return this.candidatePedestrianStandGlyph;
+  }
+
+  private getCandidateAnimatedPedestrianGlyph(): HTMLCanvasElement | null {
+    if (this.candidatePedestrianUnavailable) return null;
+    if (!this.isRenderableImage(this.candidatePedestrianWalkSprite)) return null;
+    try {
+      return this.preparePedestrianImageSource(
+        this.candidatePedestrianWalkSprite,
+        this.candidatePedestrianWalkSprite.naturalWidth,
+        this.candidatePedestrianWalkSprite.naturalHeight,
+        false
+      );
+    } catch (error) {
+      console.error("[World2D] failed to prepare candidate animated pedestrian sprite", error);
+      return null;
+    }
+  }
+
   private getOriginalPedestrianGlyph(): HTMLCanvasElement | null {
     if (this.originalPedestrianUnavailable) return null;
     if (this.originalPedestrianGlyph) return this.originalPedestrianGlyph;
     if (!this.isRenderableImage(this.originalPedestrianSprite)) return null;
     try {
-      this.originalPedestrianGlyph = this.preparePedestrianSprite(this.originalPedestrianSprite);
+      this.originalPedestrianGlyph = this.preparePedestrianSprite(this.originalPedestrianSprite, true);
     } catch (error) {
       console.error("[World2D] failed to prepare original pedestrian sprite", error);
       this.originalPedestrianUnavailable = true;
@@ -948,9 +1019,23 @@ export class World2D {
     return this.originalPedestrianGlyph;
   }
 
-  private preparePedestrianSprite(sprite: HTMLImageElement): HTMLCanvasElement | null {
+  private preparePedestrianSprite(
+    sprite: HTMLImageElement,
+    cropToFigure: boolean
+  ): HTMLCanvasElement | null {
     const srcW = sprite.naturalWidth;
     const srcH = sprite.naturalHeight;
+    if (!srcW || !srcH) return null;
+
+    return this.preparePedestrianImageSource(sprite, srcW, srcH, cropToFigure);
+  }
+
+  private preparePedestrianImageSource(
+    sourceImage: CanvasImageSource,
+    srcW: number,
+    srcH: number,
+    cropToFigure: boolean
+  ): HTMLCanvasElement | null {
     if (!srcW || !srcH) return null;
 
     const source = document.createElement("canvas");
@@ -960,7 +1045,7 @@ export class World2D {
     if (!sourceCtx) return null;
 
     sourceCtx.clearRect(0, 0, srcW, srcH);
-    sourceCtx.drawImage(sprite, 0, 0, srcW, srcH);
+    sourceCtx.drawImage(sourceImage, 0, 0, srcW, srcH);
 
     const imgData = sourceCtx.getImageData(0, 0, srcW, srcH);
     const data = imgData.data;
@@ -1008,6 +1093,10 @@ export class World2D {
     if (maxX < minX || maxY < minY) return null;
 
     sourceCtx.putImageData(imgData, 0, 0);
+
+    if (!cropToFigure) {
+      return source;
+    }
 
     const pad = 2;
     const cropW = maxX - minX + 1;
