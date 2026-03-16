@@ -1,5 +1,6 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
+import manBmpUrl from "../assets/kimbrough-rf/man.bmp";
 import humanMaleWalkingSpriteSheetUrl from "../assets/pedestrian/human-male-walking.png";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
@@ -279,9 +280,11 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
+  private readonly originalPedestrianSprite = loadCanvasImage(manBmpUrl);
   private readonly pedestrianSpriteSheet = loadCanvasImage(humanMaleWalkingSpriteSheetUrl);
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
+  private originalPedestrianGlyph: HTMLCanvasElement | null = null;
   private pedestrianGlyphFrames: (HTMLCanvasElement | null)[] = [];
   private fogFadeLeftX = -1;
   private fogFadeRightX = -1;
@@ -898,8 +901,6 @@ export class World2D {
     const h = this.figH;
     const footY = this.roadY + this.roadH / 2 + 8;
     const pose = phase === "moving" || isActuallyMoving ? "walk" : "stand";
-    const spriteCycle01 = pose === "walk" ? this.getWalkSpriteCycle(nowMs) : 0;
-    const spriteBobY = pose === "walk" ? this.getWalkSpriteBob(spriteCycle01, h) : 0;
     const pedFrame = this.getPedestrianSpriteFrame(pose, nowMs);
 
     ctx.save();
@@ -908,7 +909,7 @@ export class World2D {
     ctx.ellipse(
       x,
       footY + 3,
-      h * 0.16 * (pose === "walk" ? 1.05 : 0.96),
+      h * 0.16,
       h * 0.04,
       0,
       0,
@@ -918,7 +919,7 @@ export class World2D {
     ctx.restore();
 
     if (pedFrame) {
-      this.drawPedestrianSpriteFrame(ctx, pedFrame, x, footY + spriteBobY, h, pose);
+      this.drawPedestrianSpriteFrame(ctx, pedFrame, x, footY, h, pose);
     }
   }
 
@@ -926,6 +927,11 @@ export class World2D {
     pose: "stand" | "walk",
     nowMs: number
   ): { current: CanvasImageSource; next: CanvasImageSource | null; mix01: number } | null {
+    const originalGlyph = this.getOriginalPedestrianGlyph();
+    if (originalGlyph) {
+      return { current: originalGlyph, next: null, mix01: 0 };
+    }
+
     const glyphs = this.getPedestrianGlyphFrames();
     if (glyphs.length === 0) return null;
 
@@ -945,6 +951,13 @@ export class World2D {
       next: null,
       mix01: 0
     };
+  }
+
+  private getOriginalPedestrianGlyph(): HTMLCanvasElement | null {
+    if (this.originalPedestrianGlyph) return this.originalPedestrianGlyph;
+    if (!this.isRenderableImage(this.originalPedestrianSprite)) return null;
+    this.originalPedestrianGlyph = this.preparePedestrianSprite(this.originalPedestrianSprite);
+    return this.originalPedestrianGlyph;
   }
 
   private getPedestrianGlyphFrames(): HTMLCanvasElement[] {
@@ -996,11 +1009,6 @@ export class World2D {
 
   private getWalkSpriteCycle(nowMs: number): number {
     return (nowMs * 0.0012) % 1;
-  }
-
-  private getWalkSpriteBob(cycle01: number, h: number): number {
-    const wave = Math.sin(cycle01 * Math.PI * 2);
-    return Math.round((0.5 - 0.5 * wave) * h * 0.012);
   }
 
   private drawPedestrianSpriteFrame(
