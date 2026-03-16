@@ -1,6 +1,5 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
 import candidateAWalkingSheetUrl from "../assets/pedestrian/candidate-a-icons8-ios7-walking-sheet.png";
-import candidateAStand17PngUrl from "../assets/pedestrian/candidate-a-icons8-ios7-walking-stand-17.png";
 import candidateAStandPngUrl from "../assets/pedestrian/candidate-a-icons8-ios7-walking-stand.png";
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
 import manBmpUrl from "../assets/kimbrough-rf/man.bmp";
@@ -10,7 +9,6 @@ import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
 type SignalGlyphKind = "red" | "green";
 type CanvasPoint = { x: number; y: number };
-export type CandidateStandVariant = "17" | "24";
 type PedestrianPoseFrame = {
   torso: CanvasPoint[];
   leftArm: CanvasPoint[];
@@ -290,18 +288,13 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
-  private readonly candidatePedestrianStandSprites: Record<CandidateStandVariant, HTMLImageElement> = {
-    "17": loadCanvasImage(candidateAStand17PngUrl),
-    "24": loadCanvasImage(candidateAStandPngUrl)
-  };
+  private readonly candidatePedestrianStandSprite = loadCanvasImage(candidateAStandPngUrl);
   private readonly candidatePedestrianWalkSheet = loadCanvasImage(candidateAWalkingSheetUrl);
   private readonly originalPedestrianSprite = loadCanvasImage(manBmpUrl);
   private readonly pedestrianSpriteSheet = loadCanvasImage(humanMaleWalkingSpriteSheetUrl);
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
-  private candidateStandVariant: CandidateStandVariant = "24";
-  private candidatePedestrianStandGlyphs: Partial<Record<CandidateStandVariant, HTMLCanvasElement | null>> =
-    {};
+  private candidatePedestrianStandGlyph: HTMLCanvasElement | null = null;
   private candidatePedestrianUnavailable = false;
   private candidatePedestrianWalkGlyphFrames: (HTMLCanvasElement | null)[] = [];
   private originalPedestrianGlyph: HTMLCanvasElement | null = null;
@@ -340,10 +333,6 @@ export class World2D {
         this.recalcLayout();
       });
     });
-  }
-
-  setCandidateStandVariant(variant: CandidateStandVariant): void {
-    this.candidateStandVariant = variant;
   }
 
   /* ------------------------------------------------------------------ */
@@ -984,22 +973,21 @@ export class World2D {
 
   private getCandidateStandPedestrianGlyph(): HTMLCanvasElement | null {
     if (this.candidatePedestrianUnavailable) return null;
-    const variant = this.candidateStandVariant;
-    const cached = this.candidatePedestrianStandGlyphs[variant];
-    if (cached) return cached;
-    const sprite = this.candidatePedestrianStandSprites[variant];
-    if (!this.isRenderableImage(sprite)) return null;
+    if (this.candidatePedestrianStandGlyph) return this.candidatePedestrianStandGlyph;
+    if (!this.isRenderableImage(this.candidatePedestrianStandSprite)) return null;
     try {
-      this.candidatePedestrianStandGlyphs[variant] = this.preparePedestrianSprite(sprite, false);
+      this.candidatePedestrianStandGlyph = this.preparePedestrianSprite(
+        this.candidatePedestrianStandSprite,
+        false
+      );
     } catch (error) {
       console.error("[World2D] failed to prepare candidate stand pedestrian sprite", error);
       return null;
     }
-    const glyph = this.candidatePedestrianStandGlyphs[variant];
-    if (!glyph) {
+    if (!this.candidatePedestrianStandGlyph) {
       return null;
     }
-    return glyph;
+    return this.candidatePedestrianStandGlyph;
   }
 
   private getCandidateAnimatedPedestrianFrame(

@@ -5,7 +5,6 @@ import { ExperimentEngine } from "./experiment/engine";
 import type { ClientDeviceInfo, SessionSubmission } from "./experiment/logger";
 import { ExperimentLogger } from "./experiment/logger";
 import { formatMoney, formatSeconds } from "./experiment/utils";
-import type { CandidateStandVariant } from "./scene/world2d";
 import { World2D } from "./scene/world2d";
 
 type RunKind = "practice" | "formal";
@@ -20,26 +19,8 @@ const params = new URLSearchParams(window.location.search);
 const participantId = (params.get("pid") ?? "").trim();
 const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 const PENDING_SUBMISSIONS_KEY = "honglvdeng_pending_submissions_v1";
-const STAND_VARIANT_STORAGE_KEY = "honglvdeng_stand_variant_v1";
 const EXPERIMENT_UI_FONT = '"Experiment Sans"';
 const EXPERIMENT_MONEY_FONT = '"Experiment Mono"';
-
-function loadCandidateStandVariant(): CandidateStandVariant {
-  try {
-    const raw = window.localStorage.getItem(STAND_VARIANT_STORAGE_KEY);
-    return raw === "17" ? "17" : "24";
-  } catch {
-    return "24";
-  }
-}
-
-function saveCandidateStandVariant(variant: CandidateStandVariant): void {
-  try {
-    window.localStorage.setItem(STAND_VARIANT_STORAGE_KEY, variant);
-  } catch {
-    // Ignore storage errors and keep the current in-memory selection.
-  }
-}
 
 function normalizeApiBaseUrl(raw: string | undefined): string {
   if (!raw) return "";
@@ -72,7 +53,6 @@ function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig
 
 let formalConfig: ExperimentConfig = makeConfig("full", 5);
 let practiceConfig: ExperimentConfig = makeConfig("full", 2);
-let selectedStandVariant: CandidateStandVariant = loadCandidateStandVariant();
 
 function createLogger(config: ExperimentConfig, runKind_: RunKind): ExperimentLogger {
   return new ExperimentLogger(config, {
@@ -274,19 +254,6 @@ app.innerHTML = `
           </div>
           <div class="control-actions">
             <button class="btn primary" id="btnStart">开始</button>
-            <div class="stand-variant-picker" aria-label="站姿版本选择">
-              <div class="stand-variant-label">站姿版本</div>
-              <div class="stand-variant-options">
-                <label class="stand-variant-pill">
-                  <input type="radio" name="standVariant" value="17" />
-                  <span>17</span>
-                </label>
-                <label class="stand-variant-pill">
-                  <input type="radio" name="standVariant" value="24" />
-                  <span>24</span>
-                </label>
-              </div>
-            </div>
             <div class="hint control-tip">
               <span class="control-tip-line control-tip-line-lead">提示：仅在<strong>红灯等待</strong>时点击“通行（WALK）”</span>
               <span class="control-tip-line">才会闯红灯。</span>
@@ -328,10 +295,7 @@ const els = {
   lightRow: document.querySelector<HTMLDivElement>("#lightRow")!,
   modal: document.querySelector<HTMLDivElement>("#modal")!,
   modalCard: document.querySelector<HTMLDivElement>("#modalCard")!,
-  desktopGate: document.querySelector<HTMLDivElement>("#desktopGate")!,
-  standVariantInputs: Array.from(
-    document.querySelectorAll<HTMLInputElement>('input[name="standVariant"]')
-  )
+  desktopGate: document.querySelector<HTMLDivElement>("#desktopGate")!
 };
 
 let runKind: RunKind = "practice";
@@ -351,19 +315,6 @@ let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateEnteredOnce = false;
 let desktopGateShowingPracticeIntro = false;
-
-function syncStandVariantControls(): void {
-  els.standVariantInputs.forEach((input) => {
-    input.checked = input.value === selectedStandVariant;
-  });
-}
-
-function applyCandidateStandVariant(variant: CandidateStandVariant, persist = true): void {
-  selectedStandVariant = variant;
-  if (persist) saveCandidateStandVariant(variant);
-  syncStandVariantControls();
-  world?.setCandidateStandVariant(variant);
-}
 
 function updateTopHints(): void {
   els.runHint.textContent = runKind === "practice" ? "练习" : "正式实验";
@@ -514,7 +465,6 @@ function switchRun(next: RunKind): void {
   formalSubmission = null;
   world?.dispose();
   world = new World2D(els.canvas, currentConfig);
-  world.setCandidateStandVariant(selectedStandVariant);
   lastPhase = engine.state.phase;
   finishGate = false;
   updateTopHints();
@@ -806,13 +756,6 @@ els.btnWalk.addEventListener("click", () => {
   engine.pressWalk(performance.now());
 });
 
-els.standVariantInputs.forEach((input) => {
-  input.addEventListener("change", () => {
-    if (!input.checked) return;
-    applyCandidateStandVariant(input.value === "17" ? "17" : "24");
-  });
-});
-
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     if (engine.state.phase !== "idle" && engine.state.phase !== "finished") {
@@ -828,7 +771,6 @@ let finishGate = false;
 const hudCache = {
   btnWalkDisabled: null as boolean | null,
   btnStartDisabled: null as boolean | null,
-  standVariantDisabled: null as boolean | null,
   posText: "",
   timeText: "",
   moneyText: "",
@@ -840,7 +782,6 @@ const hudCache = {
 
 async function bootstrapDesktopApp(): Promise<void> {
   updateTopHints();
-  syncStandVariantControls();
   await waitForExperimentFonts();
   document.body.classList.remove("app-fonts-loading");
   document.body.classList.add("app-fonts-ready");
@@ -901,7 +842,6 @@ function updateHud(): void {
   const s = engine.state;
   const nextWalkDisabled = s.phase === "idle" || s.phase === "finished";
   const nextStartDisabled = s.phase !== "idle";
-  const nextStandVariantDisabled = s.phase !== "idle";
   if (hudCache.btnWalkDisabled !== nextWalkDisabled) {
     els.btnWalk.disabled = nextWalkDisabled;
     hudCache.btnWalkDisabled = nextWalkDisabled;
@@ -909,12 +849,6 @@ function updateHud(): void {
   if (hudCache.btnStartDisabled !== nextStartDisabled) {
     els.btnStart.disabled = nextStartDisabled;
     hudCache.btnStartDisabled = nextStartDisabled;
-  }
-  if (hudCache.standVariantDisabled !== nextStandVariantDisabled) {
-    els.standVariantInputs.forEach((input) => {
-      input.disabled = nextStandVariantDisabled;
-    });
-    hudCache.standVariantDisabled = nextStandVariantDisabled;
   }
 
   let posText = "—";
