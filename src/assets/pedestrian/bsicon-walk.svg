@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500">
+  <title>WALK</title>
+  <g stroke="black" fill="none" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M 140,470 L 250,275 V 125 L 280,120 V 285 L 330,390 375,470" stroke-width="60" />
+    <path d="M 145,245 L 185,190 225,120 280,114 310,128 360,170 350,245" stroke-width="50" />
+    <path d="M 245,40 L 248,52" stroke-width="80" />
+  </g>
+</svg>
