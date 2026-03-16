@@ -1,6 +1,6 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
-import manBmpUrl from "../assets/kimbrough-rf/man.bmp";
+import humanMaleWalkingSpriteSheetUrl from "../assets/pedestrian/human-male-walking.png";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
 type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
@@ -23,6 +23,10 @@ const SIGNAL_RED_ON = "#c32128";
 const SIGNAL_RED_OFF = "#35171a";
 const SIGNAL_GREEN_ON = "#1c7a3b";
 const SIGNAL_GREEN_OFF = "#162a1b";
+const PED_SPRITE_FRAME_WIDTH = 16;
+const PED_SPRITE_FRAME_HEIGHT = 32;
+const PED_STAND_FRAME_INDEX = 0;
+const PED_WALK_SEQUENCE = [0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1];
 const UI_FONT_FAMILY = '"Experiment Sans", sans-serif';
 const MONEY_FONT_FAMILY = '"Experiment Mono", monospace';
 const STAND_PED_POSE: PedestrianPoseFrame = {
@@ -275,10 +279,10 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
-  private readonly pedestrianSprite = loadCanvasImage(manBmpUrl);
+  private readonly pedestrianSpriteSheet = loadCanvasImage(humanMaleWalkingSpriteSheetUrl);
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
-  private pedestrianGlyph: HTMLCanvasElement | null = null;
+  private pedestrianGlyphFrames: (HTMLCanvasElement | null)[] = [];
   private fogFadeLeftX = -1;
   private fogFadeRightX = -1;
   private lastMoneyPulseStep: number | null = null;
@@ -893,7 +897,10 @@ export class World2D {
   ): void {
     const h = this.figH;
     const footY = this.roadY + this.roadH / 2 + 8;
-    const pedFrame = this.getPedestrianSpriteFrame();
+    const pose = phase === "moving" || isActuallyMoving ? "walk" : "stand";
+    const spriteCycle01 = pose === "walk" ? this.getWalkSpriteCycle(nowMs) : 0;
+    const spriteBobY = pose === "walk" ? this.getWalkSpriteBob(spriteCycle01, h) : 0;
+    const pedFrame = this.getPedestrianSpriteFrame(pose, nowMs);
 
     ctx.save();
     ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
@@ -901,7 +908,7 @@ export class World2D {
     ctx.ellipse(
       x,
       footY + 3,
-      h * 0.16,
+      h * 0.16 * (pose === "walk" ? 1.05 : 0.96),
       h * 0.04,
       0,
       0,
@@ -911,29 +918,104 @@ export class World2D {
     ctx.restore();
 
     if (pedFrame) {
-      this.drawPedestrianSpriteFrame(ctx, pedFrame, x, footY, h);
+      this.drawPedestrianSpriteFrame(ctx, pedFrame, x, footY + spriteBobY, h, pose);
     }
   }
 
-  private getPedestrianSpriteFrame(): CanvasImageSource | null {
-    if (this.pedestrianGlyph) return this.pedestrianGlyph;
-    if (!this.isRenderableImage(this.pedestrianSprite)) return null;
-    this.pedestrianGlyph = this.preparePedestrianSprite(this.pedestrianSprite);
-    return this.pedestrianGlyph;
+  private getPedestrianSpriteFrame(
+    pose: "stand" | "walk",
+    nowMs: number
+  ): { current: CanvasImageSource; next: CanvasImageSource | null; mix01: number } | null {
+    const glyphs = this.getPedestrianGlyphFrames();
+    if (glyphs.length === 0) return null;
+
+    if (pose === "stand") {
+      const standGlyph = glyphs[Math.min(PED_STAND_FRAME_INDEX, glyphs.length - 1)];
+      return standGlyph ? { current: standGlyph, next: null, mix01: 0 } : null;
+    }
+
+    const scaled = this.getWalkSpriteCycle(nowMs) * PED_WALK_SEQUENCE.length;
+    const sequenceIndex = Math.floor(scaled) % PED_WALK_SEQUENCE.length;
+    const index = PED_WALK_SEQUENCE[sequenceIndex];
+    const glyph = glyphs[index];
+    if (!glyph) return null;
+
+    return {
+      current: glyph,
+      next: null,
+      mix01: 0
+    };
+  }
+
+  private getPedestrianGlyphFrames(): HTMLCanvasElement[] {
+    const frameCount = Math.max(
+      1,
+      Math.floor(this.pedestrianSpriteSheet.naturalWidth / PED_SPRITE_FRAME_WIDTH)
+    );
+
+    if (this.pedestrianGlyphFrames.length !== frameCount) {
+      this.pedestrianGlyphFrames = new Array(frameCount).fill(null);
+    }
+
+    if (!this.isRenderableImage(this.pedestrianSpriteSheet)) return [];
+
+    for (let index = 0; index < frameCount; index += 1) {
+      if (this.pedestrianGlyphFrames[index]) continue;
+      this.pedestrianGlyphFrames[index] = this.extractPedestrianSpriteFrame(index);
+    }
+
+    return this.pedestrianGlyphFrames.filter((glyph): glyph is HTMLCanvasElement => !!glyph);
+  }
+
+  private extractPedestrianSpriteFrame(frameIndex: number): HTMLCanvasElement | null {
+    if (!this.isRenderableImage(this.pedestrianSpriteSheet)) return null;
+
+    const frameCount = Math.floor(this.pedestrianSpriteSheet.naturalWidth / PED_SPRITE_FRAME_WIDTH);
+    if (frameIndex < 0 || frameIndex >= frameCount) return null;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = PED_SPRITE_FRAME_WIDTH;
+    canvas.height = PED_SPRITE_FRAME_HEIGHT;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      this.pedestrianSpriteSheet,
+      frameIndex * PED_SPRITE_FRAME_WIDTH,
+      0,
+      PED_SPRITE_FRAME_WIDTH,
+      PED_SPRITE_FRAME_HEIGHT,
+      0,
+      0,
+      PED_SPRITE_FRAME_WIDTH,
+      PED_SPRITE_FRAME_HEIGHT
+    );
+    return canvas;
+  }
+
+  private getWalkSpriteCycle(nowMs: number): number {
+    return (nowMs * 0.0012) % 1;
+  }
+
+  private getWalkSpriteBob(cycle01: number, h: number): number {
+    const wave = Math.sin(cycle01 * Math.PI * 2);
+    return Math.round((0.5 - 0.5 * wave) * h * 0.012);
   }
 
   private drawPedestrianSpriteFrame(
     ctx: CanvasRenderingContext2D,
-    frame: CanvasImageSource,
+    frame: { current: CanvasImageSource; next: CanvasImageSource | null; mix01: number },
     x: number,
     footY: number,
-    h: number
+    h: number,
+    pose: "stand" | "walk"
   ): void {
     const spriteW =
-      "width" in frame && "height" in frame
-        ? (h * frame.width) / Math.max(frame.height, 1)
+      "width" in frame.current && "height" in frame.current
+        ? (h * frame.current.width) / Math.max(frame.current.height, 1)
         : h * 0.6;
-    const anchorRatio = 0.46;
+    const anchorRatio = pose === "walk" ? 0.46 : 0.48;
     const drawW = Math.round(spriteW);
     const drawH = Math.round(h);
     const drawX = Math.round(x - drawW * anchorRatio);
@@ -941,7 +1023,12 @@ export class World2D {
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(frame, drawX, drawY, drawW, drawH);
+    ctx.globalAlpha = frame.next ? 1 - frame.mix01 : 1;
+    ctx.drawImage(frame.current, drawX, drawY, drawW, drawH);
+    if (frame.next) {
+      ctx.globalAlpha = frame.mix01;
+      ctx.drawImage(frame.next, drawX, drawY, drawW, drawH);
+    }
     ctx.restore();
   }
 
