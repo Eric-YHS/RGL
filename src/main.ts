@@ -254,10 +254,6 @@ app.innerHTML = `
           </div>
           <div class="control-actions">
             <button class="btn primary" id="btnStart">开始</button>
-            <div class="hint control-tip">
-              <span class="control-tip-line control-tip-line-lead">提示：仅在<strong>红灯等待</strong>时点击“通行（WALK）”</span>
-              <span class="control-tip-line">才会闯红灯。</span>
-            </div>
           </div>
         </div>
 
@@ -317,7 +313,7 @@ let desktopGateEnteredOnce = false;
 let desktopGateShowingPracticeIntro = false;
 
 function updateTopHints(): void {
-  els.runHint.textContent = runKind === "practice" ? "练习" : "正式实验";
+  els.runHint.textContent = runKind === "practice" ? "练习" : "正式决策";
 }
 
 function hasDesktopViewport(): boolean {
@@ -388,7 +384,7 @@ function renderDesktopPreflightGate(): void {
         <p class="hint">阅读完后，请点击下方按钮进入练习页面。</p>
         <h2>示例短片</h2>
         <p class="hint">请将示例短片放到 <code>public/demo.mp4</code>。</p>
-        <video style="width:100%; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);" controls muted playsinline>
+        <video style="width:100%; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);" autoplay loop muted playsinline preload="auto">
           <source src="/demo.mp4" type="video/mp4" />
         </video>
         <div class="actions">
@@ -411,7 +407,7 @@ function renderDesktopPreflightGate(): void {
   const readyNotice = prerequisitesReady
     ? `
         <div class="desktop-preflight-ready">
-          桌面端校验已通过。请点击下方按钮进入实验说明。
+          桌面端校验已通过，请点击下方按钮进入实验说明。
         </div>
         <div class="desktop-preflight-actions">
           <button class="btn primary" id="btnDesktopGateContinue">进入实验说明</button>
@@ -504,7 +500,7 @@ function showPracticeIntro(): void {
     <p class="hint">阅读完后，请点击左侧【开始】按钮开始练习。</p>
     <h2>示例短片</h2>
     <p class="hint">请将示例短片放到 <code>public/demo.mp4</code>。</p>
-    <video style="width:100%; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);" controls muted playsinline>
+    <video style="width:100%; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);" autoplay loop muted playsinline preload="auto">
       <source src="/demo.mp4" type="video/mp4" />
     </video>
     <div class="actions">
@@ -522,7 +518,7 @@ function showPracticeComplete(): void {
     <h1>练习已完成</h1>
     <p>如果您没有疑问，请进入正式决策任务。</p>
     <div class="actions">
-      <button class="btn primary" id="btnToFormal">进入正式实验</button>
+      <button class="btn primary" id="btnToFormal">进入</button>
     </div>
   `);
   document.querySelector<HTMLButtonElement>("#btnToFormal")?.addEventListener("click", () => {
@@ -589,7 +585,7 @@ function showFormalComprehensionTest(): void {
       <button class="btn" id="btnBackToFormalIntro">返回提示语</button>
       <button class="btn primary" id="btnBeginFormal">我已作答，去开始</button>
     </div>
-    <p class="hint" style="margin-top:10px;">作答后，请点击左侧【开始】按钮开始正式实验。</p>
+    <p class="hint" style="margin-top:10px;">作答后，请点击左侧【开始】按钮开始正式决策任务。</p>
   `);
 
   document
@@ -622,13 +618,23 @@ function showFormalComprehensionTest(): void {
   });
 }
 
+async function submitFormalResultsSilently(): Promise<void> {
+  if (!formalSubmission) {
+    formalSubmission = buildFormalSubmission();
+  }
+  enqueuePendingSubmission(formalSubmission);
+  const outcome = await submitSubmissionWithFallback(formalSubmission);
+  if (outcome === "sent") {
+    void flushPendingSubmissions();
+  }
+}
+
 function showPostQuestion(): void {
   const elapsed = engine.state.elapsedSec;
   const money = engine.state.money;
   const v = engine.state.violations;
 
   openModal(`
-    <h1>实验已完成</h1>
     <p class="hint">耗时：${formatSeconds(elapsed, 1)}；最终金额：${formatMoney(money)}；闯红灯次数：${v}</p>
     <h2>请回答</h2>
     <p>刚才的任务中，关于“等待红灯”的规则，您的真实想法是？</p>
@@ -688,62 +694,9 @@ function showPostQuestion(): void {
       });
     }
 
-    showFormalResults();
-  });
-}
-
-function showFormalResults(): void {
-  const elapsed = engine.state.elapsedSec;
-  const money = engine.state.money;
-  const v = engine.state.violations;
-  if (!formalSubmission) {
-    formalSubmission = buildFormalSubmission();
-  }
-
-  openModal(`
-    <h1>实验已完成</h1>
-    <p>耗时：<strong>${formatSeconds(elapsed, 1)}</strong>；最终金额：<strong>${formatMoney(
-      money
-    )}</strong>；闯红灯次数：<strong>${v}</strong></p>
-    <h2>数据上报</h2>
-    <p class="hint" id="submitStatus">正在提交到服务器，请稍候…</p>
-    <div class="actions">
-      <button class="btn primary" id="btnRetrySubmit" style="display:none;">重试提交</button>
-      <button class="btn" id="btnCloseResults">关闭</button>
-    </div>
-  `);
-
-  const submitStatus = document.querySelector<HTMLParagraphElement>("#submitStatus");
-  const btnRetrySubmit = document.querySelector<HTMLButtonElement>("#btnRetrySubmit");
-
-  document.querySelector<HTMLButtonElement>("#btnCloseResults")?.addEventListener("click", () => {
     closeModal();
+    void submitFormalResultsSilently();
   });
-
-  let inFlight = false;
-  const runSubmit = async (): Promise<void> => {
-    if (inFlight || !formalSubmission) return;
-    inFlight = true;
-    if (btnRetrySubmit) btnRetrySubmit.style.display = "none";
-    if (submitStatus) submitStatus.textContent = "正在提交到服务器，请稍候…";
-    const outcome = await submitSubmissionWithFallback(formalSubmission);
-    if (outcome === "sent") {
-      if (submitStatus) submitStatus.textContent = "数据已成功保存到服务器。";
-      void flushPendingSubmissions();
-    } else {
-      if (submitStatus) {
-        submitStatus.textContent =
-          "网络异常，数据已暂存于当前设备；恢复联网后将自动补传，可点击重试。";
-      }
-      if (btnRetrySubmit) btnRetrySubmit.style.display = "inline-flex";
-    }
-    inFlight = false;
-  };
-
-  btnRetrySubmit?.addEventListener("click", () => {
-    void runSubmit();
-  });
-  void runSubmit();
 }
 
 els.btnStart.addEventListener("click", () => {
