@@ -1,6 +1,6 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
-import bsiconWalkUrl from "../assets/pedestrian/bsicon-walk.svg";
+import manBmpUrl from "../assets/kimbrough-rf/man.bmp";
 import humanMaleWalkingSpriteSheetUrl from "../assets/pedestrian/human-male-walking.png";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
@@ -280,7 +280,7 @@ export class World2D {
   private smoothAvatarX = -1; // smoothed position to prevent jumps
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
-  private readonly originalPedestrianSprite = loadCanvasImage(bsiconWalkUrl);
+  private readonly originalPedestrianSprite = loadCanvasImage(manBmpUrl);
   private readonly pedestrianSpriteSheet = loadCanvasImage(humanMaleWalkingSpriteSheetUrl);
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
