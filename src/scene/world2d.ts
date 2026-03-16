@@ -285,6 +285,7 @@ export class World2D {
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
   private originalPedestrianGlyph: HTMLCanvasElement | null = null;
+  private originalPedestrianUnavailable = false;
   private pedestrianGlyphFrames: (HTMLCanvasElement | null)[] = [];
   private fogFadeLeftX = -1;
   private fogFadeRightX = -1;
@@ -443,49 +444,50 @@ export class World2D {
     const ctx = this.ctx;
     ctx.save();
     ctx.scale(this.dpr, this.dpr);
+    try {
+      this.drawBackground(ctx);
+      this.drawRoad(ctx);
 
-    this.drawBackground(ctx);
-    this.drawRoad(ctx);
+      // Crosswalks & traffic lights
+      for (let i = 0; i < this.config.numLights; i++) {
+        const x = this.lightXs[i];
+        this.drawCrosswalk(ctx, x);
 
-    // Crosswalks & traffic lights
-    for (let i = 0; i < this.config.numLights; i++) {
-      const x = this.lightXs[i];
-      this.drawCrosswalk(ctx, x);
+        this.drawTrafficLight(ctx, x, this.getTrafficLightColor(state, i + 1), "top", nowMs);
+      }
 
-      this.drawTrafficLight(ctx, x, this.getTrafficLightColor(state, i + 1), "top", nowMs);
+      // Stick figure — interpolate between actual light X positions
+      const stopOffset = 28; // pixels before the light pole
+      const targetX = this.computeAvatarX(state, progress01, stopOffset);
+
+      // Smooth movement: limit max jump per frame to prevent teleporting
+      const maxStepPx = 8; // max pixels per frame (~480px/sec at 60fps)
+      if (this.smoothAvatarX < 0) {
+        this.smoothAvatarX = targetX; // first frame
+      } else if (Math.abs(targetX - this.smoothAvatarX) > maxStepPx) {
+        // Move toward target at max speed
+        this.smoothAvatarX += Math.sign(targetX - this.smoothAvatarX) * maxStepPx;
+      } else {
+        this.smoothAvatarX = targetX;
+      }
+      if (state.phase === "idle") this.smoothAvatarX = targetX; // reset on idle
+
+      const avatarX = this.smoothAvatarX;
+      this.drawStickFigure(ctx, avatarX, state.phase, nowMs, avatarX !== this.lastAvatarX);
+      this.lastAvatarX = avatarX;
+
+      // Fog overlay for sequential mode (drawn after scene, before money overlay)
+      if (this.config.revealMode === "sequential") {
+        this.drawFog(ctx, state, avatarX);
+      }
+
+      this.drawPressureVignette(ctx, state.money, this.config.startMoney, nowMs, state.phase);
+
+      // Prominent money overlay (always on top)
+      this.drawMoneyOverlay(ctx, state.money, this.config.startMoney, nowMs, state.phase);
+    } finally {
+      ctx.restore();
     }
-
-    // Stick figure — interpolate between actual light X positions
-    const stopOffset = 28; // pixels before the light pole
-    const targetX = this.computeAvatarX(state, progress01, stopOffset);
-
-    // Smooth movement: limit max jump per frame to prevent teleporting
-    const maxStepPx = 8; // max pixels per frame (~480px/sec at 60fps)
-    if (this.smoothAvatarX < 0) {
-      this.smoothAvatarX = targetX; // first frame
-    } else if (Math.abs(targetX - this.smoothAvatarX) > maxStepPx) {
-      // Move toward target at max speed
-      this.smoothAvatarX += Math.sign(targetX - this.smoothAvatarX) * maxStepPx;
-    } else {
-      this.smoothAvatarX = targetX;
-    }
-    if (state.phase === "idle") this.smoothAvatarX = targetX; // reset on idle
-
-    const avatarX = this.smoothAvatarX;
-    this.drawStickFigure(ctx, avatarX, state.phase, nowMs, avatarX !== this.lastAvatarX);
-    this.lastAvatarX = avatarX;
-
-    // Fog overlay for sequential mode (drawn after scene, before money overlay)
-    if (this.config.revealMode === "sequential") {
-      this.drawFog(ctx, state, avatarX);
-    }
-
-    this.drawPressureVignette(ctx, state.money, this.config.startMoney, nowMs, state.phase);
-
-    // Prominent money overlay (always on top)
-    this.drawMoneyOverlay(ctx, state.money, this.config.startMoney, nowMs, state.phase);
-
-    ctx.restore();
   }
 
   /* ------------------------------------------------------------------ */
@@ -929,10 +931,142 @@ export class World2D {
   }
 
   private getOriginalPedestrianGlyph(): HTMLCanvasElement | null {
+    if (this.originalPedestrianUnavailable) return null;
     if (this.originalPedestrianGlyph) return this.originalPedestrianGlyph;
     if (!this.isRenderableImage(this.originalPedestrianSprite)) return null;
-    this.originalPedestrianGlyph = this.preparePedestrianSprite(this.originalPedestrianSprite);
+    try {
+      this.originalPedestrianGlyph = this.preparePedestrianSprite(this.originalPedestrianSprite);
+    } catch (error) {
+      console.error("[World2D] failed to prepare original pedestrian sprite", error);
+      this.originalPedestrianUnavailable = true;
+      return null;
+    }
+    if (!this.originalPedestrianGlyph) {
+      this.originalPedestrianUnavailable = true;
+      return null;
+    }
     return this.originalPedestrianGlyph;
+  }
+
+  private preparePedestrianSprite(sprite: HTMLImageElement): HTMLCanvasElement | null {
+    const srcW = sprite.naturalWidth;
+    const srcH = sprite.naturalHeight;
+    if (!srcW || !srcH) return null;
+
+    const source = document.createElement("canvas");
+    source.width = srcW;
+    source.height = srcH;
+    const sourceCtx = source.getContext("2d");
+    if (!sourceCtx) return null;
+
+    sourceCtx.clearRect(0, 0, srcW, srcH);
+    sourceCtx.drawImage(sprite, 0, 0, srcW, srcH);
+
+    const imgData = sourceCtx.getImageData(0, 0, srcW, srcH);
+    const data = imgData.data;
+    const background = this.samplePedestrianBackgroundColor(data, srcW, srcH);
+    let minX = srcW;
+    let minY = srcH;
+    let maxX = -1;
+    let maxY = -1;
+
+    for (let y = 0; y < srcH; y += 1) {
+      for (let x = 0; x < srcW; x += 1) {
+        const idx = (y * srcW + x) * 4;
+        const alpha = data[idx + 3];
+        if (alpha < 8) {
+          data[idx + 3] = 0;
+          continue;
+        }
+
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const distance =
+          Math.abs(r - background.r) +
+          Math.abs(g - background.g) +
+          Math.abs(b - background.b);
+        const luminance = r * 0.2126 + g * 0.7152 + b * 0.0722;
+        const isForeground = distance > 52 || luminance < 185;
+
+        if (!isForeground) {
+          data[idx + 3] = 0;
+          continue;
+        }
+
+        data[idx] = 22;
+        data[idx + 1] = 22;
+        data[idx + 2] = 22;
+        data[idx + 3] = 255;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+
+    if (maxX < minX || maxY < minY) return null;
+
+    sourceCtx.putImageData(imgData, 0, 0);
+
+    const pad = 2;
+    const cropW = maxX - minX + 1;
+    const cropH = maxY - minY + 1;
+    const output = document.createElement("canvas");
+    output.width = cropW + pad * 2;
+    output.height = cropH + pad * 2;
+    const outputCtx = output.getContext("2d");
+    if (!outputCtx) return null;
+
+    outputCtx.imageSmoothingEnabled = false;
+    outputCtx.clearRect(0, 0, output.width, output.height);
+    outputCtx.drawImage(source, minX, minY, cropW, cropH, pad, pad, cropW, cropH);
+    return output;
+  }
+
+  private samplePedestrianBackgroundColor(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number
+  ): { r: number; g: number; b: number } {
+    const sampleCoords: Array<{ x: number; y: number }> = [];
+    const edgeInset = 1;
+    const step = Math.max(1, Math.floor(Math.min(width, height) * 0.08));
+
+    for (let dy = 0; dy <= step; dy += step || 1) {
+      for (let dx = 0; dx <= step; dx += step || 1) {
+        sampleCoords.push({ x: edgeInset + dx, y: edgeInset + dy });
+        sampleCoords.push({ x: width - 1 - edgeInset - dx, y: edgeInset + dy });
+        sampleCoords.push({ x: edgeInset + dx, y: height - 1 - edgeInset - dy });
+        sampleCoords.push({ x: width - 1 - edgeInset - dx, y: height - 1 - edgeInset - dy });
+      }
+    }
+
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let count = 0;
+    for (const coord of sampleCoords) {
+      const sx = Math.max(0, Math.min(width - 1, coord.x));
+      const sy = Math.max(0, Math.min(height - 1, coord.y));
+      const idx = (sy * width + sx) * 4;
+      const alpha = data[idx + 3];
+      if (alpha < 8) continue;
+      r += data[idx];
+      g += data[idx + 1];
+      b += data[idx + 2];
+      count += 1;
+    }
+
+    if (count === 0) {
+      return { r: 255, g: 255, b: 255 };
+    }
+
+    return {
+      r: Math.round(r / count),
+      g: Math.round(g / count),
+      b: Math.round(b / count)
+    };
   }
 
   private getPedestrianSpriteFrame(
