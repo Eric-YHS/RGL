@@ -680,7 +680,7 @@ canvas.webgl {
 .completion-card-body {
   text-align: center;
   display: grid;
-  gap: 14px;
+  gap: 12px;
   justify-items: center;
   padding: 6px 0 4px;
 }

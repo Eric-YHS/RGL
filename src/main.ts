@@ -650,7 +650,6 @@ function showCompletionScreen(state: CompletionScreenState): void {
     <div class="completion-card-body">
       <div class="completion-eyebrow">正式决策结束</div>
       <h1>感谢您的参与</h1>
-      <p>本次正式决策任务已经结束。</p>
       ${statusBlock}
       <p class="completion-close-note">请关闭本页面。</p>
     </div>
