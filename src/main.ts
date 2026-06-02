@@ -5,15 +5,22 @@ import { ExperimentEngine } from "./experiment/engine";
 import type { ClientDeviceInfo, SessionSubmission } from "./experiment/logger";
 import { ExperimentLogger } from "./experiment/logger";
 import { formatMoney, formatSeconds } from "./experiment/utils";
-import { World3D } from "./scene/world3d";
+import { World2D } from "./scene/world2d";
 
-type RunKind = "practice" | "formal";
+type RunKind = "formal";
 type SubmitOutcome = "sent" | "queued";
+type DesktopInputProof = {
+  keyboard: boolean;
+  mouseMove: boolean;
+  mouseClick: boolean;
+};
 
 const params = new URLSearchParams(window.location.search);
 const participantId = (params.get("pid") ?? "").trim();
 const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 const PENDING_SUBMISSIONS_KEY = "honglvdeng_pending_submissions_v1";
+const EXPERIMENT_UI_FONT = '"Experiment Sans"';
+const EXPERIMENT_MONEY_FONT = '"Experiment Mono"';
 
 function normalizeApiBaseUrl(raw: string | undefined): string {
   if (!raw) return "";
@@ -37,21 +44,20 @@ function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig
   return {
     revealMode,
     numLights,
-    segmentDurationSec: 4,
-    redWaitSec: 5,
-    startMoney: 10,
-    moneyLossPerSec: 0.1
+    segmentDurationSec: 2,
+    redWaitSec: 20,
+    startMoney: 100,
+    moneyLossPerSec: 2.5
   };
 }
 
-let formalConfig: ExperimentConfig = makeConfig("full", 5);
-let practiceConfig: ExperimentConfig = makeConfig("full", 2);
+const formalConfig: ExperimentConfig = makeConfig("full", 1);
 
-function createLogger(config: ExperimentConfig, runKind_: RunKind): ExperimentLogger {
+function createLogger(config: ExperimentConfig): ExperimentLogger {
   return new ExperimentLogger(config, {
     participantId,
     startedAtIso: new Date().toISOString(),
-    runKind: runKind_
+    runKind: "formal"
   });
 }
 
@@ -169,9 +175,71 @@ function collectDeviceInfo(): ClientDeviceInfo {
   };
 }
 
+async function waitForExperimentFonts(): Promise<void> {
+  if (!("fonts" in document)) return;
+
+  const timeoutMs = 2500;
+  const fontLoads = Promise.all([
+    document.fonts.load(`400 16px ${EXPERIMENT_UI_FONT}`, "控制剩余报酬正式实验"),
+    document.fonts.load(`700 16px ${EXPERIMENT_UI_FONT}`, "开始通行每秒正在减少"),
+    document.fonts.load(`800 16px ${EXPERIMENT_UI_FONT}`, "提示交通信号灯"),
+    document.fonts.load(`900 16px ${EXPERIMENT_MONEY_FONT}`, "￥0123456789.-"),
+    document.fonts.load(`700 16px ${EXPERIMENT_MONEY_FONT}`, "￥0123456789.-")
+  ]).then(() => undefined);
+
+  await Promise.race([
+    fontLoads.catch(() => undefined),
+    new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs))
+  ]);
+
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+function shouldBlockMobileAccess(): boolean {
+  const nav = navigator as Navigator & {
+    userAgentData?: {
+      mobile?: boolean;
+    };
+  };
+  const ua = navigator.userAgent ?? "";
+  const platform = navigator.platform ?? "";
+  const isIpadLike = platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  const uaSaysMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(
+    ua
+  );
+  const uaDataSaysMobile = Boolean(nav.userAgentData?.mobile);
+  const coarseTouchSmallScreen =
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches &&
+    Math.max(window.screen.width || 0, window.screen.height || 0) <= 1366;
+
+  return isIpadLike || uaSaysMobile || uaDataSaysMobile || coarseTouchSmallScreen;
+}
+
+const DESKTOP_MIN_VIEWPORT_WIDTH = 1100;
+const DESKTOP_MIN_VIEWPORT_HEIGHT = 680;
+
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Missing #app");
 
+if (shouldBlockMobileAccess()) {
+  document.body.classList.add("desktop-only-blocked");
+  app.innerHTML = `
+    <main class="desktop-only-gate">
+      <section class="desktop-only-card">
+        <div class="desktop-only-eyebrow">访问受限</div>
+        <h1>本实验仅支持电脑端作答</h1>
+        <p>检测到您当前正在使用手机或平板访问。本实验需要在电脑浏览器中完成，以保证页面布局、操作方式和实验记录一致。</p>
+        <div class="desktop-only-tips">
+          <div>请改用电脑打开当前链接后再继续。</div>
+          <div>推荐使用 Chrome、Edge 或 Safari 的桌面浏览器。</div>
+        </div>
+      </section>
+    </main>
+  `;
+} else {
+document.body.classList.add("app-fonts-loading");
 app.innerHTML = `
   <div class="stage">
     <canvas class="webgl" aria-label="实验场景"></canvas>
@@ -181,42 +249,32 @@ app.innerHTML = `
         <div class="panel panel-control">
           <div class="panel-head">
             <div class="panel-title">控制</div>
-            <div class="hint" id="runHint"></div>
+            <div class="hint" id="runHint">决策任务</div>
           </div>
           <div class="control-actions">
             <button class="btn primary" id="btnStart">开始</button>
-            <div class="hint control-tip">
-              提示：仅在<strong>红灯等待</strong>时点击“通行（WALK）”才会闯红灯。
-            </div>
           </div>
         </div>
 
         <div class="panel status panel-status">
           <div class="row"><div class="label">当前位置</div><div class="value" id="posText">—</div></div>
           <div class="row"><div class="label">耗费时间</div><div class="value" id="timeText">0.0s</div></div>
-          <div class="row"><div class="label">剩余金额</div><div class="value money" id="moneyText">￥10.00</div></div>
-          <div class="row" id="lightRow" style="display:none;"><div class="label">信号灯</div><div class="value" id="lightText">—</div></div>
+          <div class="row"><div class="label">剩余报酬</div><div class="value money" id="moneyText">￥100.00</div></div>
+          <div class="row" id="lightRow"><div class="label">信号灯</div><div class="value" id="lightText">—</div></div>
         </div>
 
-        <div class="panel panel-minimap" id="minimapPanel" style="display:none;">
-          <div class="panel-head">
-            <div class="panel-title panel-title-sm">小地图</div>
-            <div class="hint">总览路线</div>
-          </div>
-          <div class="minimap minimap-box">
-            <canvas id="minimap"></canvas>
-          </div>
-        </div>
       </div>
     </div>
 
     <div class="center-controls">
-      <button class="btn danger" id="btnWalk" disabled>通行（WALK）</button>
+      <button class="btn danger" id="btnWalk" disabled>移动</button>
     </div>
 
-    <div class="modal" id="modal">
+    <div class="modal" id="modal" style="display:none;">
       <div class="card" id="modalCard"></div>
     </div>
+
+    <div class="desktop-preflight" id="desktopGate" style="display:none;"></div>
   </div>
 `;
 
@@ -230,27 +288,144 @@ const els = {
   moneyText: document.querySelector<HTMLDivElement>("#moneyText")!,
   lightText: document.querySelector<HTMLDivElement>("#lightText")!,
   lightRow: document.querySelector<HTMLDivElement>("#lightRow")!,
-  minimapPanel: document.querySelector<HTMLDivElement>("#minimapPanel")!,
-  minimap: document.querySelector<HTMLCanvasElement>("#minimap")!,
   modal: document.querySelector<HTMLDivElement>("#modal")!,
-  modalCard: document.querySelector<HTMLDivElement>("#modalCard")!
+  modalCard: document.querySelector<HTMLDivElement>("#modalCard")!,
+  desktopGate: document.querySelector<HTMLDivElement>("#desktopGate")!
 };
 
-let runKind: RunKind = "practice";
-let currentConfig: ExperimentConfig = practiceConfig;
-let logger: ExperimentLogger = createLogger(currentConfig, runKind);
+const currentConfig: ExperimentConfig = formalConfig;
+let logger: ExperimentLogger = createLogger(currentConfig);
 let engine: ExperimentEngine = new ExperimentEngine(currentConfig, logger);
-let world: World3D | null = null;
+let world: World2D | null = null;
 let formalClientSessionId = createClientSessionId();
 let formalSubmission: SessionSubmission | null = null;
+const desktopInputProof: DesktopInputProof = {
+  keyboard: false,
+  mouseMove: false,
+  mouseClick: false
+};
+let desktopGateReady = false;
+let desktopGateVisible = false;
+let pausedByDesktopGate = false;
+let desktopGateEnteredOnce = false;
+let desktopGateShowingIntro = false;
 
-function updateTopHints(): void {
-  els.runHint.textContent = runKind === "practice" ? "练习" : "正式实验";
+function hasDesktopViewport(): boolean {
+  return window.innerWidth >= DESKTOP_MIN_VIEWPORT_WIDTH && window.innerHeight >= DESKTOP_MIN_VIEWPORT_HEIGHT;
 }
 
-function updateMinimapVisibility(): void {
-  els.minimapPanel.style.display =
-    currentConfig.revealMode === "full" ? "block" : "none";
+function hasDesktopPointer(): boolean {
+  return window.matchMedia("(pointer: fine)").matches;
+}
+
+function hasDesktopHover(): boolean {
+  return window.matchMedia("(hover: hover)").matches;
+}
+
+function hasDesktopInteractionProof(): boolean {
+  return desktopInputProof.keyboard && desktopInputProof.mouseMove && desktopInputProof.mouseClick;
+}
+
+function renderDesktopPreflightGate(): void {
+  const viewportReady = hasDesktopViewport();
+  const pointerReady = hasDesktopPointer();
+  const hoverReady = hasDesktopHover();
+  const keyboardReady = desktopInputProof.keyboard;
+  const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
+  const prerequisitesReady = viewportReady && pointerReady && hoverReady && keyboardReady && mouseReady;
+  const canEnter = prerequisitesReady && desktopGateEnteredOnce;
+
+  if (canEnter) {
+    if (desktopGateVisible) {
+      els.desktopGate.style.display = "none";
+      desktopGateVisible = false;
+    }
+
+    if (pausedByDesktopGate) {
+      engine.resume(performance.now());
+      pausedByDesktopGate = false;
+    }
+
+    if (!desktopGateReady) {
+      desktopGateReady = true;
+    }
+    return;
+  }
+
+  if (!pausedByDesktopGate && engine.state.phase !== "idle" && engine.state.phase !== "finished") {
+    engine.pause(performance.now());
+    pausedByDesktopGate = true;
+  }
+
+  // Show instructions page after prerequisites are met
+  if (desktopGateShowingIntro && prerequisitesReady && !desktopGateEnteredOnce) {
+    els.desktopGate.innerHTML = `
+      <div class="card desktop-entry-card" style="max-width:640px;">
+        <h1>欢迎</h1>
+        <p>该部分人类智能任务的报酬取决于您的决策。</p>
+        <p class="hint">注意：如果你使用台式机或笔记本电脑完成此人类智能任务，建议在开始前将浏览器屏幕最大化。在完成决策任务期间，请不要关闭此窗口，也不要以其他任何方式离开网页。</p>
+        <div class="actions">
+          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
+        </div>
+      </div>
+    `;
+    els.desktopGate.style.display = "grid";
+    desktopGateVisible = true;
+    els.desktopGate
+      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
+      ?.addEventListener("click", () => {
+        desktopGateEnteredOnce = true;
+        desktopGateShowingIntro = false;
+        renderDesktopPreflightGate();
+      });
+    return;
+  }
+
+  const viewportLabel = viewportReady
+    ? `窗口尺寸已满足（至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}）`
+    : `请将浏览器窗口调整到至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}`;
+  const pointerLabel = pointerReady ? "检测到精细指针设备" : "请使用鼠标或触控板操作";
+  const hoverLabel = hoverReady ? "检测到悬停能力" : "当前设备不具备桌面端悬停能力";
+  const keyboardLabel = keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键";
+  const mouseLabel = mouseReady ? "已检测到鼠标移动和点击" : "请移动鼠标并点击一次";
+
+  const readyNotice = prerequisitesReady
+    ? `
+        <div class="desktop-preflight-ready">
+          桌面端校验已通过，请点击下方按钮进入实验说明。
+        </div>
+        <div class="desktop-preflight-actions">
+          <button class="btn primary" id="btnDesktopGateContinue">进入实验说明</button>
+        </div>
+      `
+    : "";
+
+  els.desktopGate.innerHTML = `
+    <section class="desktop-preflight-card">
+      <div class="desktop-preflight-eyebrow">桌面端校验</div>
+      <h1>请使用电脑端完成实验</h1>
+      <p>为保证实验环境一致，进入实验前必须同时满足桌面窗口尺寸、精细指针、悬停能力，以及真实键盘和鼠标交互。</p>
+      <div class="desktop-preflight-checklist">
+        <div class="${viewportReady ? "ready" : ""}">${viewportReady ? "✓" : "•"} ${viewportLabel}</div>
+        <div class="${pointerReady ? "ready" : ""}">${pointerReady ? "✓" : "•"} ${pointerLabel}</div>
+        <div class="${hoverReady ? "ready" : ""}">${hoverReady ? "✓" : "•"} ${hoverLabel}</div>
+        <div class="${keyboardReady ? "ready" : ""}">${keyboardReady ? "✓" : "•"} ${keyboardLabel}</div>
+        <div class="${mouseReady ? "ready" : ""}">${mouseReady ? "✓" : "•"} ${mouseLabel}</div>
+      </div>
+      ${readyNotice}
+    </section>
+  `;
+  els.desktopGate.style.display = "grid";
+  desktopGateVisible = true;
+
+  if (prerequisitesReady) {
+    els.desktopGate
+      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
+      ?.addEventListener("click", () => {
+        desktopGateShowingIntro = true;
+        renderDesktopPreflightGate();
+      });
+  }
 }
 
 function openModal(html: string): void {
@@ -262,25 +437,7 @@ function closeModal(): void {
   els.modal.style.display = "none";
 }
 
-function switchRun(next: RunKind): void {
-  runKind = next;
-  currentConfig = next === "practice" ? practiceConfig : formalConfig;
-  logger = createLogger(currentConfig, runKind);
-  engine = new ExperimentEngine(currentConfig, logger);
-  formalClientSessionId = createClientSessionId();
-  formalSubmission = null;
-  world?.dispose();
-  world = new World3D(els.canvas, currentConfig);
-  lastPhase = engine.state.phase;
-  finishGate = false;
-  updateTopHints();
-  updateMinimapVisibility();
-}
-
 function buildFormalSubmission(): SessionSubmission {
-  if (runKind !== "formal") {
-    throw new Error("Formal submission requested outside formal run");
-  }
   return logger.buildSubmission({
     clientSessionId: formalClientSessionId,
     submittedAtIso: new Date().toISOString(),
@@ -293,116 +450,40 @@ function buildFormalSubmission(): SessionSubmission {
   });
 }
 
-function setRevealMode(mode: RevealMode): void {
-  formalConfig = makeConfig(mode, 5);
-  practiceConfig = makeConfig(mode, 2);
-  switchRun("practice");
-}
-
-function showRevealModeSelect(): void {
+function showInstructions(): void {
   openModal(`
-    <h1>请选择呈现方式</h1>
-    <p class="hint">请在开始前选择一种呈现方式（本次任务中将保持不变）。</p>
-    <div class="actions" style="flex-direction:column; align-items:stretch; gap:12px;">
-      <button class="btn primary" id="btnRevealFull">全呈现（显示小地图）</button>
-      <button class="btn" id="btnRevealSequential">逐个呈现（雾中渐显）</button>
-    </div>
-  `);
-
-  document.querySelector<HTMLButtonElement>("#btnRevealFull")?.addEventListener("click", () => {
-    setRevealMode("full");
-    showPracticeIntro();
-  });
-  document
-    .querySelector<HTMLButtonElement>("#btnRevealSequential")
-    ?.addEventListener("click", () => {
-      setRevealMode("sequential");
-      showPracticeIntro();
-    });
-}
-
-function showPracticeIntro(): void {
-  openModal(`
-    <h1>熟悉基本操作</h1>
-    <p>在该部分，您需要控制屏幕上的“虚拟人”行走。</p>
+    <h1>指导语</h1>
+    <p>决策任务中，您将控制一个<strong>圆形图形</strong>，并在屏幕上将其移动至终点线。</p>
     <ul>
-      <li>点击屏幕左侧的【开始】按钮，“虚拟人”将开始行走。</li>
-      <li>行走途中将遇到交通信号灯，红灯会阻止通行，等待一段时间后会变为绿灯。</li>
-      <li>您可以点击屏幕中央的【通行（WALK）】按钮在红灯时直接通行。</li>
+      <li>当您点击屏幕左侧的<strong>【开始】</strong>按钮后，您的圆圈会靠近红绿灯并停下等待。</li>
+      <li>要让您的圆圈再次移动，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮。</li>
     </ul>
-    <p class="hint">阅读完后，请点击左侧【开始】按钮开始练习。</p>
-    <h2>示例短片</h2>
-    <p class="hint">请将示例短片放到 <code>public/demo.mp4</code>。</p>
-    <video style="width:100%; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);" controls muted playsinline>
-      <source src="/demo.mp4" type="video/mp4" />
-    </video>
-    <div class="actions">
-      <button class="btn primary" id="btnBeginPractice">我已阅读</button>
-    </div>
-  `);
-
-  document.querySelector<HTMLButtonElement>("#btnBeginPractice")?.addEventListener("click", () => {
-    closeModal();
-  });
-}
-
-function showPracticeComplete(): void {
-  openModal(`
-    <h1>练习已完成</h1>
-    <p>如果您没有疑问，请进入正式决策任务。</p>
-    <div class="actions">
-      <button class="btn primary" id="btnToFormal">进入正式实验</button>
-    </div>
-  `);
-  document.querySelector<HTMLButtonElement>("#btnToFormal")?.addEventListener("click", () => {
-    switchRun("formal");
-    showFormalIntro();
-  });
-}
-
-function showFormalIntro(): void {
-  openModal(`
-    <h1>正式决策任务</h1>
-    <p>请注意，实验正式开始；请仔细阅读，确保理解每一个细节。</p>
-    <h2>场景设置</h2>
-    <ul>
-      <li>点击左侧【开始】按钮后，“虚拟人”将开始行走并经过一系列交通信号灯。</li>
-      <li>两个交通信号灯之间的行走距离固定为 <strong>${currentConfig.segmentDurationSec}s</strong>。</li>
-    </ul>
-    <h2>交通机制</h2>
-    <ul>
-      <li>任务开始时，所有路灯均为红色。</li>
-      <li>当“虚拟人”到达路口时将自动停下等待红灯。</li>
-      <li>等待 <strong>${currentConfig.redWaitSec}s</strong> 后，红灯将自动转为绿灯。</li>
-    </ul>
-    <h2>操作按钮</h2>
-    <ul>
-      <li>屏幕中央有一个【通行（WALK）】按钮，您可以在任何时刻点击（无论行走中还是等待中）。</li>
-      <li>但只有当“虚拟人”<strong>等待红灯</strong>时点击，才会驱使“虚拟人”闯红灯；行走途中点击无任何效果。</li>
-    </ul>
+    <h2>实验规则</h2>
+    <p>在红绿灯处等待，直至其变为绿色后通行。</p>
     <h2>收益规则</h2>
     <ul>
-      <li>本阶段初始资金 <strong>￥${currentConfig.startMoney.toFixed(2)}</strong>。</li>
-      <li>每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${currentConfig.moneyLossPerSec.toFixed(
-        2
-      )}</strong>。</li>
-      <li>规则要求：在每个交通信号灯前等待，直到红灯变绿，方可通行。</li>
+      <li>本阶段您的初始资金为 <strong>￥${currentConfig.startMoney.toFixed(2)}</strong>。</li>
+      <li>每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${currentConfig.moneyLossPerSec.toFixed(2)}</strong>，直至您冲过终点线。</li>
+    </ul>
+    <h2>场景设置</h2>
+    <ul>
+      <li>圆圈从初始位置到红绿灯、从红绿灯到终点线各需 <strong>${currentConfig.segmentDurationSec}</strong> 秒。</li>
+      <li>红灯等待 <strong>${currentConfig.redWaitSec}</strong> 秒后变为绿灯。</li>
     </ul>
     <div class="actions">
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
     </div>
-    <p class="hint" style="margin-top:10px;">阅读完提示语后，请先完成下一页“理解测试”。</p>
   `);
 
   document.querySelector<HTMLButtonElement>("#btnToCompTest")?.addEventListener("click", () => {
-    showFormalComprehensionTest();
+    showComprehensionTest();
   });
 }
 
-function showFormalComprehensionTest(): void {
+function showComprehensionTest(): void {
   openModal(`
     <h1>理解测试</h1>
-    <p>根据上一页说明，为获得最大经济收益，我应该闯红灯以便缩短时间；但为了遵守规则，我必须等待红灯变绿。</p>
+    <p>请回答以下问题：根据上述说明，为获得最大经济收益，我应该闯红灯以便缩短时间；但为了遵守规则，我必须等待红灯变绿。</p>
     <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:8px;">
       <label style="display:flex; gap:8px; align-items:center; cursor:pointer;">
         <input type="radio" name="comp" value="yes" />
@@ -415,19 +496,19 @@ function showFormalComprehensionTest(): void {
       <div class="hint" id="compHint"></div>
     </div>
     <div class="actions">
-      <button class="btn" id="btnBackToFormalIntro">返回提示语</button>
-      <button class="btn primary" id="btnBeginFormal">我已作答，去开始</button>
+      <button class="btn" id="btnBackToInstructions">返回提示语</button>
+      <button class="btn primary" id="btnBeginExperiment">我已作答，开始决策</button>
     </div>
-    <p class="hint" style="margin-top:10px;">作答后，请点击左侧【开始】按钮开始正式实验。</p>
+    <p class="hint" style="margin-top:10px;">作答后，请点击左侧【开始】按钮开始决策任务。</p>
   `);
 
   document
-    .querySelector<HTMLButtonElement>("#btnBackToFormalIntro")
+    .querySelector<HTMLButtonElement>("#btnBackToInstructions")
     ?.addEventListener("click", () => {
-      showFormalIntro();
+      showInstructions();
     });
 
-  document.querySelector<HTMLButtonElement>("#btnBeginFormal")?.addEventListener("click", () => {
+  document.querySelector<HTMLButtonElement>("#btnBeginExperiment")?.addEventListener("click", () => {
     const nowMs = performance.now();
     const choice = document.querySelector<HTMLInputElement>('input[name="comp"]:checked')?.value;
     const hint = document.querySelector<HTMLDivElement>("#compHint");
@@ -451,16 +532,53 @@ function showFormalComprehensionTest(): void {
   });
 }
 
+type CompletionScreenState = "saving" | SubmitOutcome;
+
+async function submitFormalResultsSilently(): Promise<SubmitOutcome> {
+  if (!formalSubmission) {
+    formalSubmission = buildFormalSubmission();
+  }
+  enqueuePendingSubmission(formalSubmission);
+  const outcome = await submitSubmissionWithFallback(formalSubmission);
+  if (outcome === "sent") {
+    void flushPendingSubmissions();
+  }
+  return outcome;
+}
+
+function showCompletionScreen(state: CompletionScreenState): void {
+  const elapsed = engine.state.elapsedSec;
+  const money = engine.state.money;
+  const waitSec = Math.max(0, elapsed - currentConfig.segmentDurationSec * 2);
+  const taskMoney = Math.max(0, currentConfig.startMoney - currentConfig.moneyLossPerSec * elapsed);
+
+  const statusBlock =
+    state === "saving"
+      ? `<div class="completion-status saving">数据正在保存，请稍候…</div>`
+      : state === "sent"
+        ? `<div class="completion-status success">数据已成功保存。</div>`
+        : `<div class="completion-status queued">网络暂时不稳定，数据已保存并会继续尝试提交。</div>`;
+
+  openModal(`
+    <div class="completion-card-body">
+      <div class="completion-eyebrow">决策任务完成</div>
+      <h1>感谢您的参与</h1>
+      <p>您在红绿灯处等待了 <strong>${formatSeconds(waitSec, 1)}</strong>，获得 <strong>${formatMoney(taskMoney)}</strong>。</p>
+      ${statusBlock}
+      <p class="completion-close-note">后续填写完简短问卷后，您将在见数平台领取自己的收益。</p>
+    </div>
+  `);
+}
+
 function showPostQuestion(): void {
   const elapsed = engine.state.elapsedSec;
   const money = engine.state.money;
   const v = engine.state.violations;
 
   openModal(`
-    <h1>实验已完成</h1>
     <p class="hint">耗时：${formatSeconds(elapsed, 1)}；最终金额：${formatMoney(money)}；闯红灯次数：${v}</p>
     <h2>请回答</h2>
-    <p>刚才的任务中，关于“等待红灯”的规则，您的真实想法是？</p>
+    <p>刚才的任务中，关于"等待红灯"的规则，您的真实想法是？</p>
     <div style="display:grid; gap:10px; margin-top:10px;">
       <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
         <input type="radio" name="post" value="A" />
@@ -479,8 +597,6 @@ function showPostQuestion(): void {
         <span>D. 我以为按钮随时能点，没太在意红灯。</span>
       </label>
     </div>
-    <h2>补充（可选）</h2>
-    <textarea class="textarea" id="postText" placeholder="如愿意，可补充一句原因…"></textarea>
     <div class="actions">
       <button class="btn primary" id="btnSubmitPost">提交并保存数据</button>
     </div>
@@ -489,7 +605,6 @@ function showPostQuestion(): void {
   document.querySelector<HTMLButtonElement>("#btnSubmitPost")?.addEventListener("click", () => {
     const nowMs = performance.now();
     const choice = document.querySelector<HTMLInputElement>('input[name="post"]:checked')?.value;
-    const text = (document.querySelector<HTMLTextAreaElement>("#postText")?.value ?? "").trim();
 
     if (!choice) return;
 
@@ -504,75 +619,11 @@ function showPostQuestion(): void {
       note: choice
     });
 
-    if (text) {
-      logger.log({
-        nowMs,
-        tSec: engine.state.elapsedSec,
-        event: "post_rule_attitude_text",
-        phase: engine.state.phase,
-        lightIndex: engine.state.lightIndex,
-        lightColor: null,
-        money: engine.state.money,
-        note: text
-      });
-    }
-
-    showFormalResults();
+    showCompletionScreen("saving");
+    void submitFormalResultsSilently().then((outcome) => {
+      showCompletionScreen(outcome);
+    });
   });
-}
-
-function showFormalResults(): void {
-  const elapsed = engine.state.elapsedSec;
-  const money = engine.state.money;
-  const v = engine.state.violations;
-  if (!formalSubmission) {
-    formalSubmission = buildFormalSubmission();
-  }
-
-  openModal(`
-    <h1>实验已完成</h1>
-    <p>耗时：<strong>${formatSeconds(elapsed, 1)}</strong>；最终金额：<strong>${formatMoney(
-      money
-    )}</strong>；闯红灯次数：<strong>${v}</strong></p>
-    <h2>数据上报</h2>
-    <p class="hint" id="submitStatus">正在提交到服务器，请稍候…</p>
-    <div class="actions">
-      <button class="btn primary" id="btnRetrySubmit" style="display:none;">重试提交</button>
-      <button class="btn" id="btnCloseResults">关闭</button>
-    </div>
-  `);
-
-  const submitStatus = document.querySelector<HTMLParagraphElement>("#submitStatus");
-  const btnRetrySubmit = document.querySelector<HTMLButtonElement>("#btnRetrySubmit");
-
-  document.querySelector<HTMLButtonElement>("#btnCloseResults")?.addEventListener("click", () => {
-    closeModal();
-  });
-
-  let inFlight = false;
-  const runSubmit = async (): Promise<void> => {
-    if (inFlight || !formalSubmission) return;
-    inFlight = true;
-    if (btnRetrySubmit) btnRetrySubmit.style.display = "none";
-    if (submitStatus) submitStatus.textContent = "正在提交到服务器，请稍候…";
-    const outcome = await submitSubmissionWithFallback(formalSubmission);
-    if (outcome === "sent") {
-      if (submitStatus) submitStatus.textContent = "数据已成功保存到服务器。";
-      void flushPendingSubmissions();
-    } else {
-      if (submitStatus) {
-        submitStatus.textContent =
-          "网络异常，数据已暂存于当前设备；恢复联网后将自动补传，可点击重试。";
-      }
-      if (btnRetrySubmit) btnRetrySubmit.style.display = "inline-flex";
-    }
-    inFlight = false;
-  };
-
-  btnRetrySubmit?.addEventListener("click", () => {
-    void runSubmit();
-  });
-  void runSubmit();
 }
 
 els.btnStart.addEventListener("click", () => {
@@ -594,10 +645,6 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-const minimapCtx = els.minimap.getContext("2d");
-const minimapBase = document.createElement("canvas");
-const minimapBaseCtx = minimapBase.getContext("2d");
-let minimapBaseKey = "";
 let lastPhase: typeof engine.state.phase = engine.state.phase;
 let finishGate = false;
 
@@ -613,18 +660,71 @@ const hudCache = {
   lightGreen: null as boolean | null
 };
 
-updateTopHints();
-updateMinimapVisibility();
-void flushPendingSubmissions();
-showRevealModeSelect();
+async function bootstrapDesktopApp(): Promise<void> {
+  await waitForExperimentFonts();
+  document.body.classList.remove("app-fonts-loading");
+  document.body.classList.add("app-fonts-ready");
+  void flushPendingSubmissions();
+
+  world = new World2D(els.canvas, currentConfig);
+  lastPhase = engine.state.phase;
+  finishGate = false;
+
+  renderDesktopPreflightGate();
+  loop();
+}
+
+void bootstrapDesktopApp();
 
 window.addEventListener("online", () => {
   void flushPendingSubmissions();
 });
 
+window.addEventListener("resize", () => {
+  renderDesktopPreflightGate();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (
+    !desktopInputProof.keyboard &&
+    !e.metaKey &&
+    !e.ctrlKey &&
+    !e.altKey &&
+    !["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab"].includes(e.key)
+  ) {
+    desktopInputProof.keyboard = true;
+    renderDesktopPreflightGate();
+  }
+});
+
+window.addEventListener("mousemove", () => {
+  if (!desktopInputProof.mouseMove) {
+    desktopInputProof.mouseMove = true;
+    renderDesktopPreflightGate();
+  }
+});
+
+window.addEventListener("mousedown", () => {
+  if (!desktopInputProof.mouseClick) {
+    desktopInputProof.mouseClick = true;
+    renderDesktopPreflightGate();
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  const nowMs = performance.now();
+  if (document.hidden) {
+    engine.pause(nowMs);
+    return;
+  }
+  engine.resume(nowMs);
+  renderDesktopPreflightGate();
+});
+
 function updateHud(): void {
   const s = engine.state;
-  const nextWalkDisabled = s.phase === "idle" || s.phase === "finished";
+  // "移动" button: only enabled during waiting_red with red light
+  const nextWalkDisabled = s.phase !== "waiting_red" || s.currentLightColor !== "red";
   const nextStartDisabled = s.phase !== "idle";
   if (hudCache.btnWalkDisabled !== nextWalkDisabled) {
     els.btnWalk.disabled = nextWalkDisabled;
@@ -646,14 +746,17 @@ function updateHud(): void {
   if (s.phase !== "idle") {
     if (s.phase === "finished") {
       posText = "已完成";
-    } else if (currentConfig.revealMode === "full") {
-      posText = `交通信号灯${s.lightIndex}（${s.lightIndex}/${currentConfig.numLights}）`;
-    } else {
-      posText = s.phase === "moving" ? "非交通信号灯" : "交通信号灯";
+    } else if (s.phase === "moving") {
+      posText = "走向红绿灯";
+    } else if (s.phase === "waiting_red") {
+      posText = "红绿灯前等待";
+    } else if (s.phase === "moving_to_finish") {
+      posText = "冲向终点线";
     }
     timeText = formatSeconds(s.elapsedSec, 1);
     moneyText = formatMoney(s.money);
-    moneyUrgent = s.money <= 5 || Math.floor(s.elapsedSec * 2) % 2 === 0;
+    const pulseRate = 2.4;
+    moneyUrgent = s.phase !== "finished" && Math.floor(s.elapsedSec * pulseRate) % 2 === 0;
 
     if (s.phase === "moving") {
       lightText = "行走中";
@@ -662,6 +765,8 @@ function updateHud(): void {
       lightText = isRed ? "🔴 红灯" : "🟢 绿灯";
       lightRed = isRed;
       lightGreen = !isRed;
+    } else if (s.phase === "moving_to_finish") {
+      lightText = "已通过";
     } else if (s.phase === "finished") {
       lightText = "✅ 完成";
     }
@@ -697,100 +802,6 @@ function updateHud(): void {
   }
 }
 
-function drawMinimap(): void {
-  if (!minimapCtx) return;
-  const w = els.minimap.width;
-  const h = els.minimap.height;
-
-  const dpr = window.devicePixelRatio || 1;
-  const cssW = Math.round(els.minimap.clientWidth);
-  const cssH = Math.round(els.minimap.clientHeight);
-  if (cssW <= 0 || cssH <= 0) return;
-  const targetW = Math.round(cssW * dpr);
-  const targetH = Math.round(cssH * dpr);
-  if (w !== targetW || h !== targetH) {
-    els.minimap.width = targetW;
-    els.minimap.height = targetH;
-  }
-
-  const pad = Math.max(10 * dpr, Math.min(14 * dpr, targetW * 0.09));
-  const x0 = pad;
-  const x1 = els.minimap.width - pad;
-  const y = els.minimap.height / 2;
-
-  const nextBaseKey = `${targetW}x${targetH}`;
-  if (minimapBaseCtx && minimapBaseKey !== nextBaseKey) {
-    minimapBase.width = targetW;
-    minimapBase.height = targetH;
-    minimapBaseCtx.clearRect(0, 0, targetW, targetH);
-    minimapBaseCtx.strokeStyle = "rgba(255,255,255,0.12)";
-    minimapBaseCtx.lineWidth = 3 * dpr;
-    minimapBaseCtx.lineCap = "round";
-    minimapBaseCtx.beginPath();
-    minimapBaseCtx.moveTo(x0, y);
-    minimapBaseCtx.lineTo(x1, y);
-    minimapBaseCtx.stroke();
-    minimapBaseCtx.fillStyle = "rgba(255,255,255,0.35)";
-    minimapBaseCtx.beginPath();
-    minimapBaseCtx.arc(x0, y, 3 * dpr, 0, Math.PI * 2);
-    minimapBaseCtx.fill();
-    minimapBaseCtx.fillStyle = "rgba(255,255,255,0.35)";
-    minimapBaseCtx.fillRect(x1 - 1 * dpr, y - 8 * dpr, 2 * dpr, 16 * dpr);
-    minimapBaseCtx.fillStyle = "rgba(0,194,255,0.45)";
-    minimapBaseCtx.fillRect(x1 + 1 * dpr, y - 8 * dpr, 6 * dpr, 5 * dpr);
-    minimapBaseKey = nextBaseKey;
-  }
-
-  minimapCtx.clearRect(0, 0, els.minimap.width, els.minimap.height);
-  if (minimapBaseKey === nextBaseKey) {
-    minimapCtx.drawImage(minimapBase, 0, 0);
-  }
-
-  const p = engine.getRouteProgress01();
-  const px = x0 + (x1 - x0) * p;
-  const progressGrad = minimapCtx.createLinearGradient(x0, 0, px, 0);
-  progressGrad.addColorStop(0, "rgba(0,194,255,0.15)");
-  progressGrad.addColorStop(1, "rgba(0,194,255,0.55)");
-  minimapCtx.strokeStyle = progressGrad;
-  minimapCtx.lineWidth = 3 * dpr;
-  minimapCtx.beginPath();
-  minimapCtx.moveTo(x0, y);
-  minimapCtx.lineTo(px, y);
-  minimapCtx.stroke();
-
-  // lights
-  const n = currentConfig.numLights;
-  const s = engine.state;
-  for (let i = 1; i <= n; i++) {
-    const t = i / n;
-    const lx = x0 + (x1 - x0) * t;
-    // Determine color: passed lights are green, upcoming are red
-    let dotColor = "rgba(255,255,255,0.45)";
-    if (s.phase !== "idle") {
-      if (i < s.lightIndex) {
-        dotColor = "rgba(82,196,26,0.8)";
-      } else if (i === s.lightIndex && s.phase === "waiting_red") {
-        dotColor = s.currentLightColor === "red" ? "rgba(255,77,79,0.9)" : "rgba(82,196,26,0.9)";
-      } else {
-        dotColor = "rgba(255,77,79,0.55)";
-      }
-    }
-    minimapCtx.fillStyle = dotColor;
-    minimapCtx.beginPath();
-    minimapCtx.arc(lx, y, 4.2 * dpr, 0, Math.PI * 2);
-    minimapCtx.fill();
-  }
-
-  // avatar marker with glow
-  minimapCtx.shadowColor = "rgba(0,194,255,0.6)";
-  minimapCtx.shadowBlur = 8 * dpr;
-  minimapCtx.fillStyle = "rgba(0,194,255,0.95)";
-  minimapCtx.beginPath();
-  minimapCtx.arc(px, y, 6.2 * dpr, 0, Math.PI * 2);
-  minimapCtx.fill();
-  minimapCtx.shadowColor = "transparent";
-  minimapCtx.shadowBlur = 0;
-}
 
 function loop(): void {
   const nowMs = performance.now();
@@ -798,17 +809,12 @@ function loop(): void {
 
   world?.render(engine.state, engine.getRouteProgress01(), nowMs);
   updateHud();
-  if (currentConfig.revealMode === "full" && world) drawMinimap();
 
   if (!finishGate && lastPhase !== engine.state.phase) {
     lastPhase = engine.state.phase;
     if (engine.state.phase === "finished") {
       finishGate = true;
-      if (runKind === "practice") {
-        showPracticeComplete();
-      } else {
-        showPostQuestion();
-      }
+      showPostQuestion();
     }
   } else {
     lastPhase = engine.state.phase;
@@ -817,4 +823,4 @@ function loop(): void {
   requestAnimationFrame(loop);
 }
 
-loop();
+}

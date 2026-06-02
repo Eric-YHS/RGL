@@ -9,7 +9,7 @@ export type ExperimentConfig = {
   moneyLossPerSec: number;
 };
 
-export type Phase = "idle" | "moving" | "waiting_red" | "finished";
+export type Phase = "idle" | "moving" | "waiting_red" | "moving_to_finish" | "finished";
 
 export type LightColor = "red" | "green";
 
@@ -20,11 +20,13 @@ export type ExperimentState = {
   money: number;
   violations: number;
   passedOutcome: Array<"green" | "run_red" | null>;
+  lightGreenAtSecByIndex: Array<number | null>;
 
-  segmentProgressSec: number; // moving 时有效
+  segmentProgressSec: number; // moving / moving_to_finish 时有效
   waitingSinceSec: number | null; // waiting_red 时有效
   greenAtSec: number | null; // waiting_red 时有效
   autoPassAtSec: number | null; // 绿灯后自动通行的时间点
+  waitingForWalkSec: number | null; // 绿灯后等待参与者点击"移动"的起始时间
   currentLightColor: LightColor;
 };
 

@@ -257,9 +257,11 @@ function formatPhase(phase: Phase): string {
     case "idle":
       return "未开始";
     case "moving":
-      return "行走中";
+      return "走向红绿灯";
     case "waiting_red":
       return "红灯等待";
+    case "moving_to_finish":
+      return "冲向终点";
     case "finished":
       return "已完成";
   }
