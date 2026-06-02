@@ -1,24 +1,9 @@
 import type { ExperimentConfig, ExperimentState, Phase } from "../experiment/types";
-import candidateAWalkingSheetUrl from "../assets/pedestrian/candidate-a-icons8-ios7-walking-sheet.png";
-import candidateAStandPngUrl from "../assets/pedestrian/candidate-a-icons8-ios7-walking-stand.png";
 import greenSignalBmpUrl from "../assets/kimbrough-rf/green.bmp";
-import manBmpUrl from "../assets/kimbrough-rf/man.bmp";
-import humanMaleWalkingSpriteSheetUrl from "../assets/pedestrian/human-male-walking.png";
 import redSignalBmpUrl from "../assets/kimbrough-rf/red.bmp";
 
 type SignalGlyphCrop = { x: number; y: number; w: number; h: number };
 type SignalGlyphKind = "red" | "green";
-type CanvasPoint = { x: number; y: number };
-type PedestrianPoseFrame = {
-  torso: CanvasPoint[];
-  leftArm: CanvasPoint[];
-  rightArm: CanvasPoint[];
-  leftLeg: CanvasPoint[];
-  rightLeg: CanvasPoint[];
-  headCenter: CanvasPoint;
-  headR: number;
-  shadowScaleX: number;
-};
 
 const RED_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 17, y: 8, w: 15, h: 35 };
 const GREEN_SIGNAL_GLYPH_CROP: SignalGlyphCrop = { x: 14, y: 52, w: 24, h: 28 };
@@ -26,243 +11,16 @@ const SIGNAL_RED_ON = "#c32128";
 const SIGNAL_RED_OFF = "#35171a";
 const SIGNAL_GREEN_ON = "#1c7a3b";
 const SIGNAL_GREEN_OFF = "#162a1b";
-const PED_SPRITE_FRAME_WIDTH = 16;
-const PED_SPRITE_FRAME_HEIGHT = 32;
-const PED_STAND_FRAME_INDEX = 0;
-const PED_WALK_SEQUENCE = [0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1];
-const CANDIDATE_PED_FRAME_WIDTH = 50;
-const CANDIDATE_PED_FRAME_HEIGHT = 50;
-const CANDIDATE_PED_FRAME_DURATIONS_MS = [
-  40, 40, 50, 40, 40, 40, 40, 40, 50, 40, 40, 40, 40, 40,
-  50, 40, 40, 40, 40, 40, 50, 40, 40, 40, 40, 40, 50, 40
-];
 const UI_FONT_FAMILY = '"Experiment Sans", sans-serif';
 const MONEY_FONT_FAMILY = '"Experiment Mono", monospace';
-const STAND_PED_POSE: PedestrianPoseFrame = {
-  torso: [
-    { x: -8, y: -86 },
-    { x: 8, y: -86 },
-    { x: 11, y: -60 },
-    { x: 4, y: -38 },
-    { x: -4, y: -38 },
-    { x: -11, y: -60 }
-  ],
-  leftArm: [
-    { x: -7, y: -82 },
-    { x: -14, y: -62 },
-    { x: -10, y: -42 }
-  ],
-  rightArm: [
-    { x: 7, y: -82 },
-    { x: 13, y: -60 },
-    { x: 9, y: -42 }
-  ],
-  leftLeg: [
-    { x: -4, y: -38 },
-    { x: -7, y: -15 },
-    { x: -13, y: 0 }
-  ],
-  rightLeg: [
-    { x: 4, y: -38 },
-    { x: 8, y: -15 },
-    { x: 12, y: 0 }
-  ],
-  headCenter: { x: 0, y: -102 },
-  headR: 10,
-  shadowScaleX: 1
-};
-const WALK_PED_POSES: PedestrianPoseFrame[] = [
-  {
-    torso: [
-      { x: -10, y: -86 },
-      { x: 7, y: -82 },
-      { x: 11, y: -58 },
-      { x: 3, y: -38 },
-      { x: -6, y: -40 },
-      { x: -13, y: -62 }
-    ],
-    leftArm: [
-      { x: -6, y: -81 },
-      { x: -12, y: -66 },
-      { x: -11, y: -46 }
-    ],
-    rightArm: [
-      { x: 6, y: -79 },
-      { x: 13, y: -64 },
-      { x: 16, y: -47 }
-    ],
-    leftLeg: [
-      { x: -4, y: -38 },
-      { x: -9, y: -17 },
-      { x: -24, y: 0 }
-    ],
-    rightLeg: [
-      { x: 4, y: -38 },
-      { x: 9, y: -14 },
-      { x: 17, y: 0 }
-    ],
-    headCenter: { x: -1, y: -103 },
-    headR: 10,
-    shadowScaleX: 1.08
-  },
-  {
-    torso: [
-      { x: -9, y: -85 },
-      { x: 8, y: -84 },
-      { x: 11, y: -58 },
-      { x: 4, y: -38 },
-      { x: -4, y: -38 },
-      { x: -11, y: -59 }
-    ],
-    leftArm: [
-      { x: -6, y: -81 },
-      { x: -10, y: -62 },
-      { x: -8, y: -44 }
-    ],
-    rightArm: [
-      { x: 6, y: -80 },
-      { x: 11, y: -62 },
-      { x: 9, y: -44 }
-    ],
-    leftLeg: [
-      { x: -4, y: -38 },
-      { x: -8, y: -17 },
-      { x: -11, y: 0 }
-    ],
-    rightLeg: [
-      { x: 4, y: -38 },
-      { x: 7, y: -17 },
-      { x: 12, y: 0 }
-    ],
-    headCenter: { x: 0, y: -101 },
-    headR: 10,
-    shadowScaleX: 0.94
-  },
-  {
-    torso: [
-      { x: -7, y: -82 },
-      { x: 10, y: -86 },
-      { x: 13, y: -62 },
-      { x: 6, y: -40 },
-      { x: -3, y: -38 },
-      { x: -11, y: -58 }
-    ],
-    leftArm: [
-      { x: -6, y: -79 },
-      { x: -13, y: -64 },
-      { x: -16, y: -47 }
-    ],
-    rightArm: [
-      { x: 6, y: -81 },
-      { x: 12, y: -66 },
-      { x: 11, y: -46 }
-    ],
-    leftLeg: [
-      { x: -4, y: -38 },
-      { x: -9, y: -14 },
-      { x: -17, y: 0 }
-    ],
-    rightLeg: [
-      { x: 4, y: -38 },
-      { x: 9, y: -17 },
-      { x: 24, y: 0 }
-    ],
-    headCenter: { x: 1, y: -103 },
-    headR: 10,
-    shadowScaleX: 1.08
-  },
-  {
-    torso: [
-      { x: -8, y: -84 },
-      { x: 9, y: -85 },
-      { x: 12, y: -59 },
-      { x: 4, y: -38 },
-      { x: -4, y: -38 },
-      { x: -11, y: -58 }
-    ],
-    leftArm: [
-      { x: -6, y: -80 },
-      { x: -11, y: -62 },
-      { x: -9, y: -44 }
-    ],
-    rightArm: [
-      { x: 6, y: -81 },
-      { x: 10, y: -62 },
-      { x: 8, y: -44 }
-    ],
-    leftLeg: [
-      { x: -4, y: -38 },
-      { x: -7, y: -17 },
-      { x: -12, y: 0 }
-    ],
-    rightLeg: [
-      { x: 4, y: -38 },
-      { x: 8, y: -17 },
-      { x: 11, y: 0 }
-    ],
-    headCenter: { x: 0, y: -101 },
-    headR: 10,
-    shadowScaleX: 0.94
-  }
-];
+const CIRCLE_RADIUS = 18;
+const CIRCLE_COLOR = "#2563eb";
 
 function loadCanvasImage(src: string): HTMLImageElement {
   const img = new Image();
   img.decoding = "async";
   img.src = src;
   return img;
-}
-
-/* Deterministic PRNG (mulberry32) for reproducible uneven spacing */
-function mulberry32(seed: number): () => number {
-  let s = seed | 0;
-  return () => {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const SEQUENTIAL_POSITION_TEMPLATES: Record<number, number[][]> = {
-  2: [
-    [0.22, 0.72],
-    [0.19, 0.68],
-    [0.27, 0.76]
-  ],
-  5: [
-    [0.16, 0.42, 0.54, 0.75, 0.85],
-    [0.18, 0.30, 0.56, 0.69, 0.84],
-    [0.14, 0.39, 0.51, 0.77, 0.87]
-  ]
-};
-
-/**
- * Generate uneven spacing ratios for sequential mode.
- * Returns cumulative positions in [0,1] for each light.
- * Uses a fixed seed so every participant gets the same layout.
- */
-function generateUnevenPositions(numLights: number, seed = 42): number[] {
-  const templates = SEQUENTIAL_POSITION_TEMPLATES[numLights];
-  if (templates && templates.length > 0) {
-    const templateIndex = Math.abs(seed) % templates.length;
-    return templates[templateIndex].slice();
-  }
-
-  const rng = mulberry32(seed);
-  const raw: number[] = [];
-  for (let i = 0; i <= numLights; i++) {
-    const edge = i === 0 || i === numLights;
-    raw.push(edge ? 0.9 + rng() * 0.45 : 0.55 + rng() * 2.0);
-  }
-  const total = raw.reduce((a, b) => a + b, 0);
-  const positions: number[] = [];
-  let cum = 0;
-  for (let i = 0; i < numLights; i++) {
-    cum += raw[i] / total;
-    positions.push(cum);
-  }
-  return positions;
 }
 
 export class World2D {
@@ -281,33 +39,16 @@ export class World2D {
   private roadH = 0;
   private roadLeft = 0;
   private roadRight = 0;
-  private lightXs: number[] = [];
-  private lightPositions01: number[] = []; // normalized [0,1] positions of lights on route
-  private figH = 0;
-  private lastAvatarX = -1; // track movement to decide walk animation
-  private smoothAvatarX = -1; // smoothed position to prevent jumps
+  private lightX = 0;
+  private finishLineX = 0;
+  private lastAvatarX = -1;
+  private smoothAvatarX = -1;
   private readonly redSignalSprite = loadCanvasImage(redSignalBmpUrl);
   private readonly greenSignalSprite = loadCanvasImage(greenSignalBmpUrl);
-  private readonly candidatePedestrianStandSprite = loadCanvasImage(candidateAStandPngUrl);
-  private readonly candidatePedestrianWalkSheet = loadCanvasImage(candidateAWalkingSheetUrl);
-  private readonly originalPedestrianSprite = loadCanvasImage(manBmpUrl);
-  private readonly pedestrianSpriteSheet = loadCanvasImage(humanMaleWalkingSpriteSheetUrl);
   private redSignalGlyph: HTMLCanvasElement | null = null;
   private greenSignalGlyph: HTMLCanvasElement | null = null;
-  private candidatePedestrianStandGlyph: HTMLCanvasElement | null = null;
-  private candidatePedestrianUnavailable = false;
-  private candidatePedestrianWalkGlyphFrames: (HTMLCanvasElement | null)[] = [];
-  private originalPedestrianGlyph: HTMLCanvasElement | null = null;
-  private originalPedestrianUnavailable = false;
-  private pedestrianGlyphFrames: (HTMLCanvasElement | null)[] = [];
-  private fogFadeLeftX = -1;
-  private fogFadeRightX = -1;
   private lastMoneyPulseStep: number | null = null;
   private moneyPulseUntilMs = 0;
-
-  /* Fog parameters for sequential mode */
-  private readonly fogLeadPx = 0.03; // how far ahead of avatar (as fraction of road width) is clear
-  private readonly fogFadePx = 0.04; // fade zone width as fraction of road width
 
   constructor(canvas: HTMLCanvasElement, config: ExperimentConfig) {
     this.canvas = canvas;
@@ -345,7 +86,6 @@ export class World2D {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cssW = parent.clientWidth;
     const cssH = parent.clientHeight;
-    const compactPortrait = cssH > cssW && cssW <= 560;
     this.canvas.width = Math.round(cssW * this.dpr);
     this.canvas.height = Math.round(cssH * this.dpr);
     this.canvas.style.width = `${cssW}px`;
@@ -353,79 +93,24 @@ export class World2D {
     this.w = cssW;
     this.h = cssH;
 
-    const defaultRoadY = this.h * (compactPortrait ? 0.6 : 0.59);
-    this.roadH = this.h * (compactPortrait ? 0.098 : 0.104);
+    const defaultRoadY = this.h * 0.59;
+    this.roadH = this.h * 0.104;
     this.roadLeft = this.w * 0.08;
     this.roadRight = this.w * 0.92;
     const manualSceneDownShiftPx = 20;
-    this.roadY =
-      defaultRoadY +
-      this.getDesktopSceneDownShift(parent, compactPortrait, defaultRoadY) +
-      manualSceneDownShiftPx;
-    this.syncStageAnchors(parent, compactPortrait);
-
-    const n = this.config.numLights;
-    const isSequential = this.config.revealMode === "sequential";
-
-    if (isSequential) {
-      // Uneven spacing with fixed seed
-      this.lightPositions01 = generateUnevenPositions(n);
-    } else {
-      // Even spacing
-      this.lightPositions01 = [];
-      for (let i = 1; i <= n; i++) {
-        this.lightPositions01.push(i / (n + 1));
-      }
-    }
+    this.roadY = defaultRoadY + manualSceneDownShiftPx;
 
     const roadW = this.roadRight - this.roadLeft;
-    this.lightXs = this.lightPositions01.map((p) => this.roadLeft + roadW * p);
+    this.lightX = this.roadLeft + roadW * 0.4;
+    this.finishLineX = this.roadLeft + roadW * 0.85;
 
-    this.figH = Math.min(70, this.h * 0.12);
-    this.resetFogTracking();
+    this.syncStageAnchors(parent);
   }
 
-  private getDesktopSceneDownShift(
-    parent: HTMLElement,
-    compactPortrait: boolean,
-    defaultRoadY: number
-  ): number {
-    if (compactPortrait) return 0;
-
-    const statusPanel = parent.querySelector<HTMLElement>(".panel-status");
-    if (!statusPanel) return 0;
-
-    const parentRect = parent.getBoundingClientRect();
-    const statusRect = statusPanel.getBoundingClientRect();
-    const statusBottomY = statusRect.bottom - parentRect.top;
-    if (!Number.isFinite(statusBottomY)) return 0;
-
-    const { poleH, housingH } = this.getTrafficLightMetrics(compactPortrait);
-    const currentLightTopY = defaultRoadY - this.roadH / 2 - poleH - housingH;
-    const rawShift = statusBottomY - currentLightTopY;
-    const alignmentBias = Math.min(16, this.h * 0.018);
-    const desiredShift = Math.max(0, rawShift) + alignmentBias;
-    const maxShift = this.h * 0.075;
-
-    return Math.min(maxShift, desiredShift);
-  }
-
-  private getTrafficLightMetrics(compactPortrait: boolean): {
-    poleH: number;
-    housingH: number;
-  } {
-    const trafficLightScale = compactPortrait ? 1 : 1.52;
-    return {
-      poleH: this.h * 0.14 * (compactPortrait ? 1 : 1.12),
-      housingH: 42 * trafficLightScale
-    };
-  }
-
-  private syncStageAnchors(parent: HTMLElement, compactPortrait: boolean): void {
+  private syncStageAnchors(parent: HTMLElement): void {
     const roadBottomY = this.roadY + this.roadH / 2;
     const lowerBlankHeight = Math.max(0, this.h - roadBottomY);
-    const walkCenterFactor = compactPortrait ? 0.48 : 0.44;
-    const walkCenterY = roadBottomY + lowerBlankHeight * walkCenterFactor;
+    const walkCenterY = roadBottomY + lowerBlankHeight * 0.44;
     parent.style.setProperty("--walk-center-y", `${walkCenterY}px`);
   }
 
@@ -460,43 +145,27 @@ export class World2D {
     try {
       this.drawBackground(ctx);
       this.drawRoad(ctx);
+      this.drawFinishLine(ctx);
+      this.drawCrosswalk(ctx, this.lightX);
+      this.drawTrafficLight(ctx, this.lightX, this.getTrafficLightColor(state), "top", nowMs);
 
-      // Crosswalks & traffic lights
-      for (let i = 0; i < this.config.numLights; i++) {
-        const x = this.lightXs[i];
-        this.drawCrosswalk(ctx, x);
-
-        this.drawTrafficLight(ctx, x, this.getTrafficLightColor(state, i + 1), "top", nowMs);
-      }
-
-      // Stick figure — interpolate between actual light X positions
-      const stopOffset = 28; // pixels before the light pole
-      const targetX = this.computeAvatarX(state, progress01, stopOffset);
-
-      // Smooth movement: limit max jump per frame to prevent teleporting
-      const maxStepPx = 8; // max pixels per frame (~480px/sec at 60fps)
+      // Circle avatar
+      const targetX = this.computeAvatarX(state);
+      const maxStepPx = 8;
       if (this.smoothAvatarX < 0) {
-        this.smoothAvatarX = targetX; // first frame
+        this.smoothAvatarX = targetX;
       } else if (Math.abs(targetX - this.smoothAvatarX) > maxStepPx) {
-        // Move toward target at max speed
         this.smoothAvatarX += Math.sign(targetX - this.smoothAvatarX) * maxStepPx;
       } else {
         this.smoothAvatarX = targetX;
       }
-      if (state.phase === "idle") this.smoothAvatarX = targetX; // reset on idle
+      if (state.phase === "idle") this.smoothAvatarX = targetX;
 
       const avatarX = this.smoothAvatarX;
-      this.drawStickFigure(ctx, avatarX, state.phase, nowMs, avatarX !== this.lastAvatarX);
+      this.drawCircle(ctx, avatarX, state.phase, nowMs, avatarX !== this.lastAvatarX);
       this.lastAvatarX = avatarX;
 
-      // Fog overlay for sequential mode (drawn after scene, before money overlay)
-      if (this.config.revealMode === "sequential") {
-        this.drawFog(ctx, state, avatarX);
-      }
-
       this.drawPressureVignette(ctx, state.money, this.config.startMoney, nowMs, state.phase);
-
-      // Prominent money overlay (always on top)
       this.drawMoneyOverlay(ctx, state.money, this.config.startMoney, nowMs, state.phase);
     } finally {
       ctx.restore();
@@ -508,14 +177,12 @@ export class World2D {
   /* ------------------------------------------------------------------ */
 
   private drawBackground(ctx: CanvasRenderingContext2D): void {
-    // Sky gradient
     const skyGrad = ctx.createLinearGradient(0, 0, 0, this.roadY - this.roadH);
     skyGrad.addColorStop(0, "#b8dced");
     skyGrad.addColorStop(1, "#ddeef6");
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, this.w, this.roadY - this.roadH / 2);
 
-    // Ground
     ctx.fillStyle = "#c8d8c0";
     ctx.fillRect(0, this.roadY + this.roadH / 2, this.w, this.h - (this.roadY + this.roadH / 2));
   }
@@ -527,15 +194,12 @@ export class World2D {
   private drawRoad(ctx: CanvasRenderingContext2D): void {
     const top = this.roadY - this.roadH / 2;
 
-    // Sidewalk edges
     ctx.fillStyle = "#b0b0a8";
     ctx.fillRect(0, top - 4, this.w, this.roadH + 8);
 
-    // Asphalt
     ctx.fillStyle = "#6b6b6b";
     ctx.fillRect(0, top, this.w, this.roadH);
 
-    // Dashed center line
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.5)";
     ctx.lineWidth = 2;
@@ -544,6 +208,42 @@ export class World2D {
     ctx.moveTo(0, this.roadY);
     ctx.lineTo(this.w, this.roadY);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Finish line                                                        */
+  /* ------------------------------------------------------------------ */
+
+  private drawFinishLine(ctx: CanvasRenderingContext2D): void {
+    const x = this.finishLineX;
+    const top = this.roadY - this.roadH / 2;
+    const bottom = this.roadY + this.roadH / 2;
+    const checkerSize = 6;
+    const lineW = 18;
+
+    ctx.save();
+    // Draw checkerboard pattern
+    for (let row = 0; row * checkerSize < (bottom - top); row++) {
+      for (let col = 0; col * checkerSize < lineW; col++) {
+        const isWhite = (row + col) % 2 === 0;
+        ctx.fillStyle = isWhite ? "#ffffff" : "#1a1a1a";
+        ctx.fillRect(
+          x - lineW / 2 + col * checkerSize,
+          top + row * checkerSize,
+          checkerSize,
+          checkerSize
+        );
+      }
+    }
+    ctx.restore();
+
+    // Label
+    ctx.save();
+    ctx.font = `700 12px ${UI_FONT_FAMILY}`;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#333";
+    ctx.fillText("终点线", x, bottom + 18);
     ctx.restore();
   }
 
@@ -578,8 +278,8 @@ export class World2D {
     side: "top" | "bottom",
     nowMs: number
   ): void {
-    const trafficLightScale = this.getTrafficLightScale();
-    const poleH = this.h * 0.14 * (this.isCompactPortraitLayout() ? 1 : 1.12);
+    const trafficLightScale = 1.52;
+    const poleH = this.h * 0.14 * 1.12;
     const poleW = 3 * trafficLightScale;
     const housingW = 20 * trafficLightScale;
     const housingH = 42 * trafficLightScale;
@@ -595,11 +295,9 @@ export class World2D {
     const poleTop = roadEdge + dir * poleH;
     const poleBottom = roadEdge;
 
-    // Pole
     ctx.fillStyle = "#444";
     ctx.fillRect(x - poleW / 2, Math.min(poleTop, poleBottom), poleW, poleH);
 
-    // Housing
     const hx = x - housingW / 2;
     const hy = side === "top" ? poleTop - housingH : poleTop;
 
@@ -607,17 +305,13 @@ export class World2D {
     this.roundRect(ctx, hx, hy, housingW, housingH, 5 * trafficLightScale);
     ctx.fill();
 
-    // Bulbs: red on top, green on bottom within housing
     const cx = x;
     const redCY = hy + housingH / 2 - bulbSpacing / 2;
     const greenCY = hy + housingH / 2 + bulbSpacing / 2;
 
-    // Pulse for active light
     const pulse = 0.7 + 0.3 * Math.abs(Math.sin(nowMs * 0.005));
 
-    // Red bulb
     this.drawBulb(ctx, cx, redCY, bulbR, color === "red", SIGNAL_RED_ON, SIGNAL_RED_OFF, pulse);
-    // Green bulb
     this.drawBulb(ctx, cx, greenCY, bulbR, color === "green", SIGNAL_GREEN_ON, SIGNAL_GREEN_OFF, pulse);
 
     if (color === "red") {
@@ -629,19 +323,21 @@ export class World2D {
     }
   }
 
-  private getTrafficLightColor(
-    state: ExperimentState,
-    lightIdx: number
-  ): "red" | "green" | "off" {
+  private getTrafficLightColor(state: ExperimentState): "red" | "green" | "off" {
     if (state.phase === "idle") return "red";
     if (state.phase === "finished") {
-      return this.getResolvedPassedLightColor(state, lightIdx);
+      const outcome = state.passedOutcome[1];
+      if (outcome === "green") return "green";
+      return "red";
     }
-    if (lightIdx < state.lightIndex) {
-      return this.getResolvedPassedLightColor(state, lightIdx);
-    }
-    if (lightIdx === state.lightIndex && state.phase === "waiting_red") {
+    if (state.phase === "waiting_red") {
       return state.currentLightColor;
+    }
+    // moving or moving_to_finish: show the resolved color
+    if (state.phase === "moving_to_finish") {
+      const outcome = state.passedOutcome[1];
+      if (outcome === "green") return "green";
+      return "red";
     }
     return "red";
   }
@@ -784,151 +480,64 @@ export class World2D {
     ctx.restore();
   }
 
-  private getTrafficLightScale(): number {
-    return this.isCompactPortraitLayout() ? 1 : 1.52;
-  }
-
   private isRenderableImage(img: HTMLImageElement): boolean {
     return img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
   }
 
   /* ------------------------------------------------------------------ */
-  /*  Fog (sequential mode)                                              */
+  /*  Circle avatar                                                      */
   /* ------------------------------------------------------------------ */
 
-  private drawFog(ctx: CanvasRenderingContext2D, state: ExperimentState, avatarX: number): void {
-    if (state.phase === "idle") {
-      this.resetFogTracking();
+  private computeAvatarX(state: ExperimentState): number {
+    const stopOffset = CIRCLE_RADIUS + 10;
+
+    if (state.phase === "idle") return this.roadLeft + CIRCLE_RADIUS;
+
+    if (state.phase === "finished") return this.finishLineX;
+
+    const seg = this.config.segmentDurationSec;
+
+    if (state.phase === "moving") {
+      const fromX = this.roadLeft + CIRCLE_RADIUS;
+      const toX = this.lightX - stopOffset;
+      const fraction = Math.min(1, state.segmentProgressSec / seg);
+      return fromX + (toX - fromX) * fraction;
     }
 
-    const roadW = this.roadRight - this.roadLeft;
-    const baseFadeW = this.getFogFadeWidthPx(roadW);
-    const currentTargetX = state.phase !== "idle" && state.phase !== "finished"
-      ? this.lightXs[state.lightIndex - 1]
-      : undefined;
-    const clearEndX = this.getFogClearEndX(state, avatarX, roadW, currentTargetX);
-    let fadeLeft = Math.max(0, clearEndX);
-    let fogSolidX = fadeLeft + baseFadeW;
-
-    if (state.phase !== "idle" && state.phase !== "finished") {
-      const nextHiddenX = this.lightXs[state.lightIndex];
-
-      if (currentTargetX !== undefined && nextHiddenX !== undefined) {
-        const revealCapX = nextHiddenX - this.getFogLightSafeHalfWidthPx();
-        fogSolidX = Math.min(fogSolidX, revealCapX);
-        fogSolidX = Math.max(fogSolidX, fadeLeft);
-      }
+    if (state.phase === "waiting_red") {
+      return this.lightX - stopOffset;
     }
 
-    if (this.fogFadeLeftX >= 0) {
-      fadeLeft = Math.max(fadeLeft, this.fogFadeLeftX);
-    }
-    if (this.fogFadeRightX >= 0) {
-      fogSolidX = Math.max(fogSolidX, this.fogFadeRightX);
-    }
-    fogSolidX = Math.max(fogSolidX, fadeLeft);
-
-    if (fogSolidX >= this.w) return;
-
-    ctx.save();
-    const fadeRight = Math.min(this.w, fogSolidX);
-    this.fogFadeLeftX = fadeLeft;
-    this.fogFadeRightX = fadeRight;
-
-    // Repaint background bands over the fogged area to fully hide scene elements.
-    // We draw three horizontal strips (sky, road area, ground) with horizontal
-    // alpha gradients so the transition is smooth.
-
-    const roadTop = this.roadY - this.roadH / 2 - 4; // include sidewalk
-    const roadBot = this.roadY + this.roadH / 2 + 4;
-
-    // [r,g,b] for each band to build proper transparent→solid gradients
-    const bands: Array<{ y: number; h: number; color: string; rgb: string }> = [
-      { y: 0, h: roadTop, color: "#ddeef6", rgb: "221,238,246" },
-      { y: roadTop, h: roadBot - roadTop, color: "#b0b0a8", rgb: "176,176,168" },
-      { y: roadBot, h: this.h - roadBot, color: "#c8d8c0", rgb: "200,216,192" }
-    ];
-
-    for (const band of bands) {
-      // Gradient fade zone: from transparent version of the SAME color to solid
-      if (fadeRight > fadeLeft) {
-        const grad = ctx.createLinearGradient(fadeLeft, 0, fadeRight, 0);
-        grad.addColorStop(0, `rgba(${band.rgb},0)`);
-        grad.addColorStop(1, `rgba(${band.rgb},1)`);
-        ctx.fillStyle = grad;
-        ctx.fillRect(fadeLeft, band.y, fadeRight - fadeLeft, band.h);
-      }
-
-      // Solid fog: fully repaint background from fadeRight to canvas edge
-      if (fadeRight < this.w) {
-        ctx.fillStyle = band.color;
-        ctx.fillRect(fadeRight, band.y, this.w - fadeRight, band.h);
-      }
+    if (state.phase === "moving_to_finish") {
+      const fromX = this.lightX - stopOffset;
+      const toX = this.finishLineX;
+      const fraction = Math.min(1, state.segmentProgressSec / seg);
+      return fromX + (toX - fromX) * fraction;
     }
 
-    ctx.restore();
+    return this.roadLeft + CIRCLE_RADIUS;
   }
 
-  /* ------------------------------------------------------------------ */
-  /*  Avatar position                                                    */
-  /* ------------------------------------------------------------------ */
-
-  private computeAvatarX(state: ExperimentState, _progress01: number, stopOffset: number): number {
-    if (state.phase === "idle") return this.roadLeft;
-
-    // When finished, stay at the last waiting position (no jump)
-    if (state.phase === "finished") {
-      const lastLightX = this.lightXs[this.lightXs.length - 1];
-      return lastLightX - stopOffset;
-    }
-
-    const idx = state.lightIndex; // 1-based, current target light
-    const targetLightX = this.lightXs[idx - 1];
-
-    // The stop point just before target light
-    const toX = targetLightX - stopOffset;
-
-    // Departure point: road start, or the stop position at the previous light
-    // (must match where the avatar was standing when waiting_red)
-    const fromX = idx <= 1
-      ? this.roadLeft
-      : this.lightXs[idx - 2] - stopOffset;
-
-    // segmentFraction: 0 at segment start, 1 when arrived at light
-    const segFrac = state.phase === "moving"
-      ? Math.min(1, state.segmentProgressSec / this.config.segmentDurationSec)
-      : 1; // waiting_red: fully arrived
-
-    return fromX + (toX - fromX) * segFrac;
-  }
-
-  /* ------------------------------------------------------------------ */
-  /*  Stick figure                                                       */
-  /* ------------------------------------------------------------------ */
-
-  private drawStickFigure(
+  private drawCircle(
     ctx: CanvasRenderingContext2D,
     x: number,
     phase: Phase,
     nowMs: number,
-    isActuallyMoving: boolean
+    isMoving: boolean
   ): void {
-    const h = this.figH;
     const footY = this.roadY + this.roadH / 2 + 8;
-    const pose = phase === "moving" || isActuallyMoving ? "walk" : "stand";
-    const pedFrame = this.getPreferredPedestrianFrame(pose, nowMs);
-    const usesLegacySprite = pedFrame?.source === "legacy";
-    const spriteCycle01 = usesLegacySprite && pose === "walk" ? this.getWalkSpriteCycle(nowMs) : 0;
-    const spriteBobY = usesLegacySprite && pose === "walk" ? this.getWalkSpriteBob(spriteCycle01, h) : 0;
+    const circleY = footY - CIRCLE_RADIUS - 4;
+    const isAnimating = phase === "moving" || phase === "moving_to_finish";
 
+    // Shadow
     ctx.save();
     ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
     ctx.beginPath();
     ctx.ellipse(
       x,
       footY + 3,
-      h * 0.16 * (pose === "walk" ? 1.05 : 0.96),
-      h * 0.04,
+      CIRCLE_RADIUS * (isAnimating ? 1.05 : 0.96),
+      CIRCLE_RADIUS * 0.22,
       0,
       0,
       Math.PI * 2
@@ -936,503 +545,38 @@ export class World2D {
     ctx.fill();
     ctx.restore();
 
-    if (pedFrame) {
-      this.drawPedestrianSpriteFrame(ctx, pedFrame, x, footY + spriteBobY, h, pose);
-    }
-  }
-
-  private getPreferredPedestrianFrame(
-    pose: "stand" | "walk",
-    nowMs: number
-  ): {
-    current: CanvasImageSource;
-    next: CanvasImageSource | null;
-    mix01: number;
-    source: "candidate" | "original" | "legacy";
-  } | null {
-    if (pose === "walk") {
-      const candidateWalkFrame = this.getCandidateAnimatedPedestrianFrame(nowMs);
-      if (candidateWalkFrame) {
-        return { ...candidateWalkFrame, source: "candidate" };
-      }
+    // Bounce animation when moving
+    let bounceY = 0;
+    if (isAnimating && isMoving) {
+      bounceY = Math.abs(Math.sin(nowMs * 0.008)) * 4;
     }
 
-    const candidateStandGlyph = this.getCandidateStandPedestrianGlyph();
-    if (candidateStandGlyph) {
-      return { current: candidateStandGlyph, next: null, mix01: 0, source: "candidate" };
-    }
-
-    const originalPedFrame = this.getOriginalPedestrianGlyph();
-    if (originalPedFrame) {
-      return { current: originalPedFrame, next: null, mix01: 0, source: "original" };
-    }
-
-    const legacyFrame = this.getPedestrianSpriteFrame(pose, nowMs);
-    return legacyFrame ? { ...legacyFrame, source: "legacy" } : null;
-  }
-
-  private getCandidateStandPedestrianGlyph(): HTMLCanvasElement | null {
-    if (this.candidatePedestrianUnavailable) return null;
-    if (this.candidatePedestrianStandGlyph) return this.candidatePedestrianStandGlyph;
-    if (!this.isRenderableImage(this.candidatePedestrianStandSprite)) return null;
-    try {
-      this.candidatePedestrianStandGlyph = this.preparePedestrianSprite(
-        this.candidatePedestrianStandSprite,
-        false
-      );
-    } catch (error) {
-      console.error("[World2D] failed to prepare candidate stand pedestrian sprite", error);
-      return null;
-    }
-    if (!this.candidatePedestrianStandGlyph) {
-      return null;
-    }
-    return this.candidatePedestrianStandGlyph;
-  }
-
-  private getCandidateAnimatedPedestrianFrame(
-    nowMs: number
-  ): { current: CanvasImageSource; next: CanvasImageSource | null; mix01: number } | null {
-    if (this.candidatePedestrianUnavailable) return null;
-    const glyphs = this.getCandidatePedestrianGlyphFrames();
-    if (glyphs.length === 0) return null;
-
-    const frameIndex = this.getCandidateWalkFrameIndex(nowMs);
-    const glyph = glyphs[frameIndex] ?? glyphs[0];
-    return glyph ? { current: glyph, next: null, mix01: 0 } : null;
-  }
-
-  private getCandidatePedestrianGlyphFrames(): HTMLCanvasElement[] {
-    if (!this.isRenderableImage(this.candidatePedestrianWalkSheet)) return [];
-
-    const frameCount = Math.max(
-      1,
-      Math.floor(this.candidatePedestrianWalkSheet.naturalWidth / CANDIDATE_PED_FRAME_WIDTH)
-    );
-    if (this.candidatePedestrianWalkGlyphFrames.length !== frameCount) {
-      this.candidatePedestrianWalkGlyphFrames = new Array(frameCount).fill(null);
-    }
-
-    for (let index = 0; index < frameCount; index += 1) {
-      if (this.candidatePedestrianWalkGlyphFrames[index]) continue;
-      this.candidatePedestrianWalkGlyphFrames[index] = this.extractCandidatePedestrianFrame(index);
-    }
-
-    return this.candidatePedestrianWalkGlyphFrames.filter(
-      (glyph): glyph is HTMLCanvasElement => !!glyph
-    );
-  }
-
-  private extractCandidatePedestrianFrame(frameIndex: number): HTMLCanvasElement | null {
-    if (!this.isRenderableImage(this.candidatePedestrianWalkSheet)) return null;
-
-    const frameCount = Math.floor(
-      this.candidatePedestrianWalkSheet.naturalWidth / CANDIDATE_PED_FRAME_WIDTH
-    );
-    if (frameIndex < 0 || frameIndex >= frameCount) return null;
-
-    return this.preparePedestrianImageSource(
-      this.candidatePedestrianWalkSheet,
-      CANDIDATE_PED_FRAME_WIDTH,
-      CANDIDATE_PED_FRAME_HEIGHT,
-      false,
-      frameIndex * CANDIDATE_PED_FRAME_WIDTH,
-      0
-    );
-  }
-
-  private getCandidateWalkFrameIndex(nowMs: number): number {
-    const durations = CANDIDATE_PED_FRAME_DURATIONS_MS;
-    const totalDurationMs = durations.reduce((sum, duration) => sum + duration, 0);
-    let t = ((nowMs % totalDurationMs) + totalDurationMs) % totalDurationMs;
-    for (let i = 0; i < durations.length; i += 1) {
-      if (t < durations[i]) return i;
-      t -= durations[i];
-    }
-    return durations.length - 1;
-  }
-
-  private getOriginalPedestrianGlyph(): HTMLCanvasElement | null {
-    if (this.originalPedestrianUnavailable) return null;
-    if (this.originalPedestrianGlyph) return this.originalPedestrianGlyph;
-    if (!this.isRenderableImage(this.originalPedestrianSprite)) return null;
-    try {
-      this.originalPedestrianGlyph = this.preparePedestrianSprite(this.originalPedestrianSprite, true);
-    } catch (error) {
-      console.error("[World2D] failed to prepare original pedestrian sprite", error);
-      this.originalPedestrianUnavailable = true;
-      return null;
-    }
-    if (!this.originalPedestrianGlyph) {
-      this.originalPedestrianUnavailable = true;
-      return null;
-    }
-    return this.originalPedestrianGlyph;
-  }
-
-  private preparePedestrianSprite(
-    sprite: HTMLImageElement,
-    cropToFigure: boolean
-  ): HTMLCanvasElement | null {
-    const srcW = sprite.naturalWidth;
-    const srcH = sprite.naturalHeight;
-    if (!srcW || !srcH) return null;
-
-    return this.preparePedestrianImageSource(sprite, srcW, srcH, cropToFigure);
-  }
-
-  private preparePedestrianImageSource(
-    sourceImage: CanvasImageSource,
-    srcW: number,
-    srcH: number,
-    cropToFigure: boolean,
-    sourceX = 0,
-    sourceY = 0
-  ): HTMLCanvasElement | null {
-    if (!srcW || !srcH) return null;
-
-    const source = document.createElement("canvas");
-    source.width = srcW;
-    source.height = srcH;
-    const sourceCtx = source.getContext("2d");
-    if (!sourceCtx) return null;
-
-    sourceCtx.clearRect(0, 0, srcW, srcH);
-    sourceCtx.drawImage(sourceImage, sourceX, sourceY, srcW, srcH, 0, 0, srcW, srcH);
-
-    const imgData = sourceCtx.getImageData(0, 0, srcW, srcH);
-    const data = imgData.data;
-    const background = this.samplePedestrianBackgroundColor(data, srcW, srcH);
-    let minX = srcW;
-    let minY = srcH;
-    let maxX = -1;
-    let maxY = -1;
-
-    for (let y = 0; y < srcH; y += 1) {
-      for (let x = 0; x < srcW; x += 1) {
-        const idx = (y * srcW + x) * 4;
-        const alpha = data[idx + 3];
-        if (alpha < 8) {
-          data[idx + 3] = 0;
-          continue;
-        }
-
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-        const distance =
-          Math.abs(r - background.r) +
-          Math.abs(g - background.g) +
-          Math.abs(b - background.b);
-        const luminance = r * 0.2126 + g * 0.7152 + b * 0.0722;
-        const isForeground = distance > 52 || luminance < 185;
-
-        if (!isForeground) {
-          data[idx + 3] = 0;
-          continue;
-        }
-
-        data[idx] = 22;
-        data[idx + 1] = 22;
-        data[idx + 2] = 22;
-        data[idx + 3] = 255;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-      }
-    }
-
-    if (maxX < minX || maxY < minY) return null;
-
-    sourceCtx.putImageData(imgData, 0, 0);
-
-    if (!cropToFigure) {
-      return source;
-    }
-
-    const pad = 2;
-    const cropW = maxX - minX + 1;
-    const cropH = maxY - minY + 1;
-    const output = document.createElement("canvas");
-    output.width = cropW + pad * 2;
-    output.height = cropH + pad * 2;
-    const outputCtx = output.getContext("2d");
-    if (!outputCtx) return null;
-
-    outputCtx.imageSmoothingEnabled = false;
-    outputCtx.clearRect(0, 0, output.width, output.height);
-    outputCtx.drawImage(source, minX, minY, cropW, cropH, pad, pad, cropW, cropH);
-    return output;
-  }
-
-  private samplePedestrianBackgroundColor(
-    data: Uint8ClampedArray,
-    width: number,
-    height: number
-  ): { r: number; g: number; b: number } {
-    const sampleCoords: Array<{ x: number; y: number }> = [];
-    const edgeInset = 1;
-    const step = Math.max(1, Math.floor(Math.min(width, height) * 0.08));
-
-    for (let dy = 0; dy <= step; dy += step || 1) {
-      for (let dx = 0; dx <= step; dx += step || 1) {
-        sampleCoords.push({ x: edgeInset + dx, y: edgeInset + dy });
-        sampleCoords.push({ x: width - 1 - edgeInset - dx, y: edgeInset + dy });
-        sampleCoords.push({ x: edgeInset + dx, y: height - 1 - edgeInset - dy });
-        sampleCoords.push({ x: width - 1 - edgeInset - dx, y: height - 1 - edgeInset - dy });
-      }
-    }
-
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    let count = 0;
-    for (const coord of sampleCoords) {
-      const sx = Math.max(0, Math.min(width - 1, coord.x));
-      const sy = Math.max(0, Math.min(height - 1, coord.y));
-      const idx = (sy * width + sx) * 4;
-      const alpha = data[idx + 3];
-      if (alpha < 8) continue;
-      r += data[idx];
-      g += data[idx + 1];
-      b += data[idx + 2];
-      count += 1;
-    }
-
-    if (count === 0) {
-      return { r: 255, g: 255, b: 255 };
-    }
-
-    return {
-      r: Math.round(r / count),
-      g: Math.round(g / count),
-      b: Math.round(b / count)
-    };
-  }
-
-  private getPedestrianSpriteFrame(
-    pose: "stand" | "walk",
-    nowMs: number
-  ): { current: CanvasImageSource; next: CanvasImageSource | null; mix01: number } | null {
-    const glyphs = this.getPedestrianGlyphFrames();
-    if (glyphs.length === 0) return null;
-
-    if (pose === "stand") {
-      const standGlyph = glyphs[Math.min(PED_STAND_FRAME_INDEX, glyphs.length - 1)];
-      return standGlyph ? { current: standGlyph, next: null, mix01: 0 } : null;
-    }
-
-    const scaled = this.getWalkSpriteCycle(nowMs) * PED_WALK_SEQUENCE.length;
-    const sequenceIndex = Math.floor(scaled) % PED_WALK_SEQUENCE.length;
-    const index = PED_WALK_SEQUENCE[sequenceIndex];
-    const glyph = glyphs[index];
-    if (!glyph) return null;
-
-    return {
-      current: glyph,
-      next: null,
-      mix01: 0
-    };
-  }
-
-  private getPedestrianGlyphFrames(): HTMLCanvasElement[] {
-    const frameCount = Math.max(
-      1,
-      Math.floor(this.pedestrianSpriteSheet.naturalWidth / PED_SPRITE_FRAME_WIDTH)
-    );
-
-    if (this.pedestrianGlyphFrames.length !== frameCount) {
-      this.pedestrianGlyphFrames = new Array(frameCount).fill(null);
-    }
-
-    if (!this.isRenderableImage(this.pedestrianSpriteSheet)) return [];
-
-    for (let index = 0; index < frameCount; index += 1) {
-      if (this.pedestrianGlyphFrames[index]) continue;
-      this.pedestrianGlyphFrames[index] = this.extractPedestrianSpriteFrame(index);
-    }
-
-    return this.pedestrianGlyphFrames.filter((glyph): glyph is HTMLCanvasElement => !!glyph);
-  }
-
-  private extractPedestrianSpriteFrame(frameIndex: number): HTMLCanvasElement | null {
-    if (!this.isRenderableImage(this.pedestrianSpriteSheet)) return null;
-
-    const frameCount = Math.floor(this.pedestrianSpriteSheet.naturalWidth / PED_SPRITE_FRAME_WIDTH);
-    if (frameIndex < 0 || frameIndex >= frameCount) return null;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = PED_SPRITE_FRAME_WIDTH;
-    canvas.height = PED_SPRITE_FRAME_HEIGHT;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(
-      this.pedestrianSpriteSheet,
-      frameIndex * PED_SPRITE_FRAME_WIDTH,
-      0,
-      PED_SPRITE_FRAME_WIDTH,
-      PED_SPRITE_FRAME_HEIGHT,
-      0,
-      0,
-      PED_SPRITE_FRAME_WIDTH,
-      PED_SPRITE_FRAME_HEIGHT
-    );
-    return canvas;
-  }
-
-  private getWalkSpriteCycle(nowMs: number): number {
-    return (nowMs * 0.0012) % 1;
-  }
-
-  private getWalkSpriteBob(cycle01: number, h: number): number {
-    const wave = Math.sin(cycle01 * Math.PI * 2);
-    return Math.round((0.5 - 0.5 * wave) * h * 0.012);
-  }
-
-  private drawPedestrianSpriteFrame(
-    ctx: CanvasRenderingContext2D,
-    frame: { current: CanvasImageSource; next: CanvasImageSource | null; mix01: number },
-    x: number,
-    footY: number,
-    h: number,
-    pose: "stand" | "walk"
-  ): void {
-    const spriteW =
-      "width" in frame.current && "height" in frame.current
-        ? (h * frame.current.width) / Math.max(frame.current.height, 1)
-        : h * 0.6;
-    const anchorRatio = pose === "walk" ? 0.46 : 0.48;
-    const drawW = Math.round(spriteW);
-    const drawH = Math.round(h);
-    const drawX = Math.round(x - drawW * anchorRatio);
-    const drawY = Math.round(footY - drawH);
-
+    // Circle body
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    ctx.globalAlpha = frame.next ? 1 - frame.mix01 : 1;
-    ctx.drawImage(frame.current, drawX, drawY, drawW, drawH);
-    if (frame.next) {
-      ctx.globalAlpha = frame.mix01;
-      ctx.drawImage(frame.next, drawX, drawY, drawW, drawH);
-    }
-    ctx.restore();
-  }
-
-  private drawPedestrianSilhouette(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    footY: number,
-    u: number,
-    poseFrame: PedestrianPoseFrame
-  ): void {
-    const limbWidth = Math.max(4, 11 * u);
-    const silhouetteColor = "#161616";
-
-    ctx.save();
-    ctx.translate(x, 0);
-    ctx.strokeStyle = silhouetteColor;
-    ctx.fillStyle = silhouetteColor;
-    ctx.lineWidth = limbWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    this.drawPedestrianLimb(ctx, poseFrame.leftArm, u, footY);
-    this.drawPedestrianLimb(ctx, poseFrame.rightArm, u, footY);
-    this.drawPedestrianLimb(ctx, poseFrame.leftLeg, u, footY);
-    this.drawPedestrianLimb(ctx, poseFrame.rightLeg, u, footY);
-
+    ctx.shadowColor = "rgba(37, 99, 235, 0.3)";
+    ctx.shadowBlur = isAnimating ? 12 : 6;
+    ctx.fillStyle = CIRCLE_COLOR;
     ctx.beginPath();
-    ctx.moveTo(poseFrame.torso[0].x * u, footY + poseFrame.torso[0].y * u);
-    for (let i = 1; i < poseFrame.torso.length; i += 1) {
-      ctx.lineTo(poseFrame.torso[i].x * u, footY + poseFrame.torso[i].y * u);
-    }
-    ctx.closePath();
+    ctx.arc(x, circleY - bounceY, CIRCLE_RADIUS, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.beginPath();
-    ctx.arc(
-      poseFrame.headCenter.x * u,
-      footY + poseFrame.headCenter.y * u,
-      poseFrame.headR * u,
-      0,
-      Math.PI * 2
+    // Highlight
+    ctx.shadowBlur = 0;
+    const highlightGrad = ctx.createRadialGradient(
+      x - CIRCLE_RADIUS * 0.3,
+      circleY - bounceY - CIRCLE_RADIUS * 0.3,
+      CIRCLE_RADIUS * 0.1,
+      x,
+      circleY - bounceY,
+      CIRCLE_RADIUS
     );
-    ctx.fill();
-
-    ctx.restore();
-  }
-
-  private drawPedestrianLimb(
-    ctx: CanvasRenderingContext2D,
-    points: CanvasPoint[],
-    u: number,
-    footY: number
-  ): void {
-    if (points.length < 2) return;
+    highlightGrad.addColorStop(0, "rgba(255,255,255,0.35)");
+    highlightGrad.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = highlightGrad;
     ctx.beginPath();
-    ctx.moveTo(points[0].x * u, footY + points[0].y * u);
-    for (let i = 1; i < points.length; i += 1) {
-      ctx.lineTo(points[i].x * u, footY + points[i].y * u);
-    }
-    ctx.stroke();
-  }
-
-  private getPedestrianPoseFrame(
-    pose: "stand" | "walk",
-    cycle01: number
-  ): PedestrianPoseFrame {
-    if (pose === "stand") return STAND_PED_POSE;
-
-    const frameCount = WALK_PED_POSES.length;
-    const scaled = cycle01 * frameCount;
-    const index = Math.floor(scaled) % frameCount;
-    const nextIndex = (index + 1) % frameCount;
-    const t = this.easePedestrianCycle(scaled - Math.floor(scaled));
-
-    return this.interpolatePedestrianPose(WALK_PED_POSES[index], WALK_PED_POSES[nextIndex], t);
-  }
-
-  private interpolatePedestrianPose(
-    from: PedestrianPoseFrame,
-    to: PedestrianPoseFrame,
-    t: number
-  ): PedestrianPoseFrame {
-    return {
-      torso: this.interpolatePedestrianPoints(from.torso, to.torso, t),
-      leftArm: this.interpolatePedestrianPoints(from.leftArm, to.leftArm, t),
-      rightArm: this.interpolatePedestrianPoints(from.rightArm, to.rightArm, t),
-      leftLeg: this.interpolatePedestrianPoints(from.leftLeg, to.leftLeg, t),
-      rightLeg: this.interpolatePedestrianPoints(from.rightLeg, to.rightLeg, t),
-      headCenter: this.interpolatePedestrianPoint(from.headCenter, to.headCenter, t),
-      headR: this.lerp(from.headR, to.headR, t),
-      shadowScaleX: this.lerp(from.shadowScaleX, to.shadowScaleX, t)
-    };
-  }
-
-  private interpolatePedestrianPoints(
-    from: CanvasPoint[],
-    to: CanvasPoint[],
-    t: number
-  ): CanvasPoint[] {
-    return from.map((point, index) => this.interpolatePedestrianPoint(point, to[index], t));
-  }
-
-  private interpolatePedestrianPoint(from: CanvasPoint, to: CanvasPoint, t: number): CanvasPoint {
-    return {
-      x: this.lerp(from.x, to.x, t),
-      y: this.lerp(from.y, to.y, t)
-    };
-  }
-
-  private easePedestrianCycle(t: number): number {
-    return 0.5 - Math.cos(t * Math.PI) * 0.5;
-  }
-
-  private lerp(from: number, to: number, t: number): number {
-    return from + (to - from) * t;
+    ctx.arc(x, circleY - bounceY, CIRCLE_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   /* ------------------------------------------------------------------ */
@@ -1497,106 +641,27 @@ export class World2D {
     }
 
     const { stage, pressure } = this.getMoneyStress(money, startMoney);
-    const pulseStep = Math.floor((money + 1e-6) * 10);
-    const pulseWindowMs = stage >= 2 ? 220 : stage === 1 ? 190 : 170;
-    if (this.lastMoneyPulseStep === null) {
-      this.lastMoneyPulseStep = pulseStep;
-    } else if (pulseStep < this.lastMoneyPulseStep) {
-      this.moneyPulseUntilMs = nowMs + pulseWindowMs;
-      this.lastMoneyPulseStep = pulseStep;
-    } else if (pulseStep > this.lastMoneyPulseStep) {
-      this.lastMoneyPulseStep = pulseStep;
-    }
-
-    const pulseProgress = Math.max(0, this.moneyPulseUntilMs - nowMs) / pulseWindowMs;
-    const pulseKick = pulseProgress > 0 ? Math.sin((1 - pulseProgress) * Math.PI) : 0;
-    const cardScale = 1 + pulseKick * (stage === 2 ? 0.042 : stage === 1 ? 0.032 : 0.024);
-    const alpha = 1;
-    const cardJoltY = pulseKick * (stage === 2 ? 1.8 : 1.2);
-
-    const flashStrength = 0.08 + pressure * 0.05 + pulseKick * 0.22;
-    let mainTextColor = "#ff5c5c";
-    let labelColor = "#ffd0d0";
-    let subPrefixColor = "#efb8b8";
-    let subValueColor = "#ffdede";
-    let panelTop = "#690000";
-    let panelMid = "#460000";
-    let panelBottom = "#180000";
-    let borderColor = "#9f0909";
-
-    if (stage === 0) {
-      mainTextColor = "#ff7474";
-      labelColor = "#ffe0e0";
-      subPrefixColor = "#f4c8c8";
-      subValueColor = "#ffe8e8";
-      panelTop = "#5e0202";
-      panelMid = "#410101";
-      panelBottom = "#160000";
-      borderColor = "#861010";
-    } else if (stage === 1) {
-      mainTextColor = "#ff5555";
-      labelColor = "#ffd1d1";
-      subPrefixColor = "#efb4b4";
-      subValueColor = "#ffdfdf";
-      panelTop = "#670000";
-      panelMid = "#470000";
-      panelBottom = "#170000";
-      borderColor = "#ad0808";
-    } else {
-      mainTextColor = pulseKick > 0 ? "#ff7070" : "#ff4a4a";
-      labelColor = "#ffd3d3";
-      subPrefixColor = "#f0bcbc";
-      subValueColor = pulseKick > 0 ? "#fff0f0" : "#ffe0e0";
-      panelTop = "#720000";
-      panelMid = "#4b0000";
-      panelBottom = "#140000";
-      borderColor = pulseKick > 0 ? "#d20c0c" : "#bc0000";
-    }
-
     const compactPortrait = this.isCompactPortraitLayout();
-    const routeCenterX =
-      this.lightXs.length > 0 ? (this.lightXs[0] + this.lightXs[this.lightXs.length - 1]) / 2 : this.w / 2;
-    const routeSpan =
-      this.lightXs.length > 1 ? this.lightXs[this.lightXs.length - 1] - this.lightXs[0] : this.w * 0.42;
-    const fontSize = compactPortrait ? Math.min(46, this.w * 0.094) : Math.min(68, this.w * 0.053);
-    const labelFontSize = compactPortrait ? Math.min(18, this.w * 0.038) : Math.min(24, this.w * 0.02);
-    const subFontSize = compactPortrait ? Math.min(17, this.w * 0.039) : Math.min(21, this.w * 0.017);
-    const roadTop = this.roadY - this.roadH / 2;
-    const { poleH, housingH } = this.getTrafficLightMetrics(compactPortrait);
-    const lightsTopY = roadTop - poleH - housingH;
+    const moneyStep = Math.floor(money * 10);
+    if (this.lastMoneyPulseStep !== null && moneyStep < this.lastMoneyPulseStep) {
+      this.moneyPulseUntilMs = nowMs + 520;
+    }
+    this.lastMoneyPulseStep = moneyStep;
 
-    const displayTickMs = 80;
-    const displayMoneyStep = Math.max(this.config.moneyLossPerSec * (displayTickMs / 1000), 0.001);
-    const displayedMoney = Math.max(0, Math.round(Math.max(0, money) / displayMoneyStep) * displayMoneyStep);
-    const mainText = `￥${displayedMoney.toFixed(3)}`;
-    const labelText = "剩余报酬";
-    const subPrefixText = "每秒正在减少";
-    const subValueText = `-￥${this.config.moneyLossPerSec.toFixed(2)}`;
-    const indicatorSize = compactPortrait ? 8 : 10;
-    const labelGap = compactPortrait ? 10 : 12;
+    const isPulsing = nowMs < this.moneyPulseUntilMs;
+    const pulseT = isPulsing ? Math.max(0, (this.moneyPulseUntilMs - nowMs) / 520) : 0;
+    const pulseKick = isPulsing ? Math.pow(pulseT, 0.6) * 0.28 : 0;
+    const flashStrength = isPulsing ? Math.pow(pulseT, 1.6) : 0;
 
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.font = `700 ${labelFontSize}px ${UI_FONT_FAMILY}`;
-    const labelWidth = ctx.measureText(labelText).width;
-    ctx.font = `900 ${fontSize}px ${MONEY_FONT_FAMILY}`;
-    const mainWidth = ctx.measureText(mainText).width;
-    ctx.font = `800 ${subFontSize}px ${UI_FONT_FAMILY}`;
-    const subPrefixWidth = ctx.measureText(subPrefixText).width;
-    ctx.font = `900 ${subFontSize}px ${MONEY_FONT_FAMILY}`;
-    const subValueWidth = ctx.measureText(subValueText).width;
-    const subWidth = subPrefixWidth + subValueWidth + (compactPortrait ? 10 : 12);
-    const ribbonW = Math.min(
-      compactPortrait ? this.w - 36 : 468,
-      Math.max(
-        compactPortrait ? 252 : 344,
-        indicatorSize + labelGap + labelWidth + mainWidth + 112,
-        subWidth + 76,
-        routeSpan * (compactPortrait ? 0.58 : 0.38)
-      )
-    );
-    const ribbonH = compactPortrait ? 84 : 104;
-    const cx = routeCenterX;
+    const scaleBase = compactPortrait ? 0.96 : 1;
+    const cardScale = scaleBase * (1 + pulseKick * 0.06);
+    const cardJoltY = pulseKick * -4;
+
+    const ribbonW = compactPortrait ? 240 : 296;
+    const ribbonH = compactPortrait ? 82 : 98;
+
+    const cx = this.w / 2;
+    const lightsTopY = this.roadY - this.roadH / 2 - (compactPortrait ? 100 : 130);
     const topBlankCenterY = lightsTopY * 0.5;
     const overlayMargin = compactPortrait ? 16 : 20;
     const overlayCenterY = Math.min(
@@ -1610,6 +675,52 @@ export class World2D {
     const pillX = -ribbonW / 2;
     const pillY = -ribbonH / 2;
     const cornerRadius = compactPortrait ? 16 : 18;
+
+    let panelTop: string;
+    let panelMid: string;
+    let panelBottom: string;
+    let borderColor: string;
+    let labelColor: string;
+    let mainTextColor: string;
+    let subPrefixColor: string;
+    let subValueColor: string;
+    let labelText: string;
+
+    if (stage === 0) {
+      panelTop = "#1e293b";
+      panelMid = "#172033";
+      panelBottom = "#0f172a";
+      borderColor = "rgba(148,163,184,0.22)";
+      labelColor = "#94a3b8";
+      mainTextColor = "#e2e8f0";
+      subPrefixColor = "#64748b";
+      subValueColor = "#94a3b8";
+      labelText = "剩余报酬";
+    } else if (stage === 1) {
+      panelTop = "#2a1518";
+      panelMid = "#221015";
+      panelBottom = "#1a0a10";
+      borderColor = "rgba(248,113,113,0.3)";
+      labelColor = "#fca5a5";
+      mainTextColor = "#fecaca";
+      subPrefixColor = "#f87171";
+      subValueColor = "#fca5a5";
+      labelText = "剩余报酬";
+    } else {
+      const urgency = Math.min(1, pressure * 1.1);
+      const r1 = Math.round(42 + urgency * 16);
+      const g1 = Math.round(8 + urgency * 4);
+      const b1 = Math.round(12 + urgency * 4);
+      panelTop = `rgb(${r1},${g1},${b1})`;
+      panelMid = `rgb(${Math.round(r1 * 0.82)},${Math.round(g1 * 0.7)},${Math.round(b1 * 0.7)})`;
+      panelBottom = `rgb(${Math.round(r1 * 0.6)},${Math.round(g1 * 0.5)},${Math.round(b1 * 0.5)})`;
+      borderColor = `rgba(248,113,113,${0.36 + urgency * 0.14})`;
+      labelColor = "#fca5a5";
+      mainTextColor = "#fee2e2";
+      subPrefixColor = "#f87171";
+      subValueColor = "#fca5a5";
+      labelText = "剩余报酬";
+    }
 
     const panelGrad = ctx.createLinearGradient(0, pillY, 0, pillY + ribbonH);
     panelGrad.addColorStop(0, panelTop);
@@ -1650,6 +761,15 @@ export class World2D {
     this.roundRect(ctx, pillX + 2, pillY + 2, ribbonW - 4, ribbonH - 4, Math.max(6, cornerRadius - 2));
     ctx.stroke();
 
+    const indicatorSize = compactPortrait ? 11 : 13;
+    const labelGap = compactPortrait ? 8 : 10;
+    const mainFontSize = compactPortrait ? 26 : 31;
+    const subFontSize = compactPortrait ? 11 : 12.5;
+    const subPrefixText = "每秒扣除";
+    const subPrefixWidth = ctx.measureText(subPrefixText).width;
+    const subValueText = `￥${this.config.moneyLossPerSec.toFixed(2)}`;
+    const mainText = `￥${money.toFixed(2)}`;
+
     const leftInset = pillX + (compactPortrait ? 20 : 26);
     const rightInset = pillX + ribbonW - (compactPortrait ? 20 : 26);
     const topRowY = pillY + (compactPortrait ? 28 : 37);
@@ -1669,12 +789,12 @@ export class World2D {
     ctx.fill();
 
     ctx.fillStyle = labelColor;
-    ctx.font = `700 ${labelFontSize}px ${UI_FONT_FAMILY}`;
+    ctx.font = `700 ${compactPortrait ? 13 : 15}px ${UI_FONT_FAMILY}`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(labelText, labelX, topRowY);
 
-    ctx.font = `900 ${fontSize}px ${MONEY_FONT_FAMILY}`;
+    ctx.font = `900 ${mainFontSize}px ${MONEY_FONT_FAMILY}`;
     ctx.textAlign = "right";
     ctx.lineWidth = compactPortrait ? 1.4 : 1.6;
     ctx.strokeStyle = "rgba(28, 0, 0, 0.65)";
@@ -1705,68 +825,6 @@ export class World2D {
 
   private isCompactPortraitLayout(): boolean {
     return this.h > this.w && this.w <= 560;
-  }
-
-  private resetFogTracking(): void {
-    this.fogFadeLeftX = -1;
-    this.fogFadeRightX = -1;
-  }
-
-  private getResolvedPassedLightColor(
-    state: ExperimentState,
-    lightIdx: number
-  ): "red" | "green" {
-    const outcome = state.passedOutcome[lightIdx];
-    if (outcome === "green") return "green";
-
-    const greenAtSec = state.lightGreenAtSecByIndex[lightIdx];
-    if (outcome === "run_red" && greenAtSec !== null && state.elapsedSec >= greenAtSec) {
-      return "green";
-    }
-    return "red";
-  }
-
-  private getFogClearEndX(
-    state: ExperimentState,
-    avatarX: number,
-    roadW: number,
-    currentTargetX: number | undefined
-  ): number {
-    const baseClearEndX = avatarX + roadW * this.fogLeadPx;
-    if (currentTargetX === undefined) return baseClearEndX;
-
-    const safeClearEndX = currentTargetX + this.getFogLightSafeHalfWidthPx();
-    const extraRevealNeeded = Math.max(0, safeClearEndX - baseClearEndX);
-    if (extraRevealNeeded <= 0) return baseClearEndX;
-
-    const distanceToTarget = Math.max(0, currentTargetX - avatarX);
-    const revealStartDist = this.getFogApproachRevealDistancePx(roadW);
-    const fullRevealDist = this.getFogApproachFullRevealDistancePx();
-    const revealT =
-      state.phase === "waiting_red"
-        ? 1
-        : Math.max(
-            0,
-            Math.min(1, (revealStartDist - distanceToTarget) / Math.max(revealStartDist - fullRevealDist, 1))
-          );
-
-    return baseClearEndX + extraRevealNeeded * revealT;
-  }
-
-  private getFogFadeWidthPx(roadW: number): number {
-    return Math.max(roadW * this.fogFadePx, this.isCompactPortraitLayout() ? 18 : 14);
-  }
-
-  private getFogLightSafeHalfWidthPx(): number {
-    return this.isCompactPortraitLayout() ? 24 : 20;
-  }
-
-  private getFogApproachRevealDistancePx(roadW: number): number {
-    return this.isCompactPortraitLayout() ? Math.max(roadW * 0.22, 84) : Math.max(roadW * 0.18, 72);
-  }
-
-  private getFogApproachFullRevealDistancePx(): number {
-    return this.isCompactPortraitLayout() ? 34 : 30;
   }
 
   /* ------------------------------------------------------------------ */

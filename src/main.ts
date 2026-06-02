@@ -7,7 +7,7 @@ import { ExperimentLogger } from "./experiment/logger";
 import { formatMoney, formatSeconds } from "./experiment/utils";
 import { World2D } from "./scene/world2d";
 
-type RunKind = "practice" | "formal";
+type RunKind = "formal";
 type SubmitOutcome = "sent" | "queued";
 type DesktopInputProof = {
   keyboard: boolean;
@@ -44,21 +44,20 @@ function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig
   return {
     revealMode,
     numLights,
-    segmentDurationSec: 4,
-    redWaitSec: 5,
-    startMoney: 10,
-    moneyLossPerSec: 0.1
+    segmentDurationSec: 2,
+    redWaitSec: 20,
+    startMoney: 100,
+    moneyLossPerSec: 2.5
   };
 }
 
-let formalConfig: ExperimentConfig = makeConfig("full", 5);
-let practiceConfig: ExperimentConfig = makeConfig("full", 2);
+const formalConfig: ExperimentConfig = makeConfig("full", 1);
 
-function createLogger(config: ExperimentConfig, runKind_: RunKind): ExperimentLogger {
+function createLogger(config: ExperimentConfig): ExperimentLogger {
   return new ExperimentLogger(config, {
     participantId,
     startedAtIso: new Date().toISOString(),
-    runKind: runKind_
+    runKind: "formal"
   });
 }
 
@@ -250,7 +249,7 @@ app.innerHTML = `
         <div class="panel panel-control">
           <div class="panel-head">
             <div class="panel-title">控制</div>
-            <div class="hint" id="runHint"></div>
+            <div class="hint" id="runHint">决策任务</div>
           </div>
           <div class="control-actions">
             <button class="btn primary" id="btnStart">开始</button>
@@ -260,15 +259,15 @@ app.innerHTML = `
         <div class="panel status panel-status">
           <div class="row"><div class="label">当前位置</div><div class="value" id="posText">—</div></div>
           <div class="row"><div class="label">耗费时间</div><div class="value" id="timeText">0.0s</div></div>
-          <div class="row"><div class="label">剩余报酬</div><div class="value money" id="moneyText">￥10.00</div></div>
-          <div class="row" id="lightRow" style="display:none;"><div class="label">信号灯</div><div class="value" id="lightText">—</div></div>
+          <div class="row"><div class="label">剩余报酬</div><div class="value money" id="moneyText">￥100.00</div></div>
+          <div class="row" id="lightRow"><div class="label">信号灯</div><div class="value" id="lightText">—</div></div>
         </div>
 
       </div>
     </div>
 
     <div class="center-controls">
-      <button class="btn danger" id="btnWalk" disabled>通行（WALK）</button>
+      <button class="btn danger" id="btnWalk" disabled>移动</button>
     </div>
 
     <div class="modal" id="modal" style="display:none;">
@@ -294,9 +293,8 @@ const els = {
   desktopGate: document.querySelector<HTMLDivElement>("#desktopGate")!
 };
 
-let runKind: RunKind = "practice";
-let currentConfig: ExperimentConfig = practiceConfig;
-let logger: ExperimentLogger = createLogger(currentConfig, runKind);
+const currentConfig: ExperimentConfig = formalConfig;
+let logger: ExperimentLogger = createLogger(currentConfig);
 let engine: ExperimentEngine = new ExperimentEngine(currentConfig, logger);
 let world: World2D | null = null;
 let formalClientSessionId = createClientSessionId();
@@ -310,11 +308,7 @@ let desktopGateReady = false;
 let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateEnteredOnce = false;
-let desktopGateShowingPracticeIntro = false;
-
-function updateTopHints(): void {
-  els.runHint.textContent = runKind === "practice" ? "练习" : "正式决策";
-}
+let desktopGateShowingIntro = false;
 
 function hasDesktopViewport(): boolean {
   return window.innerWidth >= DESKTOP_MIN_VIEWPORT_WIDTH && window.innerHeight >= DESKTOP_MIN_VIEWPORT_HEIGHT;
@@ -363,6 +357,30 @@ function renderDesktopPreflightGate(): void {
     pausedByDesktopGate = true;
   }
 
+  // Show instructions page after prerequisites are met
+  if (desktopGateShowingIntro && prerequisitesReady && !desktopGateEnteredOnce) {
+    els.desktopGate.innerHTML = `
+      <div class="card desktop-entry-card" style="max-width:640px;">
+        <h1>欢迎</h1>
+        <p>该部分人类智能任务的报酬取决于您的决策。</p>
+        <p class="hint">注意：如果你使用台式机或笔记本电脑完成此人类智能任务，建议在开始前将浏览器屏幕最大化。在完成决策任务期间，请不要关闭此窗口，也不要以其他任何方式离开网页。</p>
+        <div class="actions">
+          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
+        </div>
+      </div>
+    `;
+    els.desktopGate.style.display = "grid";
+    desktopGateVisible = true;
+    els.desktopGate
+      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
+      ?.addEventListener("click", () => {
+        desktopGateEnteredOnce = true;
+        desktopGateShowingIntro = false;
+        renderDesktopPreflightGate();
+      });
+    return;
+  }
+
   const viewportLabel = viewportReady
     ? `窗口尺寸已满足（至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}）`
     : `请将浏览器窗口调整到至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}`;
@@ -370,39 +388,6 @@ function renderDesktopPreflightGate(): void {
   const hoverLabel = hoverReady ? "检测到悬停能力" : "当前设备不具备桌面端悬停能力";
   const keyboardLabel = keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键";
   const mouseLabel = mouseReady ? "已检测到鼠标移动和点击" : "请移动鼠标并点击一次";
-
-  if (desktopGateShowingPracticeIntro && prerequisitesReady && !desktopGateEnteredOnce) {
-    els.desktopGate.innerHTML = `
-      <div class="card desktop-entry-card">
-        <h1>熟悉基本操作</h1>
-        <p>在该部分，您需要控制屏幕上的“虚拟人”行走。</p>
-        <ul>
-          <li>点击左侧的【开始】按钮，“虚拟人”将开始行走。</li>
-          <li>行走途中将遇到交通信号灯，红灯会阻止通行，等待一段时间后会变为绿灯。</li>
-          <li>您可以点击屏幕中央的【通行（WALK）】按钮在红灯时直接通行。</li>
-        </ul>
-        <p class="hint">阅读完后，请点击下方按钮进入练习页面。</p>
-        <h2>示例短片</h2>
-        <p class="hint">请将示例短片放到 <code>public/demo.mp4</code>。</p>
-        <video style="width:100%; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);" autoplay loop muted playsinline preload="auto">
-          <source src="/demo.mp4" type="video/mp4" />
-        </video>
-        <div class="actions">
-          <button class="btn primary" id="btnDesktopGateBeginPractice">我已阅读，进入练习</button>
-        </div>
-      </div>
-    `;
-    els.desktopGate.style.display = "grid";
-    desktopGateVisible = true;
-    els.desktopGate
-      .querySelector<HTMLButtonElement>("#btnDesktopGateBeginPractice")
-      ?.addEventListener("click", () => {
-        desktopGateEnteredOnce = true;
-        desktopGateShowingPracticeIntro = false;
-        renderDesktopPreflightGate();
-      });
-    return;
-  }
 
   const readyNotice = prerequisitesReady
     ? `
@@ -437,7 +422,7 @@ function renderDesktopPreflightGate(): void {
     els.desktopGate
       .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
       ?.addEventListener("click", () => {
-        desktopGateShowingPracticeIntro = true;
+        desktopGateShowingIntro = true;
         renderDesktopPreflightGate();
       });
   }
@@ -452,24 +437,7 @@ function closeModal(): void {
   els.modal.style.display = "none";
 }
 
-function switchRun(next: RunKind): void {
-  runKind = next;
-  currentConfig = next === "practice" ? practiceConfig : formalConfig;
-  logger = createLogger(currentConfig, runKind);
-  engine = new ExperimentEngine(currentConfig, logger);
-  formalClientSessionId = createClientSessionId();
-  formalSubmission = null;
-  world?.dispose();
-  world = new World2D(els.canvas, currentConfig);
-  lastPhase = engine.state.phase;
-  finishGate = false;
-  updateTopHints();
-}
-
 function buildFormalSubmission(): SessionSubmission {
-  if (runKind !== "formal") {
-    throw new Error("Formal submission requested outside formal run");
-  }
   return logger.buildSubmission({
     clientSessionId: formalClientSessionId,
     submittedAtIso: new Date().toISOString(),
@@ -482,94 +450,40 @@ function buildFormalSubmission(): SessionSubmission {
   });
 }
 
-function initializeFullRevealMode(): void {
-  formalConfig = makeConfig("full", 5);
-  practiceConfig = makeConfig("full", 2);
-  switchRun("practice");
-}
-
-function showPracticeIntro(): void {
+function showInstructions(): void {
   openModal(`
-    <h1>熟悉基本操作</h1>
-    <p>在该部分，您需要控制屏幕上的“虚拟人”行走。</p>
+    <h1>指导语</h1>
+    <p>决策任务中，您将控制一个<strong>圆形图形</strong>，并在屏幕上将其移动至终点线。</p>
     <ul>
-      <li>点击屏幕左侧的【开始】按钮，“虚拟人”将开始行走。</li>
-      <li>行走途中将遇到交通信号灯，红灯会阻止通行，等待一段时间后会变为绿灯。</li>
-      <li>您可以点击屏幕中央的【通行（WALK）】按钮在红灯时直接通行。</li>
+      <li>当您点击屏幕左侧的<strong>【开始】</strong>按钮后，您的圆圈会靠近红绿灯并停下等待。</li>
+      <li>要让您的圆圈再次移动，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮。</li>
     </ul>
-    <p class="hint">阅读完后，请点击左侧【开始】按钮开始练习。</p>
-    <h2>示例短片</h2>
-    <p class="hint">请将示例短片放到 <code>public/demo.mp4</code>。</p>
-    <video style="width:100%; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);" autoplay loop muted playsinline preload="auto">
-      <source src="/demo.mp4" type="video/mp4" />
-    </video>
-    <div class="actions">
-      <button class="btn primary" id="btnBeginPractice">我已阅读</button>
-    </div>
-  `);
-
-  document.querySelector<HTMLButtonElement>("#btnBeginPractice")?.addEventListener("click", () => {
-    closeModal();
-  });
-}
-
-function showPracticeComplete(): void {
-  openModal(`
-    <h1>练习已完成</h1>
-    <p>如果您没有疑问，请进入正式决策任务。</p>
-    <div class="actions">
-      <button class="btn primary" id="btnToFormal">进入</button>
-    </div>
-  `);
-  document.querySelector<HTMLButtonElement>("#btnToFormal")?.addEventListener("click", () => {
-    switchRun("formal");
-    showFormalIntro();
-  });
-}
-
-function showFormalIntro(): void {
-  openModal(`
-    <h1>正式决策任务</h1>
-    <p>请注意，实验正式开始；请仔细阅读，确保理解每一个细节。</p>
-    <h2>场景设置</h2>
-    <ul>
-      <li>点击左侧【开始】按钮后，“虚拟人”将开始行走并经过一系列交通信号灯。</li>
-      <li>两个交通信号灯之间的行走距离固定为 <strong>${currentConfig.segmentDurationSec}s</strong>。</li>
-    </ul>
-    <h2>交通机制</h2>
-    <ul>
-      <li>任务开始时，所有路灯均为红色。</li>
-      <li>当“虚拟人”到达路口时将自动停下等待红灯。</li>
-      <li>等待 <strong>${currentConfig.redWaitSec}s</strong> 后，红灯将自动转为绿灯。</li>
-    </ul>
-    <h2>操作按钮</h2>
-    <ul>
-      <li>屏幕中央有一个【通行（WALK）】按钮，您可以在任何时刻点击（无论行走中还是等待中）。</li>
-      <li>但只有当“虚拟人”<strong>等待红灯</strong>时点击，才会驱使“虚拟人”闯红灯；行走途中点击无任何效果。</li>
-    </ul>
+    <h2>实验规则</h2>
+    <p>在红绿灯处等待，直至其变为绿色后通行。</p>
     <h2>收益规则</h2>
     <ul>
-      <li>本阶段初始资金 <strong>￥${currentConfig.startMoney.toFixed(2)}</strong>。</li>
-      <li>每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${currentConfig.moneyLossPerSec.toFixed(
-        2
-      )}</strong>。</li>
-      <li>规则要求：在每个交通信号灯前等待，直到红灯变绿，方可通行。</li>
+      <li>本阶段您的初始资金为 <strong>￥${currentConfig.startMoney.toFixed(2)}</strong>。</li>
+      <li>每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${currentConfig.moneyLossPerSec.toFixed(2)}</strong>，直至您冲过终点线。</li>
+    </ul>
+    <h2>场景设置</h2>
+    <ul>
+      <li>圆圈从初始位置到红绿灯、从红绿灯到终点线各需 <strong>${currentConfig.segmentDurationSec}</strong> 秒。</li>
+      <li>红灯等待 <strong>${currentConfig.redWaitSec}</strong> 秒后变为绿灯。</li>
     </ul>
     <div class="actions">
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
     </div>
-    <p class="hint" style="margin-top:10px;">阅读完提示语后，请先完成下一页“理解测试”。</p>
   `);
 
   document.querySelector<HTMLButtonElement>("#btnToCompTest")?.addEventListener("click", () => {
-    showFormalComprehensionTest();
+    showComprehensionTest();
   });
 }
 
-function showFormalComprehensionTest(): void {
+function showComprehensionTest(): void {
   openModal(`
     <h1>理解测试</h1>
-    <p>根据上一页说明，为获得最大经济收益，我应该闯红灯以便缩短时间；但为了遵守规则，我必须等待红灯变绿。</p>
+    <p>请回答以下问题：根据上述说明，为获得最大经济收益，我应该闯红灯以便缩短时间；但为了遵守规则，我必须等待红灯变绿。</p>
     <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:8px;">
       <label style="display:flex; gap:8px; align-items:center; cursor:pointer;">
         <input type="radio" name="comp" value="yes" />
@@ -582,19 +496,19 @@ function showFormalComprehensionTest(): void {
       <div class="hint" id="compHint"></div>
     </div>
     <div class="actions">
-      <button class="btn" id="btnBackToFormalIntro">返回提示语</button>
-      <button class="btn primary" id="btnBeginFormal">我已作答，去开始</button>
+      <button class="btn" id="btnBackToInstructions">返回提示语</button>
+      <button class="btn primary" id="btnBeginExperiment">我已作答，开始决策</button>
     </div>
-    <p class="hint" style="margin-top:10px;">作答后，请点击左侧【开始】按钮开始正式决策任务。</p>
+    <p class="hint" style="margin-top:10px;">作答后，请点击左侧【开始】按钮开始决策任务。</p>
   `);
 
   document
-    .querySelector<HTMLButtonElement>("#btnBackToFormalIntro")
+    .querySelector<HTMLButtonElement>("#btnBackToInstructions")
     ?.addEventListener("click", () => {
-      showFormalIntro();
+      showInstructions();
     });
 
-  document.querySelector<HTMLButtonElement>("#btnBeginFormal")?.addEventListener("click", () => {
+  document.querySelector<HTMLButtonElement>("#btnBeginExperiment")?.addEventListener("click", () => {
     const nowMs = performance.now();
     const choice = document.querySelector<HTMLInputElement>('input[name="comp"]:checked')?.value;
     const hint = document.querySelector<HTMLDivElement>("#compHint");
@@ -633,25 +547,25 @@ async function submitFormalResultsSilently(): Promise<SubmitOutcome> {
 }
 
 function showCompletionScreen(state: CompletionScreenState): void {
+  const elapsed = engine.state.elapsedSec;
+  const money = engine.state.money;
+  const waitSec = Math.max(0, elapsed - currentConfig.segmentDurationSec * 2);
+  const taskMoney = Math.max(0, currentConfig.startMoney - currentConfig.moneyLossPerSec * elapsed);
+
   const statusBlock =
     state === "saving"
-      ? `
-        <div class="completion-status saving">数据正在保存，请稍候…</div>
-      `
+      ? `<div class="completion-status saving">数据正在保存，请稍候…</div>`
       : state === "sent"
-        ? `
-          <div class="completion-status success">数据已成功保存。</div>
-        `
-        : `
-          <div class="completion-status queued">网络暂时不稳定，数据已保存并会继续尝试提交。</div>
-        `;
+        ? `<div class="completion-status success">数据已成功保存。</div>`
+        : `<div class="completion-status queued">网络暂时不稳定，数据已保存并会继续尝试提交。</div>`;
 
   openModal(`
     <div class="completion-card-body">
-      <div class="completion-eyebrow">正式决策结束</div>
+      <div class="completion-eyebrow">决策任务完成</div>
       <h1>感谢您的参与</h1>
+      <p>您在红绿灯处等待了 <strong>${formatSeconds(waitSec, 1)}</strong>，获得 <strong>${formatMoney(taskMoney)}</strong>。</p>
       ${statusBlock}
-      <p class="completion-close-note">请关闭本页面。</p>
+      <p class="completion-close-note">后续填写完简短问卷后，您将在见数平台领取自己的收益。</p>
     </div>
   `);
 }
@@ -664,7 +578,7 @@ function showPostQuestion(): void {
   openModal(`
     <p class="hint">耗时：${formatSeconds(elapsed, 1)}；最终金额：${formatMoney(money)}；闯红灯次数：${v}</p>
     <h2>请回答</h2>
-    <p>刚才的任务中，关于“等待红灯”的规则，您的真实想法是？</p>
+    <p>刚才的任务中，关于"等待红灯"的规则，您的真实想法是？</p>
     <div style="display:grid; gap:10px; margin-top:10px;">
       <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
         <input type="radio" name="post" value="A" />
@@ -683,8 +597,6 @@ function showPostQuestion(): void {
         <span>D. 我以为按钮随时能点，没太在意红灯。</span>
       </label>
     </div>
-    <h2>补充（可选）</h2>
-    <textarea class="textarea" id="postText" placeholder="如愿意，可补充一句原因…"></textarea>
     <div class="actions">
       <button class="btn primary" id="btnSubmitPost">提交并保存数据</button>
     </div>
@@ -693,7 +605,6 @@ function showPostQuestion(): void {
   document.querySelector<HTMLButtonElement>("#btnSubmitPost")?.addEventListener("click", () => {
     const nowMs = performance.now();
     const choice = document.querySelector<HTMLInputElement>('input[name="post"]:checked')?.value;
-    const text = (document.querySelector<HTMLTextAreaElement>("#postText")?.value ?? "").trim();
 
     if (!choice) return;
 
@@ -707,19 +618,6 @@ function showPostQuestion(): void {
       money: engine.state.money,
       note: choice
     });
-
-    if (text) {
-      logger.log({
-        nowMs,
-        tSec: engine.state.elapsedSec,
-        event: "post_rule_attitude_text",
-        phase: engine.state.phase,
-        lightIndex: engine.state.lightIndex,
-        lightColor: null,
-        money: engine.state.money,
-        note: text
-      });
-    }
 
     showCompletionScreen("saving");
     void submitFormalResultsSilently().then((outcome) => {
@@ -763,12 +661,15 @@ const hudCache = {
 };
 
 async function bootstrapDesktopApp(): Promise<void> {
-  updateTopHints();
   await waitForExperimentFonts();
   document.body.classList.remove("app-fonts-loading");
   document.body.classList.add("app-fonts-ready");
   void flushPendingSubmissions();
-  initializeFullRevealMode();
+
+  world = new World2D(els.canvas, currentConfig);
+  lastPhase = engine.state.phase;
+  finishGate = false;
+
   renderDesktopPreflightGate();
   loop();
 }
@@ -822,7 +723,8 @@ document.addEventListener("visibilitychange", () => {
 
 function updateHud(): void {
   const s = engine.state;
-  const nextWalkDisabled = s.phase === "idle" || s.phase === "finished";
+  // "移动" button: only enabled during waiting_red with red light
+  const nextWalkDisabled = s.phase !== "waiting_red" || s.currentLightColor !== "red";
   const nextStartDisabled = s.phase !== "idle";
   if (hudCache.btnWalkDisabled !== nextWalkDisabled) {
     els.btnWalk.disabled = nextWalkDisabled;
@@ -844,10 +746,12 @@ function updateHud(): void {
   if (s.phase !== "idle") {
     if (s.phase === "finished") {
       posText = "已完成";
-    } else if (currentConfig.revealMode === "full") {
-      posText = `交通信号灯${s.lightIndex}（${s.lightIndex}/${currentConfig.numLights}）`;
-    } else {
-      posText = s.phase === "moving" ? "行走中" : "交通信号灯";
+    } else if (s.phase === "moving") {
+      posText = "走向红绿灯";
+    } else if (s.phase === "waiting_red") {
+      posText = "红绿灯前等待";
+    } else if (s.phase === "moving_to_finish") {
+      posText = "冲向终点线";
     }
     timeText = formatSeconds(s.elapsedSec, 1);
     moneyText = formatMoney(s.money);
@@ -861,6 +765,8 @@ function updateHud(): void {
       lightText = isRed ? "🔴 红灯" : "🟢 绿灯";
       lightRed = isRed;
       lightGreen = !isRed;
+    } else if (s.phase === "moving_to_finish") {
+      lightText = "已通过";
     } else if (s.phase === "finished") {
       lightText = "✅ 完成";
     }
@@ -908,11 +814,7 @@ function loop(): void {
     lastPhase = engine.state.phase;
     if (engine.state.phase === "finished") {
       finishGate = true;
-      if (runKind === "practice") {
-        showPracticeComplete();
-      } else {
-        showPostQuestion();
-      }
+      showPostQuestion();
     }
   } else {
     lastPhase = engine.state.phase;
