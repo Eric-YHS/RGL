@@ -260,6 +260,8 @@ export class World3D {
   }
 
   render(state: ExperimentState, progress01: number, nowMs: number): void {
+    if (this.disposed) return;
+
     const z = this.routeLength * progress01;
 
     // Avatar

@@ -102,9 +102,14 @@ export class ExperimentEngine {
       routePos10: Number(routePos10.toFixed(3))
     });
 
-    // Only effective during red light waiting
-    if (this.state.phase === "waiting_red" && this.state.currentLightColor === "red") {
-      this.runRedLight(nowMs, tSec);
+    // Effective only while waiting at the light. Red -> run the red light
+    // (rule-breaking); green -> proceed normally (rule-following).
+    if (this.state.phase === "waiting_red") {
+      if (this.state.currentLightColor === "red") {
+        this.runRedLight(nowMs, tSec);
+      } else {
+        this.passOnGreen(nowMs, tSec);
+      }
     }
   }
 
@@ -135,23 +140,26 @@ export class ExperimentEngine {
     // Phase: waiting at red light
     if (this.state.phase === "waiting_red") {
       const greenAtSec = this.state.greenAtSec;
-      if (greenAtSec !== null && this.state.elapsedSec >= greenAtSec) {
-        if (this.state.currentLightColor !== "green") {
-          this.state.currentLightColor = "green";
-          this.state.waitingForWalkSec = this.state.elapsedSec;
-          this.logger.log({
-            nowMs,
-            tSec: this.state.elapsedSec,
-            event: "light_green",
-            phase: this.state.phase,
-            lightIndex: this.state.lightIndex,
-            lightColor: "green",
-            money: this.state.money
-          });
-        }
-        // Auto-continue after green (participant doesn't need to click)
-        this.startMovingToFinish(nowMs, this.state.elapsedSec, "green");
+      if (
+        greenAtSec !== null &&
+        this.state.elapsedSec >= greenAtSec &&
+        this.state.currentLightColor !== "green"
+      ) {
+        this.state.currentLightColor = "green";
+        this.state.waitingForWalkSec = this.state.elapsedSec;
+        this.logger.log({
+          nowMs,
+          tSec: this.state.elapsedSec,
+          event: "light_green",
+          phase: this.state.phase,
+          lightIndex: this.state.lightIndex,
+          lightColor: "green",
+          money: this.state.money
+        });
       }
+      // The circle stays at the light until the participant clicks "移动".
+      // Clicking during red counts as running the red light (rule-breaking);
+      // clicking after it turns green counts as rule-following.
       return;
     }
 
@@ -167,7 +175,6 @@ export class ExperimentEngine {
   }
 
   getRouteProgress01(): number {
-    const n = this.config.numLights;
     if (this.state.phase === "idle") return 0;
     if (this.state.phase === "finished") return 1;
 
@@ -267,6 +274,26 @@ export class ExperimentEngine {
     });
 
     this.startMovingToFinish(nowMs, tSec, "run_red");
+  }
+
+  private passOnGreen(nowMs: number, tSec: number): void {
+    const routePos01 = this.getRouteProgress01();
+    const routePos10 = this.getRoutePosScale10();
+
+    this.logger.log({
+      nowMs,
+      tSec,
+      event: "pass_light",
+      phase: this.state.phase,
+      lightIndex: this.state.lightIndex,
+      lightColor: "green",
+      money: this.state.money,
+      routePos01,
+      routePos10: Number(routePos10.toFixed(3)),
+      note: "green"
+    });
+
+    this.startMovingToFinish(nowMs, tSec, "green");
   }
 
   private startMovingToFinish(nowMs: number, tSec: number, reason: "green" | "run_red"): void {
