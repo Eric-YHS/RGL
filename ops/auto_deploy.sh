@@ -3,7 +3,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/honglvdeng}"
 REMOTE="${REMOTE:-origin}"
-BRANCH="${BRANCH:-0602simplified}"
+BRANCH="${BRANCH:-}"
 LOCK_FILE="${LOCK_FILE:-/tmp/honglvdeng-auto-deploy.lock}"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
@@ -20,6 +20,15 @@ if ! flock -n 9; then
 fi
 
 cd "$APP_DIR"
+
+if [[ -z "$BRANCH" ]]; then
+  BRANCH="$(git branch --show-current)"
+fi
+
+if [[ -z "$BRANCH" ]]; then
+  echo "[auto-deploy] unable to determine deployment branch" >&2
+  exit 1
+fi
 
 git fetch "$REMOTE" "$BRANCH" --quiet
 local_sha="$(git rev-parse HEAD)"
