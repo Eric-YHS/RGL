@@ -344,7 +344,7 @@ function parseSubmission(body) {
     const event = readString(row.event, { max: 64, required: true });
     if (!event.ok) return fail(`events[${i}].event invalid`);
 
-    const phase = readEnum(row.phase, ["idle", "moving", "waiting_red", "finished"]);
+    const phase = readEnum(row.phase, ["idle", "moving", "waiting_red", "moving_to_finish", "finished"]);
     if (!phase.ok) return fail(`events[${i}].phase invalid`);
 
     const lightIndex = readNullableInteger(row.lightIndex, { min: 0, max: 1000 });

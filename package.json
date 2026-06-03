@@ -18,6 +18,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/three": "^0.161.2",
     "concurrently": "^8.2.2",
     "typescript": "^5.4.5",
     "vite": "^5.2.0"

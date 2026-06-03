@@ -136,7 +136,7 @@ export class World2D {
   /*  Main render                                                        */
   /* ------------------------------------------------------------------ */
 
-  render(state: ExperimentState, progress01: number, nowMs: number): void {
+  render(state: ExperimentState, _progress01: number, nowMs: number): void {
     if (this.disposed) return;
     this.syncLayoutToCanvasSize();
     const ctx = this.ctx;
@@ -765,10 +765,17 @@ export class World2D {
     const labelGap = compactPortrait ? 8 : 10;
     const mainFontSize = compactPortrait ? 26 : 31;
     const subFontSize = compactPortrait ? 11 : 12.5;
+    const subGap = compactPortrait ? 10 : 12;
     const subPrefixText = "每秒扣除";
-    const subPrefixWidth = ctx.measureText(subPrefixText).width;
     const subValueText = `￥${this.config.moneyLossPerSec.toFixed(2)}`;
     const mainText = `￥${money.toFixed(2)}`;
+
+    // Measure the sub-row with its real fonts so it can be centered under the amount.
+    ctx.font = `800 ${subFontSize}px ${UI_FONT_FAMILY}`;
+    const subPrefixWidth = ctx.measureText(subPrefixText).width;
+    ctx.font = `900 ${subFontSize}px ${MONEY_FONT_FAMILY}`;
+    const subValueWidth = ctx.measureText(subValueText).width;
+    const subWidth = subPrefixWidth + subGap + subValueWidth;
 
     const leftInset = pillX + (compactPortrait ? 20 : 26);
     const rightInset = pillX + ribbonW - (compactPortrait ? 20 : 26);
@@ -809,9 +816,9 @@ export class World2D {
     ctx.font = `900 ${subFontSize}px ${MONEY_FONT_FAMILY}`;
     ctx.lineWidth = 1;
     ctx.strokeStyle = "rgba(28, 0, 0, 0.6)";
-    ctx.strokeText(subValueText, subLeft + subPrefixWidth + (compactPortrait ? 10 : 12), bottomRowY);
+    ctx.strokeText(subValueText, subLeft + subPrefixWidth + subGap, bottomRowY);
     ctx.fillStyle = subValueColor;
-    ctx.fillText(subValueText, subLeft + subPrefixWidth + (compactPortrait ? 10 : 12), bottomRowY);
+    ctx.fillText(subValueText, subLeft + subPrefixWidth + subGap, bottomRowY);
 
     ctx.restore();
   }

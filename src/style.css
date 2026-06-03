@@ -635,6 +635,25 @@ canvas.webgl {
   margin-top: 6px;
 }
 
+.instruction-figure {
+  margin: 14px 0 16px;
+  padding: 12px 14px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(176, 193, 217, 0.14);
+}
+
+.instruction-figure svg {
+  display: block;
+}
+
+.instruction-figure-cap {
+  margin-top: 4px;
+  color: rgba(201, 212, 228, 0.76);
+  font-size: 12px;
+  text-align: center;
+}
+
 .card .actions {
   display: flex;
   gap: 10px;
@@ -737,6 +756,17 @@ canvas.webgl {
   font-size: 15px;
   font-weight: 700;
   color: rgba(241, 246, 251, 0.96);
+}
+
+.completion-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.completion-actions .btn {
+  min-width: 160px;
+  text-decoration: none;
 }
 
 .desktop-only-card > *,

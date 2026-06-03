@@ -318,9 +318,11 @@ function formatPhase(v) {
     case "idle":
       return "未开始";
     case "moving":
-      return "行走中";
+      return "走向红绿灯";
     case "waiting_red":
       return "红灯等待";
+    case "moving_to_finish":
+      return "冲向终点";
     case "finished":
       return "已完成";
     default:
@@ -335,9 +337,24 @@ function formatLightColor(v) {
 }
 
 function formatEvent(v) {
-  if (v === "walk_press") return "按下通行键";
-  if (v === "violation") return "闯红灯";
-  return String(v ?? "");
+  switch (v) {
+    case "start":
+      return "开始";
+    case "arrive_light":
+      return "到达红绿灯";
+    case "light_green":
+      return "绿灯亮起";
+    case "walk_press":
+      return "按下通行键";
+    case "pass_light":
+      return "通过红绿灯";
+    case "violation":
+      return "闯红灯";
+    case "finish":
+      return "到达终点";
+    default:
+      return String(v ?? "");
+  }
 }
 
 function formatLanguage(v) {
@@ -369,6 +386,6 @@ function formatTimeZone(v) {
 
 function formatWalkEffect(row) {
   if (row.phase === "waiting_red" && row.light_color === "red") return "闯红灯通行";
-  if (row.phase === "waiting_red" && row.light_color === "green") return "绿灯等待中";
+  if (row.phase === "waiting_red" && row.light_color === "green") return "绿灯通行（遵守规则）";
   return "无效果";
 }
