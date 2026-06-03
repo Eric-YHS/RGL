@@ -7,7 +7,6 @@ import { ExperimentLogger } from "./experiment/logger";
 import { formatMoney, formatSeconds } from "./experiment/utils";
 import { World2D } from "./scene/world2d";
 
-type RunKind = "formal";
 type SubmitOutcome = "sent" | "queued";
 type DesktopInputProof = {
   keyboard: boolean;
@@ -18,6 +17,7 @@ type DesktopInputProof = {
 const params = new URLSearchParams(window.location.search);
 const participantId = (params.get("pid") ?? "").trim();
 const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
+const surveyUrl = (import.meta.env.VITE_SURVEY_URL ?? "").trim();
 const PENDING_SUBMISSIONS_KEY = "honglvdeng_pending_submissions_v1";
 const EXPERIMENT_UI_FONT = '"Experiment Sans"';
 const EXPERIMENT_MONEY_FONT = '"Experiment Mono"';
@@ -246,16 +246,6 @@ app.innerHTML = `
 
     <div class="hud">
       <div class="left">
-        <div class="panel panel-control">
-          <div class="panel-head">
-            <div class="panel-title">控制</div>
-            <div class="hint" id="runHint">决策任务</div>
-          </div>
-          <div class="control-actions">
-            <button class="btn primary" id="btnStart">开始</button>
-          </div>
-        </div>
-
         <div class="panel status panel-status">
           <div class="row"><div class="label">当前位置</div><div class="value" id="posText">—</div></div>
           <div class="row"><div class="label">耗费时间</div><div class="value" id="timeText">0.0s</div></div>
@@ -267,6 +257,7 @@ app.innerHTML = `
     </div>
 
     <div class="center-controls">
+      <button class="btn primary" id="btnStart">开始</button>
       <button class="btn danger" id="btnWalk" disabled>移动</button>
     </div>
 
@@ -280,7 +271,6 @@ app.innerHTML = `
 
 const els = {
   canvas: document.querySelector<HTMLCanvasElement>("canvas.webgl")!,
-  runHint: document.querySelector<HTMLDivElement>("#runHint")!,
   btnStart: document.querySelector<HTMLButtonElement>("#btnStart")!,
   btnWalk: document.querySelector<HTMLButtonElement>("#btnWalk")!,
   posText: document.querySelector<HTMLDivElement>("#posText")!,
@@ -309,6 +299,7 @@ let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateEnteredOnce = false;
 let desktopGateShowingIntro = false;
+let instructionsShownOnce = false;
 
 function hasDesktopViewport(): boolean {
   return window.innerWidth >= DESKTOP_MIN_VIEWPORT_WIDTH && window.innerHeight >= DESKTOP_MIN_VIEWPORT_HEIGHT;
@@ -320,10 +311,6 @@ function hasDesktopPointer(): boolean {
 
 function hasDesktopHover(): boolean {
   return window.matchMedia("(hover: hover)").matches;
-}
-
-function hasDesktopInteractionProof(): boolean {
-  return desktopInputProof.keyboard && desktopInputProof.mouseMove && desktopInputProof.mouseClick;
 }
 
 function renderDesktopPreflightGate(): void {
@@ -348,6 +335,13 @@ function renderDesktopPreflightGate(): void {
 
     if (!desktopGateReady) {
       desktopGateReady = true;
+    }
+
+    // First time the desktop gate clears, walk the participant through the
+    // instructions -> comprehension test -> ready-to-start flow.
+    if (!instructionsShownOnce) {
+      instructionsShownOnce = true;
+      showInstructions();
     }
     return;
   }
@@ -437,6 +431,14 @@ function closeModal(): void {
   els.modal.style.display = "none";
 }
 
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
 function buildFormalSubmission(): SessionSubmission {
   return logger.buildSubmission({
     clientSessionId: formalClientSessionId,
@@ -453,22 +455,47 @@ function buildFormalSubmission(): SessionSubmission {
 function showInstructions(): void {
   openModal(`
     <h1>指导语</h1>
-    <p>决策任务中，您将控制一个<strong>圆形图形</strong>，并在屏幕上将其移动至终点线。</p>
+    <p>决策任务中，您将控制一个<strong>圆形图形</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
+    <div class="instruction-figure" aria-hidden="true">
+      <svg viewBox="0 0 520 104" width="100%" height="100" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <pattern id="instrChecker" width="8" height="8" patternUnits="userSpaceOnUse">
+            <rect width="8" height="8" fill="#f4f6fa"></rect>
+            <rect width="4" height="4" fill="#1a1a1a"></rect>
+            <rect x="4" y="4" width="4" height="4" fill="#1a1a1a"></rect>
+          </pattern>
+        </defs>
+        <rect x="20" y="46" width="480" height="14" rx="7" fill="rgba(170,185,205,0.26)"></rect>
+        <line x1="24" y1="53" x2="496" y2="53" stroke="rgba(220,230,242,0.5)" stroke-width="2" stroke-dasharray="14 10"></line>
+        <circle cx="58" cy="38" r="13" fill="#2563eb"></circle>
+        <g transform="translate(250,0)">
+          <rect x="-2" y="20" width="4" height="26" fill="#54607a"></rect>
+          <rect x="-11" y="-4" width="22" height="34" rx="5" fill="#2a2a2a"></rect>
+          <circle cx="0" cy="6" r="6.5" fill="#c32128"></circle>
+          <circle cx="0" cy="20" r="6.5" fill="#173322"></circle>
+        </g>
+        <rect x="446" y="28" width="14" height="32" fill="url(#instrChecker)" stroke="rgba(136,150,170,0.6)" stroke-width="0.5"></rect>
+        <text x="58" y="94" text-anchor="middle" font-size="12" fill="#cdd8e6">起点</text>
+        <text x="250" y="94" text-anchor="middle" font-size="12" fill="#cdd8e6">红绿灯</text>
+        <text x="453" y="94" text-anchor="middle" font-size="12" fill="#cdd8e6">终点线</text>
+      </svg>
+      <div class="instruction-figure-cap">示例：起点 → 红绿灯 → 终点线</div>
+    </div>
     <ul>
-      <li>当您点击屏幕左侧的<strong>【开始】</strong>按钮后，您的圆圈会靠近红绿灯并停下等待。</li>
-      <li>要让您的圆圈再次移动，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮。</li>
+      <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，您的圆圈会靠近红绿灯并停下等待。</li>
+      <li>要让您的圆圈再次移动，请点击<strong>【移动】</strong>按钮，您<strong>可以在任何时刻</strong>点击该按钮。</li>
     </ul>
     <h2>实验规则</h2>
-    <p>在红绿灯处等待，直至其变为绿色后通行。</p>
+    <p>在红绿灯处等待，直至其变为<strong>绿色</strong>后通行。</p>
     <h2>收益规则</h2>
     <ul>
-      <li>本阶段您的初始资金为 <strong>￥${currentConfig.startMoney.toFixed(2)}</strong>。</li>
-      <li>每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${currentConfig.moneyLossPerSec.toFixed(2)}</strong>，直至您冲过终点线。</li>
+      <li>本部分收益取决于您将圆圈移过终点线所花费的时间，<strong>从点击【开始】按钮起计时</strong>。</li>
+      <li>本阶段初始资金为 <strong>￥${currentConfig.startMoney.toFixed(2)}</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${currentConfig.moneyLossPerSec.toFixed(2)}</strong>，直至您冲过终点线。</li>
     </ul>
     <h2>场景设置</h2>
     <ul>
-      <li>圆圈从初始位置到红绿灯、从红绿灯到终点线各需 <strong>${currentConfig.segmentDurationSec}</strong> 秒。</li>
-      <li>红灯等待 <strong>${currentConfig.redWaitSec}</strong> 秒后变为绿灯。</li>
+      <li>圆圈从初始位置到红绿灯、从红绿灯到终点线<strong>各需 ${currentConfig.segmentDurationSec} 秒</strong>。</li>
+      <li>红灯等待 <strong>${currentConfig.redWaitSec} 秒</strong>后变为绿灯。</li>
     </ul>
     <div class="actions">
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
@@ -499,7 +526,7 @@ function showComprehensionTest(): void {
       <button class="btn" id="btnBackToInstructions">返回提示语</button>
       <button class="btn primary" id="btnBeginExperiment">我已作答，开始决策</button>
     </div>
-    <p class="hint" style="margin-top:10px;">作答后，请点击左侧【开始】按钮开始决策任务。</p>
+    <p class="hint" style="margin-top:10px;">作答后，请点击底部【开始】按钮开始决策任务。</p>
   `);
 
   document
@@ -516,6 +543,10 @@ function showComprehensionTest(): void {
       if (hint) hint.textContent = "请选择答案后继续。";
       return;
     }
+    if (choice !== "yes") {
+      if (hint) hint.textContent = "回答不正确，请重新阅读指导语后再继续。";
+      return;
+    }
 
     logger.log({
       nowMs,
@@ -528,6 +559,22 @@ function showComprehensionTest(): void {
       note: choice
     });
 
+    showReadyToStart();
+  });
+}
+
+function showReadyToStart(): void {
+  openModal(`
+    <h1>回答正确</h1>
+    <p>Please click below to proceed to <strong>决策任务</strong>.</p>
+    <h2>注意</h2>
+    <p>点击<strong>【移动】</strong>按钮控制你的圆圈；规则是在红绿灯处等待，直到其变为绿色。</p>
+    <div class="actions">
+      <button class="btn primary" id="btnReadyToStart">进入决策任务</button>
+    </div>
+  `);
+
+  document.querySelector<HTMLButtonElement>("#btnReadyToStart")?.addEventListener("click", () => {
     closeModal();
   });
 }
@@ -548,9 +595,18 @@ async function submitFormalResultsSilently(): Promise<SubmitOutcome> {
 
 function showCompletionScreen(state: CompletionScreenState): void {
   const elapsed = engine.state.elapsedSec;
-  const money = engine.state.money;
   const waitSec = Math.max(0, elapsed - currentConfig.segmentDurationSec * 2);
   const taskMoney = Math.max(0, currentConfig.startMoney - currentConfig.moneyLossPerSec * elapsed);
+  const surveyAction =
+    state === "saving"
+      ? ""
+      : surveyUrl
+        ? `
+          <div class="completion-actions">
+            <a class="btn primary" href="${escapeHtmlAttr(surveyUrl)}">跳转见数</a>
+          </div>
+        `
+        : "";
 
   const statusBlock =
     state === "saving"
@@ -566,8 +622,23 @@ function showCompletionScreen(state: CompletionScreenState): void {
       <p>您在红绿灯处等待了 <strong>${formatSeconds(waitSec, 1)}</strong>，获得 <strong>${formatMoney(taskMoney)}</strong>。</p>
       ${statusBlock}
       <p class="completion-close-note">后续填写完简短问卷后，您将在见数平台领取自己的收益。</p>
+      ${surveyAction}
     </div>
   `);
+}
+
+function showTaskSubmitScreen(): void {
+  openModal(`
+    <h1>决策任务</h1>
+    <p>圆圈已越过终点线。请点击下方按钮进入下一屏幕。</p>
+    <div class="actions">
+      <button class="btn primary" id="btnTaskSubmit">提交</button>
+    </div>
+  `);
+
+  document.querySelector<HTMLButtonElement>("#btnTaskSubmit")?.addEventListener("click", () => {
+    showPostQuestion();
+  });
 }
 
 function showPostQuestion(): void {
@@ -723,8 +794,7 @@ document.addEventListener("visibilitychange", () => {
 
 function updateHud(): void {
   const s = engine.state;
-  // "移动" button: only enabled during waiting_red with red light
-  const nextWalkDisabled = s.phase !== "waiting_red" || s.currentLightColor !== "red";
+  const nextWalkDisabled = s.phase === "idle" || s.phase === "finished";
   const nextStartDisabled = s.phase !== "idle";
   if (hudCache.btnWalkDisabled !== nextWalkDisabled) {
     els.btnWalk.disabled = nextWalkDisabled;
@@ -814,7 +884,7 @@ function loop(): void {
     lastPhase = engine.state.phase;
     if (engine.state.phase === "finished") {
       finishGate = true;
-      showPostQuestion();
+      showTaskSubmitScreen();
     }
   } else {
     lastPhase = engine.state.phase;

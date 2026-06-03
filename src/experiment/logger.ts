@@ -3,6 +3,21 @@ import { csvEscape } from "./utils";
 
 type Cell = string | number;
 
+// Timeline events persisted with the submission. Milestone events (start /
+// arrive_light / light_green / pass_light / finish) let researchers reconstruct
+// the wait/run-red duration and the rule-breaking dummy without assuming fixed
+// timings. comprehension_answer / post_rule_attitude are handled separately
+// (they update fields rather than the event log).
+const PERSISTED_EVENTS = new Set<string>([
+  "start",
+  "arrive_light",
+  "light_green",
+  "walk_press",
+  "pass_light",
+  "violation",
+  "finish"
+]);
+
 export type SessionMeta = {
   participantId: string;
   startedAtIso: string;
@@ -80,7 +95,7 @@ export class ExperimentLogger {
       if (typeof args.note === "string") this.postRuleAttitudeText = args.note;
       return;
     }
-    if (args.event !== "walk_press" && args.event !== "violation") return;
+    if (!PERSISTED_EVENTS.has(args.event)) return;
 
     this.events.push({
       tMs: Math.round(args.nowMs),
@@ -275,6 +290,6 @@ function formatLightColor(color: LightColor | null): string {
 
 function formatWalkEffect(e: LogEvent): string {
   if (e.phase === "waiting_red" && e.lightColor === "red") return "闯红灯通行";
-  if (e.phase === "waiting_red" && e.lightColor === "green") return "绿灯等待中";
+  if (e.phase === "waiting_red" && e.lightColor === "green") return "绿灯通行（遵守规则）";
   return "无效果";
 }
