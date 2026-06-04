@@ -526,9 +526,8 @@ function showComprehensionTest(): void {
     </div>
     <div class="actions">
       <button class="btn" id="btnBackToInstructions">上一步</button>
-      <button class="btn primary" id="btnBeginExperiment">我已作答，开始决策</button>
+      <button class="btn primary" id="btnBeginExperiment">我已作答，下一步</button>
     </div>
-    <p class="hint" style="margin-top:10px;">作答后，请点击底部【开始】按钮开始决策任务。</p>
   `);
 
   document
@@ -568,9 +567,9 @@ function showComprehensionTest(): void {
 function showReadyToStart(): void {
   openModal(`
     <h1>准备开始决策任务</h1>
-    <p>回答正确。请点击下方按钮进入决策任务。</p>
-    <h2>注意</h2>
-    <p>进入任务后，底部按钮先显示为<strong>【开始】</strong>；点击后按钮会变为<strong>【移动】</strong>。你可以在任意时刻点击<strong>【移动】</strong>，但实验规则要求你在红绿灯处等待，直到红灯变为绿色后再通行。</p>
+    <p>回答正确。请点击下方按钮进入正式任务界面。</p>
+    <p>进入正式任务界面后，底部按钮会先显示为<strong>【开始】</strong>；点击<strong>【开始】</strong>后，任务开始计时，圆圈开始移动，按钮会切换为<strong>【移动】</strong>。</p>
+    <p class="hint">规则提醒：你可以在任意时刻点击<strong>【移动】</strong>，但实验规则要求你在红绿灯处等待，直到红灯变为绿色后再通行。</p>
     <div class="actions">
       <button class="btn" id="btnBackToCompTest">上一步</button>
       <button class="btn primary" id="btnReadyToStart">进入决策任务</button>
