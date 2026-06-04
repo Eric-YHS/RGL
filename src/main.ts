@@ -525,7 +525,7 @@ function showComprehensionTest(): void {
       <div class="hint" id="compHint"></div>
     </div>
     <div class="actions">
-      <button class="btn" id="btnBackToInstructions">返回提示语</button>
+      <button class="btn" id="btnBackToInstructions">上一步</button>
       <button class="btn primary" id="btnBeginExperiment">我已作答，开始决策</button>
     </div>
     <p class="hint" style="margin-top:10px;">作答后，请点击底部【开始】按钮开始决策任务。</p>
@@ -572,9 +572,14 @@ function showReadyToStart(): void {
     <h2>注意</h2>
     <p>进入任务后，底部按钮先显示为<strong>【开始】</strong>；点击后按钮会变为<strong>【移动】</strong>。你可以在任意时刻点击<strong>【移动】</strong>，但实验规则要求你在红绿灯处等待，直到红灯变为绿色后再通行。</p>
     <div class="actions">
+      <button class="btn" id="btnBackToCompTest">上一步</button>
       <button class="btn primary" id="btnReadyToStart">进入决策任务</button>
     </div>
   `);
+
+  document.querySelector<HTMLButtonElement>("#btnBackToCompTest")?.addEventListener("click", () => {
+    showComprehensionTest();
+  });
 
   document.querySelector<HTMLButtonElement>("#btnReadyToStart")?.addEventListener("click", () => {
     closeModal();
