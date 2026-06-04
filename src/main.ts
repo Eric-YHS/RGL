@@ -257,8 +257,7 @@ app.innerHTML = `
     </div>
 
     <div class="center-controls">
-      <button class="btn primary" id="btnStart">开始</button>
-      <button class="btn danger" id="btnWalk" disabled>移动</button>
+      <button class="btn primary" id="btnAction">开始</button>
     </div>
 
     <div class="modal" id="modal" style="display:none;">
@@ -271,8 +270,7 @@ app.innerHTML = `
 
 const els = {
   canvas: document.querySelector<HTMLCanvasElement>("canvas.webgl")!,
-  btnStart: document.querySelector<HTMLButtonElement>("#btnStart")!,
-  btnWalk: document.querySelector<HTMLButtonElement>("#btnWalk")!,
+  btnAction: document.querySelector<HTMLButtonElement>("#btnAction")!,
   posText: document.querySelector<HTMLDivElement>("#posText")!,
   timeText: document.querySelector<HTMLDivElement>("#timeText")!,
   moneyText: document.querySelector<HTMLDivElement>("#moneyText")!,
@@ -357,7 +355,7 @@ function renderDesktopPreflightGate(): void {
       <div class="card desktop-entry-card" style="max-width:640px;">
         <h1>欢迎</h1>
         <p>该部分人类智能任务的报酬取决于您的决策。</p>
-        <p class="hint">注意：如果你使用台式机或笔记本电脑完成此人类智能任务，建议在开始前将浏览器屏幕最大化。在完成决策任务期间，请不要关闭此窗口，也不要以其他任何方式离开网页。</p>
+        <p class="hint">注意：如果你使用台式机或笔记本电脑完成此人类智能任务，请在开始前将浏览器屏幕最大化。在完成决策任务期间，请不要关闭此窗口，也不要以其他任何方式离开网页。</p>
         <div class="actions">
           <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
         </div>
@@ -483,8 +481,12 @@ function showInstructions(): void {
     </div>
     <ul>
       <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，您的圆圈会靠近红绿灯并停下等待。</li>
-      <li>要让您的圆圈再次移动，请点击<strong>【移动】</strong>按钮，您<strong>可以在任何时刻</strong>点击该按钮。</li>
+      <li>按钮会由<strong>【开始】</strong>变为<strong>【移动】</strong>。要让您的圆圈再次移动，请点击<strong>【移动】</strong>按钮，您<strong>可以在任何时刻</strong>点击该按钮。</li>
     </ul>
+    <h2>示例短片</h2>
+    <div class="instruction-video">
+      <video controls preload="metadata" playsinline src="/demo.mp4"></video>
+    </div>
     <h2>实验规则</h2>
     <p>在红绿灯处等待，直至其变为<strong>绿色</strong>后通行。</p>
     <h2>收益规则</h2>
@@ -565,10 +567,10 @@ function showComprehensionTest(): void {
 
 function showReadyToStart(): void {
   openModal(`
-    <h1>回答正确</h1>
-    <p>Please click below to proceed to <strong>决策任务</strong>.</p>
+    <h1>准备开始决策任务</h1>
+    <p>回答正确。请点击下方按钮进入决策任务。</p>
     <h2>注意</h2>
-    <p>点击<strong>【移动】</strong>按钮控制你的圆圈；规则是在红绿灯处等待，直到其变为绿色。</p>
+    <p>进入任务后，底部按钮先显示为<strong>【开始】</strong>；点击后按钮会变为<strong>【移动】</strong>。你可以在任意时刻点击<strong>【移动】</strong>，但实验规则要求你在红绿灯处等待，直到红灯变为绿色后再通行。</p>
     <div class="actions">
       <button class="btn primary" id="btnReadyToStart">进入决策任务</button>
     </div>
@@ -697,14 +699,17 @@ function showPostQuestion(): void {
   });
 }
 
-els.btnStart.addEventListener("click", () => {
-  if (!world || engine.state.phase !== "idle") return;
-  closeModal();
-  engine.start(performance.now());
-});
+els.btnAction.addEventListener("click", () => {
+  if (!world || engine.state.phase === "finished") return;
 
-els.btnWalk.addEventListener("click", () => {
-  engine.pressWalk(performance.now());
+  const nowMs = performance.now();
+  if (engine.state.phase === "idle") {
+    closeModal();
+    engine.start(nowMs);
+    return;
+  }
+
+  engine.pressWalk(nowMs);
 });
 
 window.addEventListener("keydown", (e) => {
@@ -720,8 +725,10 @@ let lastPhase: typeof engine.state.phase = engine.state.phase;
 let finishGate = false;
 
 const hudCache = {
-  btnWalkDisabled: null as boolean | null,
-  btnStartDisabled: null as boolean | null,
+  btnActionDisabled: null as boolean | null,
+  btnActionText: "",
+  btnActionDanger: null as boolean | null,
+  btnActionPrimary: null as boolean | null,
   posText: "",
   timeText: "",
   moneyText: "",
@@ -794,15 +801,25 @@ document.addEventListener("visibilitychange", () => {
 
 function updateHud(): void {
   const s = engine.state;
-  const nextWalkDisabled = s.phase === "idle" || s.phase === "finished";
-  const nextStartDisabled = s.phase !== "idle";
-  if (hudCache.btnWalkDisabled !== nextWalkDisabled) {
-    els.btnWalk.disabled = nextWalkDisabled;
-    hudCache.btnWalkDisabled = nextWalkDisabled;
+  const nextActionDisabled = s.phase === "finished";
+  const nextActionText = s.phase === "idle" ? "开始" : "移动";
+  const nextActionDanger = s.phase !== "idle" && s.phase !== "finished";
+  const nextActionPrimary = !nextActionDanger;
+  if (hudCache.btnActionDisabled !== nextActionDisabled) {
+    els.btnAction.disabled = nextActionDisabled;
+    hudCache.btnActionDisabled = nextActionDisabled;
   }
-  if (hudCache.btnStartDisabled !== nextStartDisabled) {
-    els.btnStart.disabled = nextStartDisabled;
-    hudCache.btnStartDisabled = nextStartDisabled;
+  if (hudCache.btnActionText !== nextActionText) {
+    els.btnAction.textContent = nextActionText;
+    hudCache.btnActionText = nextActionText;
+  }
+  if (hudCache.btnActionDanger !== nextActionDanger) {
+    els.btnAction.classList.toggle("danger", nextActionDanger);
+    hudCache.btnActionDanger = nextActionDanger;
+  }
+  if (hudCache.btnActionPrimary !== nextActionPrimary) {
+    els.btnAction.classList.toggle("primary", nextActionPrimary);
+    hudCache.btnActionPrimary = nextActionPrimary;
   }
 
   let posText = "—";
@@ -836,7 +853,9 @@ function updateHud(): void {
       lightRed = isRed;
       lightGreen = !isRed;
     } else if (s.phase === "moving_to_finish") {
-      lightText = "已通过";
+      const passedOnRed = s.passedOutcome[s.lightIndex] === "run_red";
+      lightText = passedOnRed ? "🔴 红灯" : "已通过";
+      lightRed = passedOnRed;
     } else if (s.phase === "finished") {
       lightText = "✅ 完成";
     }
