@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="Minimal traffic light task example">
+  <rect width="960" height="540" fill="#ffffff"/>
+  <rect x="170" y="72" width="620" height="360" fill="#ffffff" stroke="#999999" stroke-width="2"/>
+
+  <rect x="326" y="82" width="308" height="38" rx="10" fill="#ffffff" stroke="#999999" stroke-width="2"/>
+  <text x="480" y="107" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#222222">
+    <tspan>Your endowment: </tspan><tspan font-weight="700">20 points</tspan>
+  </text>
+
+  <line x1="260" y1="356" x2="708" y2="356" stroke="#dddddd" stroke-width="2" stroke-dasharray="8 8"/>
+
+  <line x1="480" y1="144" x2="480" y2="408" stroke="#d1d1d1" stroke-width="4"/>
+  <rect x="465" y="116" width="30" height="78" fill="#cfcfcf"/>
+  <circle cx="480" cy="136" r="13" fill="#f20f16"/>
+  <circle cx="480" cy="165" r="13" fill="#b9d4b7"/>
+
+  <line x1="690" y1="146" x2="690" y2="410" stroke="#111111" stroke-width="4"/>
+
+  <circle cx="238" cy="356" r="24" fill="#2f6fed"/>
+  <ellipse cx="238" cy="386" rx="22" ry="5" fill="rgba(0,0,0,0.16)"/>
+
+  <rect x="425" y="446" width="110" height="48" rx="4" fill="#3d3d3d"/>
+  <text x="480" y="478" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#ffffff">Move</text>
+</svg>
