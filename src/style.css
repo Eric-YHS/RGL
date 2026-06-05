@@ -106,6 +106,10 @@ canvas.webgl {
   pointer-events: auto;
 }
 
+.center-controls .btn:hover:not(:disabled) {
+  filter: none;
+}
+
 .btn {
   border: 1px solid var(--button-border);
   border-radius: 4px;
@@ -259,7 +263,7 @@ canvas.webgl {
   place-items: center;
   box-sizing: border-box;
   padding: 24px;
-  background: rgba(255, 255, 255, 0.96);
+  background: #ffffff;
 }
 
 .card {

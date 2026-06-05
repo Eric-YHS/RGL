@@ -63,13 +63,13 @@ export class World2D {
     this.w = cssW;
     this.h = cssH;
 
-    this.panelW = Math.min(Math.max(560, this.w * 0.58), this.w - 72);
-    this.panelH = Math.min(Math.max(320, this.h * 0.46), this.h - 210);
+    this.panelW = Math.min(Math.max(760, this.w * 0.64), this.w - 160);
+    this.panelH = Math.min(Math.max(360, this.h * 0.56), this.h - 260);
     this.panelX = (this.w - this.panelW) / 2;
-    this.panelY = Math.max(22, this.h * 0.08);
+    this.panelY = Math.max(48, Math.min(this.h * 0.08, this.h - this.panelH - 154));
 
-    this.trackY = this.panelY + this.panelH * 0.82;
-    this.startX = this.panelX + this.panelW * 0.09;
+    this.trackY = this.panelY + this.panelH * 0.8;
+    this.startX = this.panelX + this.panelW * 0.1;
     this.lightX = this.panelX + this.panelW * 0.48;
     this.finishLineX = this.panelX + this.panelW * 0.84;
 
@@ -77,7 +77,7 @@ export class World2D {
   }
 
   private syncStageAnchors(parent: HTMLElement): void {
-    const controlsY = Math.min(this.h - 62, this.panelY + this.panelH + 58);
+    const controlsY = Math.min(this.h - 72, this.panelY + this.panelH + 76);
     parent.style.setProperty("--walk-center-y", `${controlsY}px`);
   }
 
@@ -136,8 +136,14 @@ export class World2D {
   }
 
   private drawEndowment(ctx: CanvasRenderingContext2D, money: number): void {
-    const labelW = 282;
+    const label = "剩余报酬：";
+    const moneyText = `￥${money.toFixed(2)}`;
     const labelH = 28;
+    ctx.font = `400 15px ${UI_FONT_FAMILY}`;
+    const labelTextW = ctx.measureText(label).width;
+    ctx.font = `700 15px ${MONEY_FONT_FAMILY}`;
+    const moneyTextW = ctx.measureText(moneyText).width;
+    const labelW = Math.max(252, labelTextW + moneyTextW + 42);
     const x = this.panelX + this.panelW / 2 - labelW / 2;
     const y = this.panelY - 1;
 
@@ -150,16 +156,17 @@ export class World2D {
     ctx.stroke();
 
     ctx.fillStyle = "#202020";
-    ctx.textAlign = "center";
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.font = `400 15px ${UI_FONT_FAMILY}`;
-    ctx.fillText("Your endowment:", x + labelW / 2 - 24, y + labelH / 2 + 1);
+    const textX = x + (labelW - labelTextW - moneyTextW) / 2;
+    ctx.fillText(label, textX, y + labelH / 2 + 1);
     ctx.font = `700 15px ${MONEY_FONT_FAMILY}`;
-    ctx.fillText(`￥${money.toFixed(2)}`, x + labelW / 2 + 74, y + labelH / 2 + 1);
+    ctx.fillText(moneyText, textX + labelTextW, y + labelH / 2 + 1);
   }
 
   private drawTrafficLight(ctx: CanvasRenderingContext2D, state: ExperimentState, nowMs: number): void {
-    const lightTop = this.panelY + 12;
+    const lightTop = this.panelY + Math.max(64, this.panelH * 0.12);
     const poleTop = lightTop + 66;
     const poleBottom = this.trackY + 44;
     const housingW = 22;
@@ -206,8 +213,9 @@ export class World2D {
   }
 
   private drawCountdown(ctx: CanvasRenderingContext2D, state: ExperimentState, x: number, y: number): void {
-    const isGreen = state.currentLightColor === "green" || state.phase === "moving_to_finish" || state.phase === "finished";
     const remaining = this.getRedCountdownSec(state);
+    const passedOnGreen = state.passedOutcome[state.lightIndex] === "green";
+    const isGreen = state.currentLightColor === "green" || passedOnGreen || remaining <= 0;
     const text = isGreen ? "0" : String(remaining);
 
     ctx.fillStyle = "#ffffff";
@@ -226,15 +234,17 @@ export class World2D {
   }
 
   private getRedCountdownSec(state: ExperimentState): number {
-    if (state.phase === "waiting_red" && state.greenAtSec !== null) {
+    if (
+      (state.phase === "waiting_red" || state.phase === "moving_to_finish" || state.phase === "finished") &&
+      state.greenAtSec !== null
+    ) {
       return Math.max(0, Math.ceil(state.greenAtSec - state.elapsedSec));
     }
-    if (state.phase === "moving_to_finish" || state.phase === "finished") return 0;
     return this.config.redWaitSec;
   }
 
   private drawFinishLine(ctx: CanvasRenderingContext2D): void {
-    const top = this.panelY + 70;
+    const top = this.panelY + Math.max(70, this.panelH * 0.14);
     const bottom = this.panelY + this.panelH - 36;
 
     ctx.strokeStyle = "#111111";
@@ -298,7 +308,9 @@ export class World2D {
   private getTrafficLightColor(state: ExperimentState): "red" | "green" {
     if (state.phase === "waiting_red") return state.currentLightColor;
     if (state.phase === "moving_to_finish" || state.phase === "finished") {
-      return state.passedOutcome[1] === "green" ? "green" : "red";
+      return state.passedOutcome[state.lightIndex] === "green" || this.getRedCountdownSec(state) <= 0
+        ? "green"
+        : "red";
     }
     return "red";
   }

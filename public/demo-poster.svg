@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="Minimal traffic light task example">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="红绿灯决策任务示例">
   <rect width="960" height="540" fill="#ffffff"/>
   <rect x="170" y="72" width="620" height="360" fill="#ffffff" stroke="#999999" stroke-width="2"/>
 
   <rect x="326" y="82" width="308" height="38" rx="10" fill="#ffffff" stroke="#999999" stroke-width="2"/>
   <text x="480" y="107" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#222222">
-    <tspan>Your endowment: </tspan><tspan font-weight="700">20 points</tspan>
+    <tspan>剩余报酬：</tspan><tspan font-weight="700">20点</tspan>
   </text>
 
   <line x1="260" y1="356" x2="708" y2="356" stroke="#dddddd" stroke-width="2" stroke-dasharray="8 8"/>
@@ -20,5 +20,5 @@
   <ellipse cx="238" cy="386" rx="22" ry="5" fill="rgba(0,0,0,0.16)"/>
 
   <rect x="425" y="446" width="110" height="48" rx="4" fill="#3d3d3d"/>
-  <text x="480" y="478" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#ffffff">Move</text>
+  <text x="480" y="478" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#ffffff">移动</text>
 </svg>

@@ -553,7 +553,7 @@ async function submitFormalResultsSilently(): Promise<SubmitOutcome> {
 function showCompletionScreen(state: CompletionScreenState): void {
   const elapsed = engine.state.elapsedSec;
   const waitSec = Math.max(0, elapsed - currentConfig.segmentDurationSec * 2);
-  const taskMoney = Math.max(0, currentConfig.startMoney - currentConfig.moneyLossPerSec * elapsed);
+  const taskMoney = engine.state.money;
   const surveyAction =
     state === "saving"
       ? ""
@@ -682,8 +682,6 @@ let finishGate = false;
 const hudCache = {
   btnActionDisabled: null as boolean | null,
   btnActionText: "",
-  btnActionDanger: null as boolean | null,
-  btnActionPrimary: null as boolean | null,
   posText: "",
   timeText: "",
   moneyText: "",
@@ -758,8 +756,6 @@ function updateHud(): void {
   const s = engine.state;
   const nextActionDisabled = s.phase === "finished";
   const nextActionText = s.phase === "idle" ? "开始" : "移动";
-  const nextActionDanger = s.phase !== "idle" && s.phase !== "finished";
-  const nextActionPrimary = !nextActionDanger;
   if (hudCache.btnActionDisabled !== nextActionDisabled) {
     els.btnAction.disabled = nextActionDisabled;
     hudCache.btnActionDisabled = nextActionDisabled;
@@ -767,14 +763,6 @@ function updateHud(): void {
   if (hudCache.btnActionText !== nextActionText) {
     els.btnAction.textContent = nextActionText;
     hudCache.btnActionText = nextActionText;
-  }
-  if (hudCache.btnActionDanger !== nextActionDanger) {
-    els.btnAction.classList.toggle("danger", nextActionDanger);
-    hudCache.btnActionDanger = nextActionDanger;
-  }
-  if (hudCache.btnActionPrimary !== nextActionPrimary) {
-    els.btnAction.classList.toggle("primary", nextActionPrimary);
-    hudCache.btnActionPrimary = nextActionPrimary;
   }
 
   let posText = "—";

@@ -122,10 +122,7 @@ export class ExperimentEngine {
     this.lastTickMs = nowMs;
 
     this.state.elapsedSec = this.getNowTsec(nowMs);
-    this.state.money = Math.max(
-      0,
-      this.config.startMoney - this.config.moneyLossPerSec * this.state.elapsedSec
-    );
+    this.state.money = this.getMoneyAtElapsed(this.state.elapsedSec);
 
     // Phase: moving toward the traffic light
     if (this.state.phase === "moving") {
@@ -330,6 +327,11 @@ export class ExperimentEngine {
   private getNowTsec(nowMs: number): number {
     if (this.startedAtMs === null) return 0;
     return (nowMs - this.startedAtMs) / 1000;
+  }
+
+  private getMoneyAtElapsed(elapsedSec: number): number {
+    const chargedSeconds = Math.floor(Math.max(0, elapsedSec));
+    return Math.max(0, this.config.startMoney - this.config.moneyLossPerSec * chargedSeconds);
   }
 
   private getRoutePosScale10(): number {
