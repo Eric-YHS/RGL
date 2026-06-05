@@ -296,7 +296,6 @@ let desktopGateReady = false;
 let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateEnteredOnce = false;
-let desktopGateShowingIntro = false;
 let instructionsShownOnce = false;
 
 function hasDesktopViewport(): boolean {
@@ -349,30 +348,6 @@ function renderDesktopPreflightGate(): void {
     pausedByDesktopGate = true;
   }
 
-  // Show instructions page after prerequisites are met
-  if (desktopGateShowingIntro && prerequisitesReady && !desktopGateEnteredOnce) {
-    els.desktopGate.innerHTML = `
-      <div class="card desktop-entry-card" style="max-width:640px;">
-        <h1>欢迎</h1>
-        <p>该部分人类智能任务的报酬取决于您的决策。</p>
-        <p class="hint">注意：如果你使用台式机或笔记本电脑完成此人类智能任务，请在开始前将浏览器屏幕最大化。在完成决策任务期间，请不要关闭此窗口，也不要以其他任何方式离开网页。</p>
-        <div class="actions">
-          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
-        </div>
-      </div>
-    `;
-    els.desktopGate.style.display = "grid";
-    desktopGateVisible = true;
-    els.desktopGate
-      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
-      ?.addEventListener("click", () => {
-        desktopGateEnteredOnce = true;
-        desktopGateShowingIntro = false;
-        renderDesktopPreflightGate();
-      });
-    return;
-  }
-
   const viewportLabel = viewportReady
     ? `窗口尺寸已满足（至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}）`
     : `请将浏览器窗口调整到至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}`;
@@ -384,18 +359,19 @@ function renderDesktopPreflightGate(): void {
   const readyNotice = prerequisitesReady
     ? `
         <div class="desktop-preflight-ready">
-          桌面端校验已通过，请点击下方按钮进入实验说明。
+          桌面端校验已通过。
         </div>
         <div class="desktop-preflight-actions">
-          <button class="btn primary" id="btnDesktopGateContinue">进入实验说明</button>
+          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
         </div>
       `
     : "";
 
   els.desktopGate.innerHTML = `
-    <section class="desktop-preflight-card">
-      <div class="desktop-preflight-eyebrow">桌面端校验</div>
-      <h1>请使用电脑端完成实验</h1>
+    <section class="desktop-preflight-card desktop-entry-card">
+      <h1>欢迎</h1>
+      <p>该部分人类智能任务的报酬取决于您的决策。</p>
+      <p>注意：如果你使用台式机或笔记本电脑完成此人类智能任务，请在开始前将浏览器屏幕最大化。在完成决策任务期间，请不要关闭此窗口，也不要以其他任何方式离开网页。</p>
       <p>为保证实验环境一致，进入实验前必须同时满足桌面窗口尺寸、精细指针、悬停能力，以及真实键盘和鼠标交互。</p>
       <div class="desktop-preflight-checklist">
         <div class="${viewportReady ? "ready" : ""}">${viewportReady ? "✓" : "•"} ${viewportLabel}</div>
@@ -414,7 +390,7 @@ function renderDesktopPreflightGate(): void {
     els.desktopGate
       .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
       ?.addEventListener("click", () => {
-        desktopGateShowingIntro = true;
+        desktopGateEnteredOnce = true;
         renderDesktopPreflightGate();
       });
   }
@@ -454,38 +430,13 @@ function showInstructions(): void {
   openModal(`
     <h1>指导语</h1>
     <p>决策任务中，您将控制一个<strong>圆形图形</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
-    <div class="instruction-figure" aria-hidden="true">
-      <svg viewBox="0 0 520 104" width="100%" height="100" preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <pattern id="instrChecker" width="8" height="8" patternUnits="userSpaceOnUse">
-            <rect width="8" height="8" fill="#f4f6fa"></rect>
-            <rect width="4" height="4" fill="#1a1a1a"></rect>
-            <rect x="4" y="4" width="4" height="4" fill="#1a1a1a"></rect>
-          </pattern>
-        </defs>
-        <rect x="20" y="46" width="480" height="14" rx="7" fill="rgba(170,185,205,0.26)"></rect>
-        <line x1="24" y1="53" x2="496" y2="53" stroke="rgba(220,230,242,0.5)" stroke-width="2" stroke-dasharray="14 10"></line>
-        <circle cx="58" cy="38" r="13" fill="#2563eb"></circle>
-        <g transform="translate(250,0)">
-          <rect x="-2" y="20" width="4" height="26" fill="#54607a"></rect>
-          <rect x="-11" y="-4" width="22" height="34" rx="5" fill="#2a2a2a"></rect>
-          <circle cx="0" cy="6" r="6.5" fill="#c32128"></circle>
-          <circle cx="0" cy="20" r="6.5" fill="#173322"></circle>
-        </g>
-        <rect x="446" y="28" width="14" height="32" fill="url(#instrChecker)" stroke="rgba(136,150,170,0.6)" stroke-width="0.5"></rect>
-        <text x="58" y="94" text-anchor="middle" font-size="12" fill="#cdd8e6">起点</text>
-        <text x="250" y="94" text-anchor="middle" font-size="12" fill="#cdd8e6">红绿灯</text>
-        <text x="453" y="94" text-anchor="middle" font-size="12" fill="#cdd8e6">终点线</text>
-      </svg>
-      <div class="instruction-figure-cap">示例：起点 → 红绿灯 → 终点线</div>
-    </div>
     <ul>
       <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，您的圆圈会靠近红绿灯并停下等待。</li>
       <li>按钮会由<strong>【开始】</strong>变为<strong>【移动】</strong>。要让您的圆圈再次移动，请点击<strong>【移动】</strong>按钮，您<strong>可以在任何时刻</strong>点击该按钮。</li>
     </ul>
     <h2>示例短片</h2>
     <div class="instruction-video">
-      <video controls preload="metadata" playsinline src="/demo.mp4"></video>
+      <video controls preload="none" playsinline poster="/demo-poster.svg" src="/demo.mp4"></video>
     </div>
     <h2>实验规则</h2>
     <p>在红绿灯处等待，直至其变为<strong>绿色</strong>后通行。</p>
