@@ -1,21 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="红绿灯决策任务示例">
   <rect width="960" height="540" fill="#ffffff"/>
-  <rect x="170" y="72" width="620" height="360" fill="#ffffff" stroke="#111111" stroke-width="3"/>
+  <rect x="170" y="72" width="620" height="360" fill="#ffffff" stroke="#0b0b0b" stroke-width="4"/>
 
-  <rect x="326" y="82" width="308" height="38" rx="10" fill="#ffffff" stroke="#111111" stroke-width="2.5"/>
+  <rect x="326" y="82" width="308" height="38" rx="10" fill="#ffffff" stroke="#0b0b0b" stroke-width="3"/>
   <text x="480" y="107" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#222222">
     <tspan>剩余报酬：</tspan><tspan font-weight="700">20点</tspan>
   </text>
 
-  <line x1="260" y1="356" x2="708" y2="356" stroke="#bdbdbd" stroke-width="2" stroke-dasharray="8 8"/>
+  <line x1="260" y1="356" x2="708" y2="356" stroke="#777777" stroke-width="3" stroke-dasharray="8 8"/>
 
-  <line x1="480" y1="144" x2="480" y2="408" stroke="#d1d1d1" stroke-width="4"/>
-  <rect x="465" y="116" width="30" height="96" fill="#cfcfcf"/>
+  <line x1="480" y1="144" x2="480" y2="408" stroke="#8a8a8a" stroke-width="5"/>
+  <rect x="465" y="116" width="30" height="96" fill="#b6b6b6" stroke="#444444" stroke-width="2"/>
   <circle cx="480" cy="136" r="13" fill="#f20f16"/>
   <circle cx="480" cy="165" r="13" fill="#dcc36d"/>
   <circle cx="480" cy="194" r="13" fill="#b9d4b7"/>
 
-  <line x1="690" y1="146" x2="690" y2="410" stroke="#111111" stroke-width="4"/>
+  <line x1="690" y1="146" x2="690" y2="410" stroke="#0b0b0b" stroke-width="5"/>
 
   <circle cx="238" cy="356" r="24" fill="#2f6fed"/>
   <ellipse cx="238" cy="386" rx="22" ry="5" fill="rgba(0,0,0,0.16)"/>

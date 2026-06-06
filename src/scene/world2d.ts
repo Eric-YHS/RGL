@@ -9,6 +9,11 @@ const RED_OFF = "#e9b7b7";
 const YELLOW_OFF = "#dcc36d";
 const GREEN_ON = "#37a447";
 const GREEN_OFF = "#b9d4b7";
+const STRONG_LINE_COLOR = "#0b0b0b";
+const SECONDARY_LINE_COLOR = "#444444";
+const GUIDE_LINE_COLOR = "#8c8c8c";
+const TRAFFIC_POLE_COLOR = "#8a8a8a";
+const TRAFFIC_HOUSING_COLOR = "#b6b6b6";
 
 export class World2D {
   private canvas: HTMLCanvasElement;
@@ -121,13 +126,13 @@ export class World2D {
   private drawTaskPanel(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(this.panelX, this.panelY, this.panelW, this.panelH);
-    ctx.strokeStyle = "#111111";
-    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = STRONG_LINE_COLOR;
+    ctx.lineWidth = 3.2;
     ctx.strokeRect(this.panelX, this.panelY, this.panelW, this.panelH);
 
     ctx.save();
-    ctx.strokeStyle = "#bdbdbd";
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = GUIDE_LINE_COLOR;
+    ctx.lineWidth = 2;
     ctx.setLineDash([6, 7]);
     ctx.beginPath();
     ctx.moveTo(this.startX, this.trackY);
@@ -151,8 +156,8 @@ export class World2D {
     ctx.fillStyle = "#ffffff";
     this.roundRect(ctx, x, y, labelW, labelH, 8);
     ctx.fill();
-    ctx.strokeStyle = "#111111";
-    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = STRONG_LINE_COLOR;
+    ctx.lineWidth = 2.4;
     this.roundRect(ctx, x, y, labelW, labelH, 8);
     ctx.stroke();
 
@@ -176,11 +181,14 @@ export class World2D {
     const housingY = lightTop + 10;
     const color = this.getTrafficLightColor(state);
 
-    ctx.fillStyle = "#d4d4d4";
-    ctx.fillRect(this.lightX - 1.5, poleTop, 3, poleBottom - poleTop);
+    ctx.fillStyle = TRAFFIC_POLE_COLOR;
+    ctx.fillRect(this.lightX - 2, poleTop, 4, poleBottom - poleTop);
 
-    ctx.fillStyle = "#cfcfcf";
+    ctx.fillStyle = TRAFFIC_HOUSING_COLOR;
     ctx.fillRect(housingX, housingY, housingW, housingH);
+    ctx.strokeStyle = SECONDARY_LINE_COLOR;
+    ctx.lineWidth = 1.8;
+    ctx.strokeRect(housingX, housingY, housingW, housingH);
 
     this.drawLightBulb(ctx, this.lightX, housingY + 12, 9, color === "red", RED_ON, RED_OFF, nowMs);
     this.drawLightBulb(ctx, this.lightX, housingY + 34, 9, false, YELLOW_OFF, YELLOW_OFF, nowMs);
@@ -224,7 +232,7 @@ export class World2D {
     this.roundRect(ctx, x - 23, y, 46, 22, 4);
     ctx.fill();
     ctx.strokeStyle = isGreen ? GREEN_ON : RED_ON;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 2;
     this.roundRect(ctx, x - 23, y, 46, 22, 4);
     ctx.stroke();
 
@@ -249,8 +257,8 @@ export class World2D {
     const top = this.panelY + Math.max(70, this.panelH * 0.14);
     const bottom = this.panelY + this.panelH - 36;
 
-    ctx.strokeStyle = "#111111";
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = STRONG_LINE_COLOR;
+    ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(this.finishLineX, top);
     ctx.lineTo(this.finishLineX, bottom);
