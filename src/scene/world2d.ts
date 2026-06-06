@@ -146,7 +146,7 @@ export class World2D {
     const moneyTextW = ctx.measureText(moneyText).width;
     const labelW = Math.max(252, labelTextW + moneyTextW + 42);
     const x = this.panelX + this.panelW / 2 - labelW / 2;
-    const y = this.panelY - 1;
+    const y = this.panelY + 10;
 
     ctx.fillStyle = "#ffffff";
     this.roundRect(ctx, x, y, labelW, labelH, 8);
