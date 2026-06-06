@@ -330,7 +330,7 @@ export class ExperimentEngine {
   }
 
   private getMoneyAtElapsed(elapsedSec: number): number {
-    const chargedSeconds = Math.floor(Math.max(0, elapsedSec));
+    const chargedSeconds = Math.max(0, elapsedSec);
     return Math.max(0, this.config.startMoney - this.config.moneyLossPerSec * chargedSeconds);
   }
 
