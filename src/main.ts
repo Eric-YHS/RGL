@@ -249,7 +249,7 @@ app.innerHTML = `
         <div class="panel status panel-status">
           <div class="row"><div class="label">当前位置</div><div class="value" id="posText">—</div></div>
           <div class="row"><div class="label">耗费时间</div><div class="value" id="timeText">0.0s</div></div>
-          <div class="row"><div class="label">剩余报酬</div><div class="value money" id="moneyText">￥100.00</div></div>
+          <div class="row"><div class="label">剩余报酬</div><div class="value money" id="moneyText">￥100.0</div></div>
           <div class="row" id="lightRow"><div class="label">信号灯</div><div class="value" id="lightText">—</div></div>
         </div>
 
@@ -768,6 +768,8 @@ function updateHud(): void {
     els.btnAction.textContent = nextActionText;
     hudCache.btnActionText = nextActionText;
   }
+  els.btnAction.classList.toggle("action-start", s.phase === "idle");
+  els.btnAction.classList.toggle("action-move", s.phase !== "idle" && s.phase !== "finished");
 
   let posText = "—";
   let timeText = formatSeconds(0, 1);

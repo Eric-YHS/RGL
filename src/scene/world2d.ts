@@ -143,7 +143,7 @@ export class World2D {
 
   private drawEndowment(ctx: CanvasRenderingContext2D, money: number): void {
     const label = "剩余报酬：";
-    const moneyText = `￥${money.toFixed(2)}`;
+    const moneyText = `￥${money.toFixed(1)}`;
     const labelH = 28;
     ctx.font = `400 15px ${UI_FONT_FAMILY}`;
     const labelTextW = ctx.measureText(label).width;
