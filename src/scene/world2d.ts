@@ -6,6 +6,7 @@ const CIRCLE_RADIUS = 16;
 const CIRCLE_COLOR = "#2f6fed";
 const RED_ON = "#f20f16";
 const RED_OFF = "#e9b7b7";
+const YELLOW_OFF = "#dcc36d";
 const GREEN_ON = "#37a447";
 const GREEN_OFF = "#b9d4b7";
 
@@ -167,10 +168,10 @@ export class World2D {
 
   private drawTrafficLight(ctx: CanvasRenderingContext2D, state: ExperimentState, nowMs: number): void {
     const lightTop = this.panelY + Math.max(64, this.panelH * 0.12);
-    const poleTop = lightTop + 66;
+    const poleTop = lightTop + 86;
     const poleBottom = this.trackY + 44;
     const housingW = 22;
-    const housingH = 58;
+    const housingH = 78;
     const housingX = this.lightX - housingW / 2;
     const housingY = lightTop + 10;
     const color = this.getTrafficLightColor(state);
@@ -182,7 +183,8 @@ export class World2D {
     ctx.fillRect(housingX, housingY, housingW, housingH);
 
     this.drawLightBulb(ctx, this.lightX, housingY + 12, 9, color === "red", RED_ON, RED_OFF, nowMs);
-    this.drawLightBulb(ctx, this.lightX, housingY + 34, 9, color === "green", GREEN_ON, GREEN_OFF, nowMs);
+    this.drawLightBulb(ctx, this.lightX, housingY + 34, 9, false, YELLOW_OFF, YELLOW_OFF, nowMs);
+    this.drawLightBulb(ctx, this.lightX, housingY + 56, 9, color === "green", GREEN_ON, GREEN_OFF, nowMs);
 
     this.drawCountdown(ctx, state, this.lightX + 42, housingY + 7);
   }

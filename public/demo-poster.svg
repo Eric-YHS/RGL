@@ -10,9 +10,10 @@
   <line x1="260" y1="356" x2="708" y2="356" stroke="#dddddd" stroke-width="2" stroke-dasharray="8 8"/>
 
   <line x1="480" y1="144" x2="480" y2="408" stroke="#d1d1d1" stroke-width="4"/>
-  <rect x="465" y="116" width="30" height="78" fill="#cfcfcf"/>
+  <rect x="465" y="116" width="30" height="96" fill="#cfcfcf"/>
   <circle cx="480" cy="136" r="13" fill="#f20f16"/>
-  <circle cx="480" cy="165" r="13" fill="#b9d4b7"/>
+  <circle cx="480" cy="165" r="13" fill="#dcc36d"/>
+  <circle cx="480" cy="194" r="13" fill="#b9d4b7"/>
 
   <line x1="690" y1="146" x2="690" y2="410" stroke="#111111" stroke-width="4"/>
 
@@ -21,4 +22,26 @@
 
   <rect x="425" y="446" width="110" height="48" rx="4" fill="#3d3d3d"/>
   <text x="480" y="478" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#ffffff">移动</text>
+
+  <g font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#111111">
+    <rect x="180" y="123" width="218" height="48" fill="#ff9f05"/>
+    <polygon points="398,123 436,104 398,154" fill="#ff9f05"/>
+    <text x="195" y="154">Your endowment</text>
+
+    <rect x="318" y="218" width="144" height="48" fill="#ff9f05"/>
+    <polygon points="462,218 498,199 462,252" fill="#ff9f05"/>
+    <text x="333" y="249">Stop light</text>
+
+    <rect x="152" y="380" width="72" height="48" fill="#ff9f05"/>
+    <polygon points="196,380 238,375 222,396" fill="#ff9f05"/>
+    <text x="167" y="411">You</text>
+
+    <rect x="245" y="358" width="184" height="48" fill="#ff9f05"/>
+    <polygon points="429,406 466,446 392,406" fill="#ff9f05"/>
+    <text x="260" y="389">Move button</text>
+
+    <rect x="690" y="380" width="166" height="48" fill="#ff9f05"/>
+    <polygon points="690,380 690,428 648,410" fill="#ff9f05"/>
+    <text x="705" y="411">Finish line</text>
+  </g>
 </svg>
