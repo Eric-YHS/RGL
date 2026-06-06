@@ -121,13 +121,13 @@ export class World2D {
   private drawTaskPanel(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(this.panelX, this.panelY, this.panelW, this.panelH);
-    ctx.strokeStyle = "#9a9a9a";
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "#111111";
+    ctx.lineWidth = 2.4;
     ctx.strokeRect(this.panelX, this.panelY, this.panelW, this.panelH);
 
     ctx.save();
-    ctx.strokeStyle = "#dedede";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#bdbdbd";
+    ctx.lineWidth = 1.4;
     ctx.setLineDash([6, 7]);
     ctx.beginPath();
     ctx.moveTo(this.startX, this.trackY);
@@ -151,8 +151,8 @@ export class World2D {
     ctx.fillStyle = "#ffffff";
     this.roundRect(ctx, x, y, labelW, labelH, 8);
     ctx.fill();
-    ctx.strokeStyle = "#999999";
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "#111111";
+    ctx.lineWidth = 1.8;
     this.roundRect(ctx, x, y, labelW, labelH, 8);
     ctx.stroke();
 
