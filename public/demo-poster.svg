@@ -23,25 +23,25 @@
   <rect x="425" y="446" width="110" height="48" rx="4" fill="#3d3d3d"/>
   <text x="480" y="478" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#ffffff">移动</text>
 
-  <g font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#111111">
-    <rect x="180" y="123" width="218" height="48" fill="#ff9f05"/>
-    <polygon points="398,123 436,104 398,154" fill="#ff9f05"/>
-    <text x="195" y="154">Your endowment</text>
+  <g font-family="Microsoft YaHei, Noto Sans CJK SC, Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#111111">
+    <rect x="208" y="123" width="136" height="48" fill="#ff9f05"/>
+    <polygon points="344,123 436,104 344,154" fill="#ff9f05"/>
+    <text x="225" y="154">剩余报酬</text>
 
-    <rect x="318" y="218" width="144" height="48" fill="#ff9f05"/>
-    <polygon points="462,218 498,199 462,252" fill="#ff9f05"/>
-    <text x="333" y="249">Stop light</text>
+    <rect x="348" y="218" width="96" height="48" fill="#ff9f05"/>
+    <polygon points="444,218 498,199 444,252" fill="#ff9f05"/>
+    <text x="364" y="249">红绿灯</text>
 
-    <rect x="152" y="380" width="72" height="48" fill="#ff9f05"/>
-    <polygon points="196,380 238,375 222,396" fill="#ff9f05"/>
-    <text x="167" y="411">You</text>
+    <rect x="160" y="380" width="56" height="48" fill="#ff9f05"/>
+    <polygon points="196,380 238,375 216,400" fill="#ff9f05"/>
+    <text x="177" y="411">您</text>
 
-    <rect x="245" y="358" width="184" height="48" fill="#ff9f05"/>
-    <polygon points="429,406 466,446 392,406" fill="#ff9f05"/>
-    <text x="260" y="389">Move button</text>
+    <rect x="258" y="358" width="128" height="48" fill="#ff9f05"/>
+    <polygon points="386,406 466,446 350,406" fill="#ff9f05"/>
+    <text x="276" y="389">移动按钮</text>
 
-    <rect x="690" y="380" width="166" height="48" fill="#ff9f05"/>
-    <polygon points="690,380 690,428 648,410" fill="#ff9f05"/>
-    <text x="705" y="411">Finish line</text>
+    <rect x="705" y="380" width="104" height="48" fill="#ff9f05"/>
+    <polygon points="705,380 705,428 648,410" fill="#ff9f05"/>
+    <text x="724" y="411">终点线</text>
   </g>
 </svg>
