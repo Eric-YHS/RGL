@@ -436,7 +436,11 @@ function showInstructions(): void {
     </ul>
     <h2>示例短片</h2>
     <div class="instruction-video">
-      <video controls preload="none" playsinline poster="/demo-poster.svg" src="/demo.mp4"></video>
+      <video controls preload="metadata" playsinline poster="/demo-poster.svg">
+        <source src="/demo.mp4" type="video/mp4" />
+        当前浏览器无法直接播放示例短片，请点击下方链接打开。
+      </video>
+      <a class="video-fallback-link" href="/demo.mp4" target="_blank" rel="noopener">打开示例短片</a>
     </div>
     <h2>实验规则</h2>
     <p>在红绿灯处等待，直至其变为<strong>绿色</strong>后通行。</p>

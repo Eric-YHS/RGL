@@ -303,6 +303,13 @@ canvas.webgl {
   background: #ffffff;
 }
 
+.video-fallback-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 14px;
+}
+
 .hint {
   color: var(--muted);
   font-size: 14px;
