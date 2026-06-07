@@ -468,7 +468,7 @@ function showComprehensionTest(): void {
   openModal(`
     <h1>理解测试</h1>
     <p>请回答以下问题：根据上述说明，为获得最大经济收益，我应该闯红灯以便缩短时间；但为了遵守规则，我必须等待红灯变绿。</p>
-    <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+    <div class="choice-row" style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
       <label style="display:flex; gap:8px; align-items:center; cursor:pointer;">
         <input type="radio" name="comp" value="yes" />
         <span>是</span>
@@ -577,8 +577,8 @@ function showCompletionScreen(state: CompletionScreenState): void {
         : `<div class="completion-status queued">网络暂时不稳定，数据已保存并会继续尝试提交。</div>`;
 
   openModal(`
+    <h1>决策任务完成</h1>
     <div class="completion-card-body">
-      <div class="completion-eyebrow">决策任务完成</div>
       <h1>感谢您的参与</h1>
       <p>您在红绿灯处等待了 <strong>${formatSeconds(waitSec, 1)}</strong>，获得 <strong>${formatMoney(taskMoney)}</strong>。</p>
       ${statusBlock}
@@ -608,10 +608,11 @@ function showPostQuestion(): void {
   const v = engine.state.violations;
 
   openModal(`
+    <h1>任务后问题</h1>
     <p class="hint">耗时：${formatSeconds(elapsed, 1)}；最终金额：${formatMoney(money)}；闯红灯次数：${v}</p>
     <h2>请回答</h2>
     <p>刚才的任务中，关于"等待红灯"的规则，您的真实想法是？</p>
-    <div style="display:grid; gap:10px; margin-top:10px;">
+    <div class="choice-stack" style="display:grid; gap:10px;">
       <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
         <input type="radio" name="post" value="A" />
         <span>A. 我严格遵守，因为这是规则。</span>

@@ -10,11 +10,16 @@ const RED_OFF = "#e9b7b7";
 const YELLOW_OFF = "#dcc36d";
 const GREEN_ON = "#37a447";
 const GREEN_OFF = "#b9d4b7";
-const STRONG_LINE_COLOR = "#0b0b0b";
-const SECONDARY_LINE_COLOR = "#444444";
+const STRONG_LINE_COLOR = "#111111";
+const SECONDARY_LINE_COLOR = "#555555";
 const GUIDE_LINE_COLOR = "#8c8c8c";
 const TRAFFIC_POLE_COLOR = "#8a8a8a";
 const TRAFFIC_HOUSING_COLOR = "#b6b6b6";
+const DESKTOP_BG = "#e7e7e7";
+const WINDOW_BLUE = "#17689a";
+const WINDOW_BLUE_DARK = "#0f4e78";
+const WINDOW_BORDER = "#7d7d7d";
+const WINDOW_CHROME = "#f3f3f3";
 
 export class World2D {
   private canvas: HTMLCanvasElement;
@@ -70,12 +75,12 @@ export class World2D {
     this.w = cssW;
     this.h = cssH;
 
-    this.panelW = Math.min(Math.max(760, this.w * 0.64), this.w - 160);
-    this.panelH = Math.min(Math.max(360, this.h * 0.56), this.h - 260);
-    this.panelX = (this.w - this.panelW) / 2;
-    this.panelY = Math.max(48, Math.min(this.h * 0.08, this.h - this.panelH - 154));
+    this.panelW = Math.min(Math.max(780, this.w * 0.66), this.w - 150);
+    this.panelH = Math.min(Math.max(370, this.h * 0.57), this.h - 250);
+    this.panelX = Math.round((this.w - this.panelW) / 2);
+    this.panelY = Math.round(Math.max(42, Math.min(this.h * 0.07, this.h - this.panelH - 148)));
 
-    this.trackY = this.panelY + this.panelH * 0.8;
+    this.trackY = this.panelY + 28 + (this.panelH - 28) * 0.79;
     this.startX = this.panelX + this.panelW * 0.1;
     this.lightX = this.panelX + this.panelW * 0.48;
     this.finishLineX = this.panelX + this.panelW * 0.84;
@@ -120,20 +125,55 @@ export class World2D {
   }
 
   private clear(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = DESKTOP_BG;
     ctx.fillRect(0, 0, this.w, this.h);
   }
 
   private drawTaskPanel(ctx: CanvasRenderingContext2D): void {
+    const titleH = 27;
+    const contentY = this.panelY + titleH;
+    const contentH = this.panelH - titleH;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
+    ctx.fillRect(this.panelX + 2, this.panelY + 2, this.panelW, this.panelH);
+
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(this.panelX, this.panelY, this.panelW, this.panelH);
-    ctx.strokeStyle = STRONG_LINE_COLOR;
-    ctx.lineWidth = 3.2;
+    ctx.strokeStyle = WINDOW_BORDER;
+    ctx.lineWidth = 1;
     ctx.strokeRect(this.panelX, this.panelY, this.panelW, this.panelH);
+
+    ctx.fillStyle = WINDOW_BLUE;
+    ctx.fillRect(this.panelX + 1, this.panelY + 1, this.panelW - 2, titleH - 1);
+    ctx.strokeStyle = WINDOW_BLUE_DARK;
+    ctx.beginPath();
+    ctx.moveTo(this.panelX + 1, this.panelY + titleH);
+    ctx.lineTo(this.panelX + this.panelW - 1, this.panelY + titleH);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.font = `700 14px ${UI_FONT_FAMILY}`;
+    ctx.fillText("决策任务", this.panelX + 10, this.panelY + titleH / 2 + 1);
+
+    ctx.fillStyle = WINDOW_CHROME;
+    ctx.fillRect(this.panelX + 1, contentY + 1, this.panelW - 2, 35);
+    ctx.strokeStyle = "#c7c7c7";
+    ctx.beginPath();
+    ctx.moveTo(this.panelX + 1, contentY + 36);
+    ctx.lineTo(this.panelX + this.panelW - 1, contentY + 36);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#d5d5d5";
+    ctx.beginPath();
+    ctx.moveTo(this.panelX + 1, contentY + contentH - 28);
+    ctx.lineTo(this.panelX + this.panelW - 1, contentY + contentH - 28);
+    ctx.stroke();
 
     ctx.save();
     ctx.strokeStyle = GUIDE_LINE_COLOR;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.6;
     ctx.setLineDash([6, 7]);
     ctx.beginPath();
     ctx.moveTo(this.startX, this.trackY);
@@ -145,22 +185,20 @@ export class World2D {
   private drawEndowment(ctx: CanvasRenderingContext2D, money: number): void {
     const label = "剩余报酬：";
     const moneyText = formatMoney(money);
-    const labelH = 28;
+    const labelH = 24;
     ctx.font = `400 15px ${UI_FONT_FAMILY}`;
     const labelTextW = ctx.measureText(label).width;
     ctx.font = `700 15px ${MONEY_FONT_FAMILY}`;
     const moneyTextW = ctx.measureText(moneyText).width;
-    const labelW = Math.max(252, labelTextW + moneyTextW + 42);
+    const labelW = Math.max(238, labelTextW + moneyTextW + 38);
     const x = this.panelX + this.panelW / 2 - labelW / 2;
-    const y = this.panelY + 10;
+    const y = this.panelY + 32;
 
     ctx.fillStyle = "#ffffff";
-    this.roundRect(ctx, x, y, labelW, labelH, 8);
-    ctx.fill();
-    ctx.strokeStyle = STRONG_LINE_COLOR;
-    ctx.lineWidth = 2.4;
-    this.roundRect(ctx, x, y, labelW, labelH, 8);
-    ctx.stroke();
+    ctx.fillRect(x, y, labelW, labelH);
+    ctx.strokeStyle = WINDOW_BORDER;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, labelW, labelH);
 
     ctx.fillStyle = "#202020";
     ctx.textAlign = "left";
@@ -173,7 +211,7 @@ export class World2D {
   }
 
   private drawTrafficLight(ctx: CanvasRenderingContext2D, state: ExperimentState, nowMs: number): void {
-    const lightTop = this.panelY + Math.max(64, this.panelH * 0.12);
+    const lightTop = this.panelY + Math.max(84, this.panelH * 0.16);
     const poleTop = lightTop + 86;
     const poleBottom = this.trackY + 44;
     const housingW = 22;
@@ -188,7 +226,7 @@ export class World2D {
     ctx.fillStyle = TRAFFIC_HOUSING_COLOR;
     ctx.fillRect(housingX, housingY, housingW, housingH);
     ctx.strokeStyle = SECONDARY_LINE_COLOR;
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = 1.4;
     ctx.strokeRect(housingX, housingY, housingW, housingH);
 
     this.drawLightBulb(ctx, this.lightX, housingY + 12, 9, color === "red", RED_ON, RED_OFF, nowMs);
@@ -255,7 +293,7 @@ export class World2D {
     const bottom = this.panelY + this.panelH - 36;
 
     ctx.strokeStyle = STRONG_LINE_COLOR;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(this.finishLineX, top);
     ctx.lineTo(this.finishLineX, bottom);
@@ -320,27 +358,6 @@ export class World2D {
         : "red";
     }
     return "red";
-  }
-
-  private roundRect(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    r: number
-  ): void {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.arcTo(x + w, y, x + w, y + r, r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-    ctx.lineTo(x + r, y + h);
-    ctx.arcTo(x, y + h, x, y + h - r, r);
-    ctx.lineTo(x, y + r);
-    ctx.arcTo(x, y, x + r, y, r);
-    ctx.closePath();
   }
 
   dispose(): void {
