@@ -5,7 +5,8 @@ export function clampInt(value: number, min: number, max: number, fallback: numb
 
 export function formatMoney(amount: number): string {
   const clamped = Math.max(0, amount);
-  return `￥${clamped.toFixed(1)}`;
+  const fixed = clamped.toFixed(1);
+  return "￥".concat(fixed);
 }
 
 export function formatSeconds(sec: number, digits = 1): string {
