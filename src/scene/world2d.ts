@@ -1,4 +1,5 @@
 import type { ExperimentConfig, ExperimentState } from "../experiment/types";
+import { formatMoney } from "../experiment/utils";
 
 const UI_FONT_FAMILY = '"Experiment Sans", sans-serif';
 const MONEY_FONT_FAMILY = '"Experiment Mono", monospace';
@@ -143,7 +144,7 @@ export class World2D {
 
   private drawEndowment(ctx: CanvasRenderingContext2D, money: number): void {
     const label = "剩余报酬：";
-    const moneyText = `￥${money.toFixed(1)}`;
+    const moneyText = formatMoney(money);
     const labelH = 28;
     ctx.font = `400 15px ${UI_FONT_FAMILY}`;
     const labelTextW = ctx.measureText(label).width;
@@ -194,7 +195,7 @@ export class World2D {
     this.drawLightBulb(ctx, this.lightX, housingY + 34, 9, false, YELLOW_OFF, YELLOW_OFF, nowMs);
     this.drawLightBulb(ctx, this.lightX, housingY + 56, 9, color === "green", GREEN_ON, GREEN_OFF, nowMs);
 
-    this.drawCountdown(ctx, state, this.lightX + 42, housingY + 7);
+    this.drawCountdown(ctx, state, this.lightX, housingY + 12);
   }
 
   private drawLightBulb(
@@ -226,21 +227,17 @@ export class World2D {
     const remaining = this.getRedCountdownSec(state);
     const passedOnGreen = state.passedOutcome[state.lightIndex] === "green";
     const isGreen = state.currentLightColor === "green" || passedOnGreen || remaining <= 0;
-    const text = isGreen ? "0" : String(remaining);
+    if (isGreen) return;
 
-    ctx.fillStyle = "#ffffff";
-    this.roundRect(ctx, x - 23, y, 46, 22, 4);
-    ctx.fill();
-    ctx.strokeStyle = isGreen ? GREEN_ON : RED_ON;
-    ctx.lineWidth = 2;
-    this.roundRect(ctx, x - 23, y, 46, 22, 4);
-    ctx.stroke();
-
-    ctx.fillStyle = isGreen ? GREEN_ON : RED_ON;
+    const text = String(remaining);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = `700 13px ${MONEY_FONT_FAMILY}`;
-    ctx.fillText(text, x, y + 11);
+    ctx.font = `700 9px ${MONEY_FONT_FAMILY}`;
+    ctx.strokeStyle = "rgba(120,0,0,0.72)";
+    ctx.lineWidth = 1.6;
+    ctx.strokeText(text, x, y + 0.5);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(text, x, y + 0.5);
   }
 
   private getRedCountdownSec(state: ExperimentState): number {

@@ -249,7 +249,7 @@ app.innerHTML = `
         <div class="panel status panel-status">
           <div class="row"><div class="label">当前位置</div><div class="value" id="posText">—</div></div>
           <div class="row"><div class="label">耗费时间</div><div class="value" id="timeText">0.0s</div></div>
-          <div class="row"><div class="label">剩余报酬</div><div class="value money" id="moneyText">￥100.0</div></div>
+          <div class="row"><div class="label">剩余报酬</div><div class="value money" id="moneyText">${formatMoney(formalConfig.startMoney)}</div></div>
           <div class="row" id="lightRow"><div class="label">信号灯</div><div class="value" id="lightText">—</div></div>
         </div>
 
@@ -447,7 +447,7 @@ function showInstructions(): void {
     <h2>收益规则</h2>
     <ul>
       <li>本部分收益取决于您将圆圈移过终点线所花费的时间，<strong>从点击【开始】按钮起计时</strong>。</li>
-      <li>本阶段初始资金为 <strong>￥${currentConfig.startMoney.toFixed(2)}</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${currentConfig.moneyLossPerSec.toFixed(2)}</strong>，直至您冲过终点线。</li>
+      <li>本阶段初始资金为 <strong>${formatMoney(currentConfig.startMoney)}</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>${formatMoney(currentConfig.moneyLossPerSec)}</strong>，直至您冲过终点线。</li>
     </ul>
     <h2>场景设置</h2>
     <ul>
