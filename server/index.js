@@ -12,6 +12,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DB_PATH = process.env.DB_PATH ?? path.resolve(__dirname, "..", "data", "experiment.db");
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? "";
+const SUBMISSION_RATE_LIMIT_WINDOW_MS = readEnvInteger(
+  "SUBMISSION_RATE_LIMIT_WINDOW_MS",
+  10 * 60 * 1000,
+  { min: 1000, max: 24 * 60 * 60 * 1000 }
+);
+const SUBMISSION_RATE_LIMIT_MAX = readEnvInteger("SUBMISSION_RATE_LIMIT_MAX", 300, {
+  min: 1,
+  max: 100000
+});
+const POST_ALLOWED_ORIGINS = readOriginAllowlist(process.env.POST_ALLOWED_ORIGINS);
 
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
@@ -209,6 +219,7 @@ const insertSubmissionTx = db.transaction((payload, ipAddress) => {
 
 const app = express();
 app.disable("x-powered-by");
+app.set("trust proxy", "loopback");
 app.use(express.json({ limit: "2mb" }));
 
 if (CORS_ORIGIN.trim()) {
@@ -233,22 +244,30 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "honglvdeng-api", nowIso: new Date().toISOString() });
 });
 
-app.post("/api/submissions", (req, res) => {
-  const parsed = parseSubmission(req.body);
-  if (!parsed.ok) {
-    res.status(400).json({ ok: false, error: parsed.error });
-    return;
-  }
+app.post(
+  "/api/submissions",
+  requireAllowedOrigin,
+  createIpRateLimiter({
+    windowMs: SUBMISSION_RATE_LIMIT_WINDOW_MS,
+    max: SUBMISSION_RATE_LIMIT_MAX
+  }),
+  (req, res) => {
+    const parsed = parseSubmission(req.body);
+    if (!parsed.ok) {
+      res.status(400).json({ ok: false, error: parsed.error });
+      return;
+    }
 
-  try {
-    const ipAddress = extractClientIp(req);
-    const result = insertSubmissionTx(parsed.payload, ipAddress);
-    res.json({ ok: true, sessionId: result.sessionId, deduplicated: result.deduplicated });
-  } catch (error) {
-    console.error("[POST /api/submissions] failed:", error);
-    res.status(500).json({ ok: false, error: "Failed to store submission" });
+    try {
+      const ipAddress = extractClientIp(req);
+      const result = insertSubmissionTx(parsed.payload, ipAddress);
+      res.json({ ok: true, sessionId: result.sessionId, deduplicated: result.deduplicated });
+    } catch (error) {
+      console.error("[POST /api/submissions] failed:", error);
+      res.status(500).json({ ok: false, error: "Failed to store submission" });
+    }
   }
-});
+);
 
 app.listen(PORT, HOST, () => {
   console.log(`[api] listening on http://${HOST}:${PORT}`);
@@ -266,6 +285,76 @@ function extractClientIp(req) {
     if (first) return first;
   }
   return req.socket.remoteAddress ?? "";
+}
+
+function requireAllowedOrigin(req, res, next) {
+  const origin = req.headers.origin;
+  if (!origin || POST_ALLOWED_ORIGINS.has(origin)) {
+    next();
+    return;
+  }
+
+  res.status(403).json({ ok: false, error: "Origin not allowed" });
+}
+
+function createIpRateLimiter({ windowMs, max }) {
+  const hits = new Map();
+  let lastSweep = 0;
+
+  return (req, res, next) => {
+    const now = Date.now();
+    if (now - lastSweep > windowMs) {
+      sweepExpiredBuckets(hits, now);
+      lastSweep = now;
+    }
+
+    const ipAddress = extractClientIp(req) || "unknown";
+    const bucket = hits.get(ipAddress);
+    const activeBucket =
+      bucket && bucket.resetAt > now ? bucket : { count: 0, resetAt: now + windowMs };
+    activeBucket.count += 1;
+    hits.set(ipAddress, activeBucket);
+
+    if (activeBucket.count > max) {
+      res.set("Retry-After", String(Math.ceil((activeBucket.resetAt - now) / 1000)));
+      res.status(429).json({ ok: false, error: "Too many submissions" });
+      return;
+    }
+
+    next();
+  };
+}
+
+function sweepExpiredBuckets(hits, now) {
+  for (const [ipAddress, bucket] of hits.entries()) {
+    if (bucket.resetAt <= now) {
+      hits.delete(ipAddress);
+    }
+  }
+}
+
+function readEnvInteger(name, fallback, { min, max }) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${name} must be an integer in [${min}, ${max}]`);
+  }
+  return value;
+}
+
+function readOriginAllowlist(raw) {
+  const defaults = [
+    "https://experiments.top",
+    "https://www.experiments.top",
+    "https://m.experiments.top",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+  ];
+  const origins = (raw && raw.trim() ? raw.split(",") : defaults)
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return new Set(origins);
 }
 
 function parseSubmission(body) {
