@@ -6,7 +6,7 @@ import cors from "cors";
 import Database from "better-sqlite3";
 import express from "express";
 
-const HOST = process.env.HOST ?? "0.0.0.0";
+const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number.parseInt(process.env.PORT ?? "8787", 10);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
