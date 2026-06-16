@@ -4,7 +4,7 @@ import type { ExperimentLogger } from "./logger";
 const MAX_DT_SEC = 0.1;
 
 export class ExperimentEngine {
-  private readonly config: ExperimentConfig;
+  readonly config: ExperimentConfig;
   private readonly logger: ExperimentLogger;
 
   private startedAtMs: number | null = null;

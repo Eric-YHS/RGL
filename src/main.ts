@@ -45,19 +45,20 @@ function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig
     revealMode,
     numLights,
     segmentDurationSec: 2,
-    redWaitSec: 20,
+    redWaitSec: 12,
     startMoney: 100,
-    moneyLossPerSec: 2.5
+    moneyLossPerSec: 2.0
   };
 }
 
 const formalConfig: ExperimentConfig = makeConfig("full", 1);
+const practiceConfig: ExperimentConfig = makeConfig("full", 1);
 
-function createLogger(config: ExperimentConfig): ExperimentLogger {
+function createLogger(config: ExperimentConfig, runKind: "formal" | "practice"): ExperimentLogger {
   return new ExperimentLogger(config, {
     participantId,
     startedAtIso: new Date().toISOString(),
-    runKind: "formal"
+    runKind
   });
 }
 
@@ -282,11 +283,12 @@ const els = {
 };
 
 const currentConfig: ExperimentConfig = formalConfig;
-let logger: ExperimentLogger = createLogger(currentConfig);
+let logger: ExperimentLogger = createLogger(currentConfig, "formal");
 let engine: ExperimentEngine = new ExperimentEngine(currentConfig, logger);
 let world: World2D | null = null;
 let formalClientSessionId = createClientSessionId();
 let formalSubmission: SessionSubmission | null = null;
+let isPracticeMode = false;
 const desktopInputProof: DesktopInputProof = {
   keyboard: false,
   mouseMove: false,
@@ -351,8 +353,8 @@ function renderDesktopPreflightGate(): void {
   const viewportLabel = viewportReady
     ? `窗口尺寸已满足（至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}）`
     : `请将浏览器窗口调整到至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}`;
-  const pointerLabel = pointerReady ? "检测到精细指针设备" : "请使用鼠标或触控板操作";
-  const hoverLabel = hoverReady ? "检测到悬停能力" : "当前设备不具备桌面端悬停能力";
+  const pointerLabel = pointerReady ? "检测到精细指针设备" : "请进行精细指针设备检测";
+  const hoverLabel = hoverReady ? "检测到悬停能力" : "请进行悬停能力检测";
   const keyboardLabel = keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键";
   const mouseLabel = mouseReady ? "已检测到鼠标移动和点击" : "请移动鼠标并点击一次";
 
@@ -369,9 +371,12 @@ function renderDesktopPreflightGate(): void {
 
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card desktop-entry-card">
-      <h1>欢迎</h1>
-      <p>该部分人类智能任务的报酬取决于您的决策。</p>
-      <p>注意：如果你使用台式机或笔记本电脑完成此人类智能任务，请在开始前将浏览器屏幕最大化。在完成决策任务期间，请不要关闭此窗口，也不要以其他任何方式离开网页。</p>
+      <h1>欢迎参加学术调查</h1>
+      <p>感谢您参与本次学术研究。我们是中山大学学术研究团队。本研究的初始酬金为 <strong>100 元人民币</strong>，但实际酬金将完全取决于您在任务中的决策，介乎 <strong>0 元–92 元人民币</strong>。</p>
+      <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。完成整个调查需时 <strong>15–20 分钟</strong>。</p>
+      <p>本次参与完全自愿，您可以随时退出，但退出无法获得酬金。作答完全匿名，数据仅用于学术研究，请放心作答。</p>
+      <p>为了确保您能顺利开展实验，请先完成下面的设备与环境检测。</p>
+      <p class="hint">注意：如果你使用台式机或笔记本电脑完成此任务，建议在开始前将浏览器屏幕最大化。在完成决策任务期间，请不要关闭此窗口，也不要以其他任何方式离开网页。</p>
       <p>为保证实验环境一致，进入实验前必须同时满足桌面窗口尺寸、精细指针、悬停能力，以及真实键盘和鼠标交互。</p>
       <div class="desktop-preflight-checklist">
         <div class="${viewportReady ? "ready" : ""}">${viewportReady ? "✓" : "•"} ${viewportLabel}</div>
@@ -429,10 +434,10 @@ function buildFormalSubmission(): SessionSubmission {
 function showInstructions(): void {
   openModal(`
     <h1>指导语</h1>
-    <p>决策任务中，您将控制一个<strong>圆形图形</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
+    <p>在本次任务中，您将控制一个<strong>圆点</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
     <ul>
-      <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，您的圆圈会靠近红绿灯并停下等待。</li>
-      <li>按钮会由<strong>【开始】</strong>变为<strong>【移动】</strong>。要让您的圆圈再次移动，请点击<strong>【移动】</strong>按钮，您<strong>可以在任何时刻</strong>点击该按钮。</li>
+      <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，圆点会靠近一个红绿信号灯并停下等待。</li>
+      <li>此时按钮会由<strong>【开始】</strong>变为<strong>【移动】</strong>。要让圆点再次移动，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮。要让圆点再次移动并通过红绿灯，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
     </ul>
     <h2>示例短片</h2>
     <div class="instruction-video">
@@ -442,18 +447,11 @@ function showInstructions(): void {
       </video>
       <a class="video-fallback-link" href="/demo.mp4" target="_blank" rel="noopener">打开示例短片</a>
     </div>
-    <h2>实验规则</h2>
-    <p>在红绿灯处等待，直至其变为<strong>绿色</strong>后通行。</p>
-    <h2>收益规则</h2>
-    <ul>
-      <li>本部分收益取决于您将圆圈移过终点线所花费的时间，<strong>从点击【开始】按钮起计时</strong>。</li>
-      <li>本阶段初始资金为 <strong>${formatMoney(currentConfig.startMoney)}</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>${formatMoney(currentConfig.moneyLossPerSec)}</strong>，直至您冲过终点线。</li>
-    </ul>
-    <h2>场景设置</h2>
-    <ul>
-      <li>圆圈从初始位置到红绿灯、从红绿灯到终点线<strong>各需 ${currentConfig.segmentDurationSec} 秒</strong>。</li>
-      <li>红灯等待 <strong>${currentConfig.redWaitSec} 秒</strong>后变为绿灯。</li>
-    </ul>
+    <h2>任务规则</h2>
+    <p>在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
+    <h2>酬金计算</h2>
+    <p>任务酬金取决于您将圆点移至终点线所花费的时间。注意：计时从点击<strong>【开始】</strong>按钮起计时。其中，从起点到红绿灯处，耗时 <strong>${engine.config.segmentDurationSec} 秒</strong>，从红绿灯处抵达终点线，耗时 <strong>${engine.config.segmentDurationSec} 秒</strong>。</p>
+    <p>您的初始报酬为 <strong>100 元人民币整</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${engine.config.moneyLossPerSec}</strong>，直至圆点抵达终点线。红灯等待 <strong>${engine.config.redWaitSec} 秒</strong>后变为绿灯。</p>
     <div class="actions">
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
     </div>
@@ -467,18 +465,42 @@ function showInstructions(): void {
 function showComprehensionTest(): void {
   openModal(`
     <h1>理解测试</h1>
-    <p>请回答以下问题：根据上述说明，为获得最大经济收益，我应该闯红灯以便缩短时间；但为了遵守规则，我必须等待红灯变绿。</p>
-    <div class="choice-row" style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
-      <label style="display:flex; gap:8px; align-items:center; cursor:pointer;">
-        <input type="radio" name="comp" value="yes" />
-        <span>是</span>
-      </label>
-      <label style="display:flex; gap:8px; align-items:center; cursor:pointer;">
-        <input type="radio" name="comp" value="no" />
-        <span>否</span>
-      </label>
-      <div class="hint" id="compHint"></div>
+    <p>请回答以下问题，以确认您已理解任务规则。两题均需回答正确才能继续。</p>
+    <div class="comp-question">
+      <p><strong>1. 根据上述说明，如果圆点抵达终点线所花费的总时间越长，您最终获得的金钱报酬会如何变化。</strong></p>
+      <div class="choice-stack" style="display:grid; gap:10px;">
+        <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
+          <input type="radio" name="comp1" value="more" />
+          <span>A. 越来越多</span>
+        </label>
+        <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
+          <input type="radio" name="comp1" value="less" />
+          <span>B. 越来越少</span>
+        </label>
+        <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
+          <input type="radio" name="comp1" value="same" />
+          <span>C. 保持不变</span>
+        </label>
+      </div>
     </div>
+    <div class="comp-question">
+      <p><strong>2. 根据指导语，本次任务的规则是什么？</strong></p>
+      <div class="choice-stack" style="display:grid; gap:10px;">
+        <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
+          <input type="radio" name="comp2" value="fast" />
+          <span>A. 圆点移动得越快越好</span>
+        </label>
+        <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
+          <input type="radio" name="comp2" value="wait" />
+          <span>B. 在红绿灯处等待，直到绿灯亮起</span>
+        </label>
+        <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
+          <input type="radio" name="comp2" value="none" />
+          <span>C. 本实验没有设定任何规则</span>
+        </label>
+      </div>
+    </div>
+    <div class="hint" id="compHint"></div>
     <div class="actions">
       <button class="btn" id="btnBackToInstructions">上一步</button>
       <button class="btn primary" id="btnBeginExperiment">我已作答，下一步</button>
@@ -493,13 +515,14 @@ function showComprehensionTest(): void {
 
   document.querySelector<HTMLButtonElement>("#btnBeginExperiment")?.addEventListener("click", () => {
     const nowMs = performance.now();
-    const choice = document.querySelector<HTMLInputElement>('input[name="comp"]:checked')?.value;
+    const choice1 = document.querySelector<HTMLInputElement>('input[name="comp1"]:checked')?.value;
+    const choice2 = document.querySelector<HTMLInputElement>('input[name="comp2"]:checked')?.value;
     const hint = document.querySelector<HTMLDivElement>("#compHint");
-    if (!choice) {
-      if (hint) hint.textContent = "请选择答案后继续。";
+    if (!choice1 || !choice2) {
+      if (hint) hint.textContent = "请回答全部两个问题后再继续。";
       return;
     }
-    if (choice !== "yes") {
+    if (choice1 !== "less" || choice2 !== "wait") {
       if (hint) hint.textContent = "回答不正确，请重新阅读指导语后再继续。";
       return;
     }
@@ -512,22 +535,23 @@ function showComprehensionTest(): void {
       lightIndex: null,
       lightColor: null,
       money: engine.state.money,
-      note: choice
+      note: `q1=${choice1};q2=${choice2}`
     });
 
-    showReadyToStart();
+    showPracticeReady();
   });
 }
 
-function showReadyToStart(): void {
+function showPracticeReady(): void {
   openModal(`
-    <h1>准备开始决策任务</h1>
-    <p>回答正确。请点击下方按钮进入正式任务界面。</p>
-    <p>进入正式任务界面后，底部按钮会先显示为<strong>【开始】</strong>；点击<strong>【开始】</strong>后，任务开始计时，圆圈开始移动，按钮会切换为<strong>【移动】</strong>。</p>
+    <h1>准备开始练习</h1>
+    <p>回答正确！请点击下方按钮进入练习界面。</p>
+    <p>进入练习界面后，底部按钮会先显示为<strong>【开始】</strong>；点击<strong>【开始】</strong>后，练习开始计时，圆点开始移动，按钮会切换为<strong>【移动】</strong>。</p>
     <p class="hint">规则提醒：你可以在任意时刻点击<strong>【移动】</strong>，但实验规则要求你在红绿灯处等待，直到红灯变为绿色后再通行。</p>
     <div class="actions">
       <button class="btn" id="btnBackToCompTest">上一步</button>
-      <button class="btn primary" id="btnReadyToStart">进入决策任务</button>
+      <button class="btn primary" id="btnEnterPractice">增加练习轮次</button>
+      <button class="btn primary" id="btnEnterFormal">进入决策任务</button>
     </div>
   `);
 
@@ -535,9 +559,43 @@ function showReadyToStart(): void {
     showComprehensionTest();
   });
 
-  document.querySelector<HTMLButtonElement>("#btnReadyToStart")?.addEventListener("click", () => {
+  document.querySelector<HTMLButtonElement>("#btnEnterPractice")?.addEventListener("click", () => {
+    enterPracticeMode();
     closeModal();
   });
+
+  document.querySelector<HTMLButtonElement>("#btnEnterFormal")?.addEventListener("click", () => {
+    enterFormalMode();
+    closeModal();
+  });
+}
+
+function enterPracticeMode(): void {
+  isPracticeMode = true;
+  const practiceLogger = createLogger(practiceConfig, "practice");
+  const practiceEngine = new ExperimentEngine(practiceConfig, practiceLogger);
+  logger = practiceLogger;
+  engine = practiceEngine;
+  if (world) {
+    world = new World2D(els.canvas, practiceConfig);
+  }
+  lastPhase = engine.state.phase;
+  finishGate = false;
+  updateHud();
+}
+
+function enterFormalMode(): void {
+  isPracticeMode = false;
+  const newLogger = createLogger(formalConfig, "formal");
+  const newEngine = new ExperimentEngine(formalConfig, newLogger);
+  logger = newLogger;
+  engine = newEngine;
+  if (world) {
+    world = new World2D(els.canvas, formalConfig);
+  }
+  lastPhase = engine.state.phase;
+  finishGate = false;
+  updateHud();
 }
 
 type CompletionScreenState = "saving" | SubmitOutcome;
@@ -556,8 +614,10 @@ async function submitFormalResultsSilently(): Promise<SubmitOutcome> {
 
 function showCompletionScreen(state: CompletionScreenState): void {
   const elapsed = engine.state.elapsedSec;
-  const waitSec = Math.max(0, elapsed - currentConfig.segmentDurationSec * 2);
+  const waitSec = Math.max(0, elapsed - engine.config.segmentDurationSec * 2);
   const taskMoney = engine.state.money;
+  const fixedFee = 0; // fixed participation fee; set to 0 if not applicable
+  const totalMoney = fixedFee + taskMoney;
   const surveyAction =
     state === "saving"
       ? ""
@@ -579,8 +639,11 @@ function showCompletionScreen(state: CompletionScreenState): void {
   openModal(`
     <h1>决策任务完成</h1>
     <div class="completion-card-body">
-      <h1>感谢您的参与</h1>
-      <p>您在红绿灯处等待了 <strong>${formatSeconds(waitSec, 1)}</strong>，获得 <strong>${formatMoney(taskMoney)}</strong>。</p>
+      <h2>感谢您的参与</h2>
+      <p>您获得的固定参与费用为 <strong>${formatMoney(fixedFee)}</strong>；</p>
+      <p>在决策任务中，初始酬金 <strong>${formatMoney(engine.config.startMoney)}</strong>，您在红绿灯处等待了 <strong>${formatSeconds(waitSec, 1)}</strong>，按照任务规则，每等待 1 秒扣除酬金 <strong>${formatMoney(engine.config.moneyLossPerSec)}</strong>。</p>
+      <p>因此，您总计获得酬金 <strong>${formatMoney(totalMoney)}</strong>。</p>
+      <p>感谢您参与我们的研究。</p>
       ${statusBlock}
       <p class="completion-close-note">后续填写完简短问卷后，您将在见数平台领取自己的收益。</p>
       ${surveyAction}
@@ -591,14 +654,18 @@ function showCompletionScreen(state: CompletionScreenState): void {
 function showTaskSubmitScreen(): void {
   openModal(`
     <h1>决策任务</h1>
-    <p>圆圈已越过终点线。请点击下方按钮进入下一屏幕。</p>
+    <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
     <div class="actions">
-      <button class="btn primary" id="btnTaskSubmit">提交</button>
+      <button class="btn primary" id="btnTaskSubmit">提交并保存数据</button>
     </div>
   `);
 
   document.querySelector<HTMLButtonElement>("#btnTaskSubmit")?.addEventListener("click", () => {
-    showPostQuestion();
+    if (isPracticeMode) {
+      showPracticeReady();
+    } else {
+      showPostQuestion();
+    }
   });
 }
 
@@ -702,7 +769,7 @@ async function bootstrapDesktopApp(): Promise<void> {
   document.body.classList.add("app-fonts-ready");
   void flushPendingSubmissions();
 
-  world = new World2D(els.canvas, currentConfig);
+  world = new World2D(els.canvas, engine.config);
   lastPhase = engine.state.phase;
   finishGate = false;
 
@@ -774,7 +841,7 @@ function updateHud(): void {
 
   let posText = "—";
   let timeText = formatSeconds(0, 1);
-  let moneyText = formatMoney(currentConfig.startMoney);
+  let moneyText = formatMoney(engine.config.startMoney);
   let lightText = "—";
   let moneyUrgent = false;
   let lightRed = false;

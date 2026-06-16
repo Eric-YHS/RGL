@@ -105,4 +105,14 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    // Serve the production dist build locally with the same API proxy.
+    allowedHosts: true,
+    proxy: {
+      "/api": {
+        target: process.env.VITE_DEV_API_TARGET ?? "http://localhost:8787",
+        changeOrigin: true,
+      },
+    },
+  },
 });

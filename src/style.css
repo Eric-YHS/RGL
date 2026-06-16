@@ -428,16 +428,21 @@ canvas.webgl {
   text-decoration: none;
 }
 
-.card label:has(input[type="radio"]) {
-  box-sizing: border-box;
-  min-width: 64px;
-  min-height: 38px;
-  padding: 8px 11px;
+.comp-question {
+  margin: 14px 24px 0;
+  padding: 12px 14px;
   border: 1px solid var(--soft-border);
-  border-radius: 0;
   background: #ffffff;
-  color: var(--text);
-  line-height: 1.35;
+}
+
+.comp-question p {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.card > .comp-question:first-child {
+  margin-top: 18px;
 }
 
 .card label:has(input[type="radio"]):hover {
