@@ -6,8 +6,9 @@ type Cell = string | number;
 // Timeline events persisted with the submission. Milestone events (start /
 // arrive_light / light_green / pass_light / finish) let researchers reconstruct
 // the wait/run-red duration and the rule-breaking dummy without assuming fixed
-// timings. comprehension_answer / post_rule_attitude are handled separately
-// (they update fields rather than the event log).
+// timings. comprehension_answer is now persisted both as an event and as a
+// dedicated field. post_rule_attitude / post_rule_attitude_text are handled
+// separately (they update fields rather than the event log).
 const PERSISTED_EVENTS = new Set<string>([
   "start",
   "arrive_light",
@@ -15,7 +16,8 @@ const PERSISTED_EVENTS = new Set<string>([
   "walk_press",
   "pass_light",
   "violation",
-  "finish"
+  "finish",
+  "comprehension_answer"
 ]);
 
 export type SessionMeta = {
@@ -48,7 +50,7 @@ export type SessionSubmission = {
   submittedAtIso: string;
   runKind: SessionMeta["runKind"];
   revealMode: ExperimentConfig["revealMode"];
-  comprehensionAnswer: "yes" | "no" | "";
+  comprehensionAnswer: string;
   postRuleAttitude: "A" | "B" | "C" | "D" | "";
   postRuleAttitudeText: string;
   summary: SubmissionSummary;
@@ -60,7 +62,7 @@ export class ExperimentLogger {
   private readonly config: ExperimentConfig;
   private readonly meta: SessionMeta;
   private readonly events: LogEvent[] = [];
-  private comprehensionAnswer: "yes" | "no" | "" = "";
+  private comprehensionAnswer = "";
   private postRuleAttitude: "A" | "B" | "C" | "D" | "" = "";
   private postRuleAttitudeText = "";
 
@@ -82,8 +84,17 @@ export class ExperimentLogger {
     note?: string;
   }): void {
     if (args.event === "comprehension_answer") {
-      if (args.note === "yes" || args.note === "no") this.comprehensionAnswer = args.note;
-      return;
+      // Only accept known-safe formats: legacy "yes"/"no" or the new
+      // multi-question pattern (e.g. "q1=less;q2=wait").  Values come
+      // from radio buttons, never from free-text input.
+      if (
+        args.note === "yes" ||
+        args.note === "no" ||
+        (typeof args.note === "string" && /^q\d+=[a-z_]+(;q\d+=[a-z_]+)*$/.test(args.note))
+      ) {
+        this.comprehensionAnswer = args.note;
+      }
+      // Falls through to persist as a timeline event as well.
     }
     if (args.event === "post_rule_attitude") {
       if (args.note === "A" || args.note === "B" || args.note === "C" || args.note === "D") {
@@ -246,9 +257,14 @@ function formatRunKind(runKind: SessionMeta["runKind"]): string {
   return runKind === "practice" ? "练习" : "正式实验";
 }
 
-function formatComprehensionAnswer(answer: "yes" | "no" | ""): string {
+function formatComprehensionAnswer(answer: string): string {
   if (answer === "yes") return "是";
   if (answer === "no") return "否";
+  // New multi-question format (e.g. "q1=less;q2=wait").
+  // Only pass through validated patterns; fall back to empty string
+  // for anything unexpected (defense in depth — values originate from
+  // radio buttons, not free-text input).
+  if (/^q\d+=[a-z_]+(;q\d+=[a-z_]+)*$/.test(answer)) return answer;
   return "";
 }
 

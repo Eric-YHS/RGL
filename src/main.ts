@@ -36,8 +36,10 @@ function createClientSessionId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
-  const rand = Math.random().toString(36).slice(2);
-  return `fallback-${Date.now().toString(36)}-${rand}`;
+  // Deterministic fallback: timestamp + high-precision performance counter.
+  // Avoids Math.random() per task.md randomness requirements.
+  const perf = performance.now().toString(36).replace(".", "");
+  return `fallback-${Date.now().toString(36)}-${perf}`;
 }
 
 function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig {
@@ -299,6 +301,7 @@ let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateEnteredOnce = false;
 let instructionsShownOnce = false;
+let practiceCompletedOnce = false;
 
 function hasDesktopViewport(): boolean {
   return window.innerWidth >= DESKTOP_MIN_VIEWPORT_WIDTH && window.innerHeight >= DESKTOP_MIN_VIEWPORT_HEIGHT;
@@ -543,31 +546,53 @@ function showComprehensionTest(): void {
 }
 
 function showPracticeReady(): void {
-  openModal(`
-    <h1>准备开始练习</h1>
-    <p>回答正确！请点击下方按钮进入练习界面。</p>
-    <p>进入练习界面后，底部按钮会先显示为<strong>【开始】</strong>；点击<strong>【开始】</strong>后，练习开始计时，圆点开始移动，按钮会切换为<strong>【移动】</strong>。</p>
-    <p class="hint">规则提醒：你可以在任意时刻点击<strong>【移动】</strong>，但实验规则要求你在红绿灯处等待，直到红灯变为绿色后再通行。</p>
-    <div class="actions">
-      <button class="btn" id="btnBackToCompTest">上一步</button>
-      <button class="btn primary" id="btnEnterPractice">增加练习轮次</button>
-      <button class="btn primary" id="btnEnterFormal">进入决策任务</button>
-    </div>
-  `);
+  if (!practiceCompletedOnce) {
+    // 第一次：只显示进入练习按钮
+    openModal(`
+      <h1>准备开始练习</h1>
+      <p>回答正确！请点击下方按钮进入练习界面。</p>
+      <p>进入练习界面后，底部按钮会先显示为<strong>【开始】</strong>；点击<strong>【开始】</strong>后，练习开始计时，圆点开始移动，按钮会切换为<strong>【移动】</strong>。</p>
+      <p class="hint">规则提醒：你可以在任意时刻点击<strong>【移动】</strong>，但实验规则要求你在红绿灯处等待，直到红灯变为绿色后再通行。</p>
+      <div class="actions">
+        <button class="btn" id="btnBackToCompTest">上一步</button>
+        <button class="btn primary" id="btnEnterPractice">进入练习</button>
+      </div>
+    `);
 
-  document.querySelector<HTMLButtonElement>("#btnBackToCompTest")?.addEventListener("click", () => {
-    showComprehensionTest();
-  });
+    document.querySelector<HTMLButtonElement>("#btnBackToCompTest")?.addEventListener("click", () => {
+      showComprehensionTest();
+    });
 
-  document.querySelector<HTMLButtonElement>("#btnEnterPractice")?.addEventListener("click", () => {
-    enterPracticeMode();
-    closeModal();
-  });
+    document.querySelector<HTMLButtonElement>("#btnEnterPractice")?.addEventListener("click", () => {
+      enterPracticeMode();
+      closeModal();
+    });
+  } else {
+    // 练习完成后：显示返回导语、继续练习、进入正式决策任务
+    openModal(`
+      <h1>准备开始正式实验</h1>
+      <p>您已完成练习轮次。您可以选择返回导语重新阅读说明、继续练习，或进入正式决策任务。</p>
+      <div class="actions">
+        <button class="btn" id="btnBackToInstructions">返回导语</button>
+        <button class="btn" id="btnContinuePractice">继续练习</button>
+        <button class="btn primary" id="btnEnterFormal">进入正式决策任务</button>
+      </div>
+    `);
 
-  document.querySelector<HTMLButtonElement>("#btnEnterFormal")?.addEventListener("click", () => {
-    enterFormalMode();
-    closeModal();
-  });
+    document.querySelector<HTMLButtonElement>("#btnBackToInstructions")?.addEventListener("click", () => {
+      showInstructions();
+    });
+
+    document.querySelector<HTMLButtonElement>("#btnContinuePractice")?.addEventListener("click", () => {
+      enterPracticeMode();
+      closeModal();
+    });
+
+    document.querySelector<HTMLButtonElement>("#btnEnterFormal")?.addEventListener("click", () => {
+      enterFormalMode();
+      closeModal();
+    });
+  }
 }
 
 function enterPracticeMode(): void {
@@ -653,76 +678,23 @@ function showCompletionScreen(state: CompletionScreenState): void {
 
 function showTaskSubmitScreen(): void {
   openModal(`
-    <h1>决策任务</h1>
+    <h1>${isPracticeMode ? "练习完成" : "决策任务"}</h1>
     <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
     <div class="actions">
-      <button class="btn primary" id="btnTaskSubmit">提交并保存数据</button>
+      <button class="btn primary" id="btnTaskSubmit">${isPracticeMode ? "返回" : "提交并保存数据"}</button>
     </div>
   `);
 
   document.querySelector<HTMLButtonElement>("#btnTaskSubmit")?.addEventListener("click", () => {
     if (isPracticeMode) {
+      practiceCompletedOnce = true;
       showPracticeReady();
     } else {
-      showPostQuestion();
+      showCompletionScreen("saving");
+      void submitFormalResultsSilently().then((outcome) => {
+        showCompletionScreen(outcome);
+      });
     }
-  });
-}
-
-function showPostQuestion(): void {
-  const elapsed = engine.state.elapsedSec;
-  const money = engine.state.money;
-  const v = engine.state.violations;
-
-  openModal(`
-    <h1>任务后问题</h1>
-    <p class="hint">耗时：${formatSeconds(elapsed, 1)}；最终金额：${formatMoney(money)}；闯红灯次数：${v}</p>
-    <h2>请回答</h2>
-    <p>刚才的任务中，关于"等待红灯"的规则，您的真实想法是？</p>
-    <div class="choice-stack" style="display:grid; gap:10px;">
-      <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
-        <input type="radio" name="post" value="A" />
-        <span>A. 我严格遵守，因为这是规则。</span>
-      </label>
-      <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
-        <input type="radio" name="post" value="B" />
-        <span>B. 我有时未遵守，因为等待时间太长，扣钱太多。</span>
-      </label>
-      <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
-        <input type="radio" name="post" value="C" />
-        <span>C. 我觉得只要无人监督，为了效率（省钱）可以适当变通。</span>
-      </label>
-      <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
-        <input type="radio" name="post" value="D" />
-        <span>D. 我以为按钮随时能点，没太在意红灯。</span>
-      </label>
-    </div>
-    <div class="actions">
-      <button class="btn primary" id="btnSubmitPost">提交并保存数据</button>
-    </div>
-  `);
-
-  document.querySelector<HTMLButtonElement>("#btnSubmitPost")?.addEventListener("click", () => {
-    const nowMs = performance.now();
-    const choice = document.querySelector<HTMLInputElement>('input[name="post"]:checked')?.value;
-
-    if (!choice) return;
-
-    logger.log({
-      nowMs,
-      tSec: engine.state.elapsedSec,
-      event: "post_rule_attitude",
-      phase: engine.state.phase,
-      lightIndex: engine.state.lightIndex,
-      lightColor: null,
-      money: engine.state.money,
-      note: choice
-    });
-
-    showCompletionScreen("saving");
-    void submitFormalResultsSilently().then((outcome) => {
-      showCompletionScreen(outcome);
-    });
   });
 }
 
