@@ -679,7 +679,7 @@ function showCompletionScreen(state: CompletionScreenState): void {
 function showTaskSubmitScreen(): void {
   openModal(`
     <h1>${isPracticeMode ? "练习完成" : "决策任务"}</h1>
-    <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
+    <p>圆点已越过终点线。请点击下方按钮${isPracticeMode ? "返回导语" : "进入下一屏幕"}。</p>
     <div class="actions">
       <button class="btn primary" id="btnTaskSubmit">${isPracticeMode ? "返回" : "提交并保存数据"}</button>
     </div>
