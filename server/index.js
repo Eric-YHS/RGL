@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 import cors from "cors";
 import Database from "better-sqlite3";
 import express from "express";
+import { loadRuntimeEnvironment } from "./runtime-env.js";
+
+loadRuntimeEnvironment();
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number.parseInt(process.env.PORT ?? "8787", 10);
