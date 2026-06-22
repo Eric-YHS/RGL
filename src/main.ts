@@ -309,6 +309,11 @@ let desktopGateEnteredOnce = false;
 let desktopGateIntroductionAcknowledged = false;
 let instructionsShownOnce = false;
 let practiceCompletedOnce = false;
+type DisplayCheckMode = "initial" | "restart" | "before_start";
+const DISPLAY_CHECK_MAX_DURATION_MS = 6000;
+let displayCheckMode: DisplayCheckMode | null = null;
+let displayCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。请连续完成，不要滚动页面。";
+let displayCheckCertified = false;
 type AttentionIssue =
   | "document_hidden"
   | "window_blurred"
@@ -328,7 +333,163 @@ function hasDesktopHover(): boolean {
   return window.matchMedia("(hover: hover)").matches;
 }
 
+function startDisplayCornerCheck(
+  mode: DisplayCheckMode,
+  notice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。请连续完成，不要滚动页面。"
+): void {
+  displayCheckMode = mode;
+  displayCheckCertified = false;
+  displayCheckNotice = notice;
+  renderDisplayCornerCheck();
+}
+
+function renderDisplayCornerCheck(): void {
+  const mode = displayCheckMode;
+  if (!mode) return;
+
+  els.desktopGate.classList.add("display-corner-check-active");
+  els.desktopGate.innerHTML = `
+    <section class="display-corner-check" id="displayCornerCheck" aria-label="实验显示区域检查">
+      <svg class="display-corner-check-line" id="displayCornerCheckLine" aria-hidden="true">
+        <polyline fill="none" stroke="#17689a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <button type="button" class="display-corner-target top-left" data-corner="0" aria-label="左上角"></button>
+      <button type="button" class="display-corner-target top-right" data-corner="1" aria-label="右上角"></button>
+      <button type="button" class="display-corner-target bottom-right" data-corner="2" aria-label="右下角"></button>
+      <button type="button" class="display-corner-target bottom-left" data-corner="3" aria-label="左下角"></button>
+      <div class="display-corner-check-instructions">
+        <h1>实验显示区域检查</h1>
+        <p id="displayCornerCheckHint">${displayCheckNotice}</p>
+        <p class="hint">必须在 6 秒内连续经过四角。检测期间滚动、缩放或调整窗口会要求重新检查。</p>
+      </div>
+    </section>
+  `;
+  els.desktopGate.style.display = "grid";
+  desktopGateVisible = true;
+
+  const surface = els.desktopGate.querySelector<HTMLElement>("#displayCornerCheck");
+  const line = els.desktopGate.querySelector<SVGPolylineElement>("#displayCornerCheckLine polyline");
+  const targets = Array.from(els.desktopGate.querySelectorAll<HTMLElement>("[data-corner]"));
+  if (!surface || !line || targets.length !== 4) return;
+
+  let nextCorner = 0;
+  let pointerId: number | null = null;
+  let startedAtMs = 0;
+  const connectedCorners: Array<{ x: number; y: number }> = [];
+  let previewPoint: { x: number; y: number } | null = null;
+
+  const pointFromEvent = (event: PointerEvent): { x: number; y: number } => {
+    const rect = surface.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  };
+  const centerOfTarget = (index: number): { x: number; y: number } => {
+    const surfaceRect = surface.getBoundingClientRect();
+    const targetRect = targets[index].getBoundingClientRect();
+    return {
+      x: targetRect.left - surfaceRect.left + targetRect.width / 2,
+      y: targetRect.top - surfaceRect.top + targetRect.height / 2
+    };
+  };
+  const isOnTarget = (point: { x: number; y: number }, index: number): boolean => {
+    const targetRect = targets[index].getBoundingClientRect();
+    const center = centerOfTarget(index);
+    return Math.hypot(point.x - center.x, point.y - center.y) <= Math.max(targetRect.width, targetRect.height) * 1.2;
+  };
+  const redraw = (): void => {
+    const points = previewPoint ? [...connectedCorners, previewPoint] : connectedCorners;
+    line.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
+  };
+  const reset = (notice: string): void => {
+    displayCheckNotice = notice;
+    renderDisplayCornerCheck();
+  };
+  const complete = (): void => {
+    displayCheckCertified = true;
+    displayCheckMode = null;
+    els.desktopGate.classList.remove("display-corner-check-active");
+    els.desktopGate.style.display = "none";
+    desktopGateVisible = false;
+    lastViewportSignature = getViewportSignature();
+
+    if (mode === "initial") {
+      desktopGateEnteredOnce = true;
+      renderDesktopPreflightGate();
+      return;
+    }
+    if (mode === "restart") {
+      restartCurrentTask();
+      return;
+    }
+    updateHud();
+  };
+
+  surface.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      reset("检测到滚轮操作。请停止滚动，确认实验区完整显示后重新从左上角开始。");
+    },
+    { passive: false }
+  );
+  surface.addEventListener("contextmenu", (event) => event.preventDefault());
+
+  surface.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    const point = pointFromEvent(event);
+    if (!isOnTarget(point, 0)) {
+      reset("请从左上角圆点开始，按住鼠标左键后连续经过四个角。");
+      return;
+    }
+    pointerId = event.pointerId;
+    startedAtMs = performance.now();
+    nextCorner = 1;
+    connectedCorners.length = 0;
+    connectedCorners.push(centerOfTarget(0));
+    previewPoint = point;
+    redraw();
+    surface.setPointerCapture(event.pointerId);
+  });
+
+  surface.addEventListener("pointermove", (event) => {
+    if (pointerId !== event.pointerId || nextCorner >= targets.length) return;
+    if (performance.now() - startedAtMs > DISPLAY_CHECK_MAX_DURATION_MS) {
+      reset("连续连线超时。请确认四角同时可见后，从左上角重新开始。");
+      return;
+    }
+
+    const point = pointFromEvent(event);
+    previewPoint = point;
+    redraw();
+    if (!isOnTarget(point, nextCorner)) return;
+
+    connectedCorners.push(centerOfTarget(nextCorner));
+    nextCorner += 1;
+    redraw();
+    if (nextCorner === targets.length) complete();
+  });
+
+  surface.addEventListener("pointerup", (event) => {
+    if (pointerId !== event.pointerId || nextCorner === targets.length) return;
+    reset("连线未经过全部四个角。请从左上角重新开始并保持按住鼠标左键。");
+  });
+  surface.addEventListener("pointercancel", () => {
+    reset("检测中断。请确认实验区完整显示后，从左上角重新开始。");
+  });
+}
+
+function invalidateDisplayCheckForEnvironmentChange(notice: string): boolean {
+  displayCheckCertified = false;
+  if (!displayCheckMode) return false;
+  displayCheckNotice = notice;
+  renderDisplayCornerCheck();
+  return true;
+}
+
 function renderDesktopPreflightGate(): void {
+  if (displayCheckMode) {
+    renderDisplayCornerCheck();
+    return;
+  }
   const pointerReady = hasDesktopPointer();
   const hoverReady = hasDesktopHover();
   const keyboardReady = desktopInputProof.keyboard;
@@ -405,7 +566,7 @@ function renderDesktopPreflightGate(): void {
           桌面端校验已通过。
         </div>
         <div class="desktop-preflight-actions">
-          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
+          <button class="btn primary" id="btnDesktopGateContinue">下一步：检查实验显示区域</button>
         </div>
       `
     : "";
@@ -430,8 +591,7 @@ function renderDesktopPreflightGate(): void {
     els.desktopGate
       .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
       ?.addEventListener("click", () => {
-        desktopGateEnteredOnce = true;
-        renderDesktopPreflightGate();
+        startDisplayCornerCheck("initial");
       });
   }
 }
@@ -517,9 +677,9 @@ function renderAttentionWarning(): void {
     <section class="attention-warning-card" aria-labelledby="attentionWarningTitle">
       <h1 id="attentionWarningTitle">实验已暂停</h1>
       <p>${attentionIssueMessage(currentAttentionIssue)}</p>
-      <p>本轮任务将作废。请确认红绿灯实验区的四周都完整可见；页面其他位置可以滚动，不影响本实验。确认后，点击下方按钮从本轮起点重新开始。</p>
+      <p>本轮任务将作废。请重新完成实验显示区域检查；检查通过后将从本轮起点重新开始。</p>
       <div class="attention-warning-actions">
-        <button class="btn primary" id="btnResumeAfterAttentionWarning">我已确认，重新开始本轮</button>
+        <button class="btn primary" id="btnResumeAfterAttentionWarning">重新检查显示区域</button>
       </div>
       <p class="hint" id="attentionWarningHint"></p>
     </section>
@@ -529,19 +689,11 @@ function renderAttentionWarning(): void {
   els.attentionWarning
     .querySelector<HTMLButtonElement>("#btnResumeAfterAttentionWarning")
     ?.addEventListener("click", () => {
-      if (!isExperimentRegionFullyVisible()) {
-        currentAttentionIssue = "experiment_region_not_fully_visible";
-        const hint = els.attentionWarning.querySelector<HTMLElement>("#attentionWarningHint");
-        if (hint) hint.textContent = "红绿灯实验区仍未完整显示。请先滚动或调整浏览器窗口/缩放后再继续。";
-        return;
-      }
-
       if (!currentAttentionIssue) return;
       attentionWarningVisible = false;
       currentAttentionIssue = null;
       els.attentionWarning.style.display = "none";
-      lastViewportSignature = getViewportSignature();
-      restartCurrentTask();
+      startDisplayCornerCheck("restart");
     });
 }
 
@@ -596,6 +748,13 @@ function installExperimentVisibilityMonitor(): void {
     const nextSignature = getViewportSignature();
     if (nextSignature !== lastViewportSignature) {
       lastViewportSignature = nextSignature;
+      if (
+        invalidateDisplayCheckForEnvironmentChange(
+          "检测到窗口大小或页面缩放变化。请确认四角同时可见后，从左上角重新开始。"
+        )
+      ) {
+        return;
+      }
       pauseForAttentionIssue("viewport_changed");
       return;
     }
@@ -606,28 +765,6 @@ function installExperimentVisibilityMonitor(): void {
 function openModal(html: string): void {
   els.modalCard.innerHTML = html;
   els.modal.style.display = "grid";
-}
-
-function showExperimentRegionRequiredBeforeStart(): void {
-  openModal(`
-    <h1>请完整显示红绿灯实验区</h1>
-    <p>开始前，请滚动或调整浏览器窗口，使红绿灯实验区的四条边都处于当前可视范围内。</p>
-    <p class="hint">检测范围仅为本实验任务区；页面其它内容可以滚动。</p>
-    <div class="actions">
-      <button class="btn primary" id="btnRecheckExperimentRegion">我已调整，重新检查</button>
-    </div>
-  `);
-
-  document
-    .querySelector<HTMLButtonElement>("#btnRecheckExperimentRegion")
-    ?.addEventListener("click", () => {
-      if (isExperimentRegionFullyVisible()) {
-        closeModal();
-        return;
-      }
-      const hint = els.modalCard.querySelector<HTMLElement>(".hint");
-      if (hint) hint.textContent = "红绿灯实验区仍未完整显示。请继续调整后重新检查。";
-    });
 }
 
 function closeModal(): void {
@@ -975,8 +1112,8 @@ els.btnAction.addEventListener("click", () => {
 
   const nowMs = performance.now();
   if (engine.state.phase === "idle") {
-    if (!isExperimentRegionFullyVisible()) {
-      showExperimentRegionRequiredBeforeStart();
+    if (!displayCheckCertified || !isExperimentRegionFullyVisible()) {
+      startDisplayCornerCheck("before_start");
       return;
     }
     closeModal();
@@ -1037,6 +1174,13 @@ window.addEventListener("resize", () => {
   const nextSignature = getViewportSignature();
   if (nextSignature !== lastViewportSignature) {
     lastViewportSignature = nextSignature;
+    if (
+      invalidateDisplayCheckForEnvironmentChange(
+        "检测到窗口大小或页面缩放变化。请确认四角同时可见后，从左上角重新开始。"
+      )
+    ) {
+      return;
+    }
     pauseForAttentionIssue("viewport_changed");
     return;
   }
@@ -1072,6 +1216,7 @@ window.addEventListener("mousedown", () => {
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    invalidateDisplayCheckForEnvironmentChange("检测到您离开了实验页面。返回后请从左上角重新开始检查。");
     pauseForAttentionIssue("document_hidden");
     return;
   }
@@ -1080,6 +1225,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("blur", () => {
+  invalidateDisplayCheckForEnvironmentChange("检测到浏览器窗口失去焦点。请返回后从左上角重新开始检查。");
   pauseForAttentionIssue("window_blurred");
 });
 
