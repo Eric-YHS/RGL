@@ -652,9 +652,9 @@ function renderAttentionWarning(): void {
     <section class="attention-warning-card" aria-labelledby="attentionWarningTitle">
       <h1 id="attentionWarningTitle">实验已暂停</h1>
       <p>${attentionIssueMessage(currentAttentionIssue)}</p>
-      <p>请确认红绿灯实验区的四周都完整可见；页面其他位置可以滚动，不影响本实验。确认后点击继续。</p>
+      <p>本轮任务将作废。请确认红绿灯实验区的四周都完整可见；页面其他位置可以滚动，不影响本实验。确认后，点击下方按钮从本轮起点重新开始。</p>
       <div class="attention-warning-actions">
-        <button class="btn primary" id="btnResumeAfterAttentionWarning">我已确认，继续实验</button>
+        <button class="btn primary" id="btnResumeAfterAttentionWarning">我已确认，重新开始本轮</button>
       </div>
       <p class="hint" id="attentionWarningHint"></p>
     </section>
@@ -671,15 +671,12 @@ function renderAttentionWarning(): void {
         return;
       }
 
-      const issue = currentAttentionIssue;
-      if (!issue) return;
-      const nowMs = performance.now();
+      if (!currentAttentionIssue) return;
       attentionWarningVisible = false;
       currentAttentionIssue = null;
       els.attentionWarning.style.display = "none";
-      engine.resume(nowMs);
-      logAttentionEvent("attention_restored", issue, nowMs);
       lastViewportSignature = getViewportSignature();
+      restartCurrentTask();
     });
 }
 
@@ -983,6 +980,25 @@ function enterFormalMode(): void {
   if (world) {
     world = new World2D(els.canvas, formalConfig);
   }
+  lastPhase = engine.state.phase;
+  finishGate = false;
+  updateHud();
+}
+
+function restartCurrentTask(): void {
+  const config = isPracticeMode ? practiceConfig : formalConfig;
+  const runKind: "practice" | "formal" = isPracticeMode ? "practice" : "formal";
+
+  // Do not resume the interrupted state. A new engine/logger makes this round
+  // start at the initial position with a fresh timer and compensation amount.
+  if (!isPracticeMode) {
+    formalClientSessionId = createClientSessionId();
+    formalSubmission = null;
+  }
+  logger = createLogger(config, runKind);
+  engine = new ExperimentEngine(config, logger);
+  world?.dispose();
+  world = new World2D(els.canvas, config);
   lastPhase = engine.state.phase;
   finishGate = false;
   updateHud();
