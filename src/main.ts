@@ -452,7 +452,7 @@ function isTaskInProgress(): boolean {
 }
 
 function isExperimentRegionFullyVisible(): boolean {
-  const rect = els.stage.getBoundingClientRect();
+  const targets = [els.stage, els.canvas, els.btnAction];
   const viewport = window.visualViewport;
   const left = viewport?.offsetLeft ?? 0;
   const top = viewport?.offsetTop ?? 0;
@@ -461,14 +461,17 @@ function isExperimentRegionFullyVisible(): boolean {
   // A one-CSS-pixel tolerance avoids false alarms from fractional layout pixels.
   const tolerance = 1;
 
-  return (
-    rect.width > 0 &&
-    rect.height > 0 &&
-    rect.left >= left - tolerance &&
-    rect.top >= top - tolerance &&
-    rect.right <= right + tolerance &&
-    rect.bottom <= bottom + tolerance
-  );
+  return targets.every((target) => {
+    const rect = target.getBoundingClientRect();
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rect.left >= left - tolerance &&
+      rect.top >= top - tolerance &&
+      rect.right <= right + tolerance &&
+      rect.bottom <= bottom + tolerance
+    );
+  });
 }
 
 function logAttentionEvent(event: "attention_lost" | "attention_restored", issue: AttentionIssue, nowMs: number): void {
@@ -569,12 +572,16 @@ function installExperimentVisibilityMonitor(): void {
     { threshold: [0, 1] }
   );
   observer.observe(els.stage);
+  observer.observe(els.canvas);
+  observer.observe(els.btnAction);
 
   if (typeof ResizeObserver !== "undefined") {
     const resizeObserver = new ResizeObserver(() => {
       scheduleExperimentVisibilityCheck();
     });
     resizeObserver.observe(els.stage);
+    resizeObserver.observe(els.canvas);
+    resizeObserver.observe(els.btnAction);
   }
 
   document.addEventListener("scroll", scheduleExperimentVisibilityCheck, true);
