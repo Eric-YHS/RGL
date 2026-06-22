@@ -360,7 +360,7 @@ function renderDisplayCornerCheck(): void {
       <div class="display-corner-check-instructions">
         <h1>实验显示区域检查</h1>
         <p id="displayCornerCheckHint">${displayCheckNotice}</p>
-        <p class="hint">必须在 6 秒内连续经过四角。检测期间滚动、缩放或调整窗口会要求重新检查。</p>
+        <p class="hint">如需调整浏览器缩放，请按住 Ctrl（Mac 为 ⌘）并滚动鼠标滚轮；调整后请重新从左上角开始。普通滚轮不能使用。</p>
       </div>
     </section>
   `;
@@ -434,6 +434,10 @@ function renderDisplayCornerCheck(): void {
   surface.addEventListener(
     "wheel",
     (event) => {
+      if (event.ctrlKey || event.metaKey) {
+        reset("正在调整浏览器缩放。调整完成并确认四角同时可见后，请从左上角重新开始。");
+        return;
+      }
       event.preventDefault();
       reset("检测到滚轮操作。请停止滚动，确认实验区完整显示后重新从左上角开始。");
     },
