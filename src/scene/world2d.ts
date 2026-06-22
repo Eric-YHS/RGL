@@ -32,6 +32,7 @@ export class World2D {
   private w = 0;
   private h = 0;
   private dpr = 1;
+  private layoutScale = 1;
   private panelX = 0;
   private panelY = 0;
   private panelW = 0;
@@ -75,10 +76,23 @@ export class World2D {
     this.w = cssW;
     this.h = cssH;
 
-    this.panelW = Math.min(Math.max(780, this.w * 0.66), this.w - 150);
-    this.panelH = Math.min(Math.max(370, this.h * 0.57), this.h - 250);
+    this.layoutScale = Math.min(1, Math.max(0.55, Math.min(this.w / 1200, this.h / 760)));
+    const sideInset = Math.max(24, 75 * this.layoutScale);
+    const controlsReserve = Math.max(104, 148 * this.layoutScale);
+    const topMargin = Math.max(24, 42 * this.layoutScale);
+
+    this.panelW = Math.max(
+      1,
+      Math.min(Math.max(780 * this.layoutScale, this.w * 0.66), this.w - sideInset * 2)
+    );
+    this.panelH = Math.max(
+      1,
+      Math.min(Math.max(370 * this.layoutScale, this.h * 0.57), this.h - controlsReserve - topMargin)
+    );
     this.panelX = Math.round((this.w - this.panelW) / 2);
-    this.panelY = Math.round(Math.max(42, Math.min(this.h * 0.07, this.h - this.panelH - 148)));
+    this.panelY = Math.round(
+      Math.max(topMargin, Math.min(this.h * 0.07, this.h - this.panelH - controlsReserve))
+    );
 
     this.trackY = this.panelY + 28 + (this.panelH - 28) * 0.79;
     this.startX = this.panelX + this.panelW * 0.1;
@@ -89,7 +103,10 @@ export class World2D {
   }
 
   private syncStageAnchors(parent: HTMLElement): void {
-    const controlsY = Math.min(this.h - 72, this.panelY + this.panelH + 76);
+    const controlsY = Math.min(
+      this.h - Math.max(48, 72 * this.layoutScale),
+      this.panelY + this.panelH + Math.max(50, 76 * this.layoutScale)
+    );
     parent.style.setProperty("--walk-center-y", `${controlsY}px`);
   }
 

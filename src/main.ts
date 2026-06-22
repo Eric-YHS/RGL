@@ -21,6 +21,12 @@ const surveyUrl = (import.meta.env.VITE_SURVEY_URL ?? "").trim();
 const PENDING_SUBMISSIONS_KEY = "honglvdeng_pending_submissions_v1";
 const EXPERIMENT_UI_FONT = '"Experiment Sans"';
 const EXPERIMENT_MONEY_FONT = '"Experiment Mono"';
+const isCredamoEmbedded =
+  window.self !== window.top || window.location.hostname.toLowerCase().includes("credamo");
+
+if (isCredamoEmbedded) {
+  document.documentElement.classList.add("credamo-embedded");
+}
 
 function normalizeApiBaseUrl(raw: string | undefined): string {
   if (!raw) return "";
@@ -220,9 +226,6 @@ function shouldBlockMobileAccess(): boolean {
   return isIpadLike || uaSaysMobile || uaDataSaysMobile || coarseTouchSmallScreen;
 }
 
-const DESKTOP_MIN_VIEWPORT_WIDTH = 1100;
-const DESKTOP_MIN_VIEWPORT_HEIGHT = 680;
-
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Missing #app");
 
@@ -244,7 +247,7 @@ if (shouldBlockMobileAccess()) {
 } else {
 document.body.classList.add("app-fonts-loading");
 app.innerHTML = `
-  <div class="stage">
+  <div class="stage" id="experimentStage">
     <canvas class="webgl" aria-label="实验场景"></canvas>
 
     <div class="hud">
@@ -269,9 +272,11 @@ app.innerHTML = `
 
     <div class="desktop-preflight" id="desktopGate" style="display:none;"></div>
   </div>
+  <div class="attention-warning" id="attentionWarning" style="display:none;" role="alertdialog" aria-modal="true"></div>
 `;
 
 const els = {
+  stage: document.querySelector<HTMLElement>("#experimentStage")!,
   canvas: document.querySelector<HTMLCanvasElement>("canvas.webgl")!,
   btnAction: document.querySelector<HTMLButtonElement>("#btnAction")!,
   posText: document.querySelector<HTMLDivElement>("#posText")!,
@@ -281,7 +286,8 @@ const els = {
   lightRow: document.querySelector<HTMLDivElement>("#lightRow")!,
   modal: document.querySelector<HTMLDivElement>("#modal")!,
   modalCard: document.querySelector<HTMLDivElement>("#modalCard")!,
-  desktopGate: document.querySelector<HTMLDivElement>("#desktopGate")!
+  desktopGate: document.querySelector<HTMLDivElement>("#desktopGate")!,
+  attentionWarning: document.querySelector<HTMLDivElement>("#attentionWarning")!
 };
 
 const currentConfig: ExperimentConfig = formalConfig;
@@ -300,12 +306,22 @@ let desktopGateReady = false;
 let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateEnteredOnce = false;
+let desktopGateIntroductionAcknowledged = false;
+let desktopGateCornerCheckActive = false;
+let desktopGateCornerCheckComplete = false;
+let desktopGateCornerCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。每命中一个角将自动以直线连接。";
 let instructionsShownOnce = false;
 let practiceCompletedOnce = false;
+type AttentionIssue =
+  | "document_hidden"
+  | "window_blurred"
+  | "viewport_changed"
+  | "experiment_region_not_fully_visible";
 
-function hasDesktopViewport(): boolean {
-  return window.innerWidth >= DESKTOP_MIN_VIEWPORT_WIDTH && window.innerHeight >= DESKTOP_MIN_VIEWPORT_HEIGHT;
-}
+let attentionWarningVisible = false;
+let currentAttentionIssue: AttentionIssue | null = null;
+let visibilityCheckQueued = false;
+let lastViewportSignature = getViewportSignature();
 
 function hasDesktopPointer(): boolean {
   return window.matchMedia("(pointer: fine)").matches;
@@ -315,13 +331,180 @@ function hasDesktopHover(): boolean {
   return window.matchMedia("(hover: hover)").matches;
 }
 
+function renderDesktopCornerCheck(): void {
+  const action = desktopGateCornerCheckComplete
+    ? `
+        <div class="corner-probe-success">显示区域检查完成。</div>
+        <div class="desktop-preflight-actions">
+          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
+        </div>
+      `
+    : "";
+
+  els.desktopGate.innerHTML = `
+    <section class="corner-probe" id="cornerProbe" aria-label="显示区域检查">
+      <svg class="corner-probe-line" id="cornerProbeLine" aria-hidden="true">
+        <polyline fill="none" stroke="#17689a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <button type="button" class="corner-probe-target top-left" data-corner="0" aria-label="左上角"></button>
+      <button type="button" class="corner-probe-target top-right" data-corner="1" aria-label="右上角"></button>
+      <button type="button" class="corner-probe-target bottom-right" data-corner="2" aria-label="右下角"></button>
+      <button type="button" class="corner-probe-target bottom-left" data-corner="3" aria-label="左下角"></button>
+      <div class="corner-probe-center">
+        <h1>显示区域检查</h1>
+        <p id="cornerProbeHint">${desktopGateCornerCheckNotice}</p>
+        <p class="hint">若检测到滚轮操作，请按住 <strong>Ctrl</strong> 键并滚动鼠标滚轮调整浏览器缩放，然后重新连线。</p>
+      </div>
+      ${action}
+    </section>
+  `;
+  els.desktopGate.style.display = "grid";
+  desktopGateVisible = true;
+
+  if (desktopGateCornerCheckComplete) {
+    els.desktopGate
+      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
+      ?.addEventListener("click", () => {
+        desktopGateEnteredOnce = true;
+        renderDesktopPreflightGate();
+      });
+    return;
+  }
+
+  const surface = els.desktopGate.querySelector<HTMLElement>("#cornerProbe");
+  const line = els.desktopGate.querySelector<SVGPolylineElement>("#cornerProbeLine polyline");
+  const targets = Array.from(els.desktopGate.querySelectorAll<HTMLElement>("[data-corner]"));
+  if (!surface || !line || targets.length !== 4) return;
+
+  let nextCorner = 0;
+  const connectedCorners: Array<{ x: number; y: number }> = [];
+  let previewPoint: { x: number; y: number } | null = null;
+
+  const pointFromEvent = (event: MouseEvent): { x: number; y: number } => {
+    const rect = surface.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  };
+  const centerOfTarget = (index: number): { x: number; y: number } => {
+    const surfaceRect = surface.getBoundingClientRect();
+    const targetRect = targets[index].getBoundingClientRect();
+    return {
+      x: targetRect.left - surfaceRect.left + targetRect.width / 2,
+      y: targetRect.top - surfaceRect.top + targetRect.height / 2
+    };
+  };
+  const isOnTarget = (point: { x: number; y: number }, index: number): boolean => {
+    const targetRect = targets[index].getBoundingClientRect();
+    const center = centerOfTarget(index);
+    return Math.hypot(point.x - center.x, point.y - center.y) <= Math.max(targetRect.width, targetRect.height) * 1.2;
+  };
+  const redraw = (): void => {
+    const points = previewPoint ? [...connectedCorners, previewPoint] : connectedCorners;
+    line.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
+  };
+  const reset = (notice: string): void => {
+    desktopGateCornerCheckNotice = notice;
+    desktopGateCornerCheckComplete = false;
+    renderDesktopPreflightGate();
+  };
+
+  surface.addEventListener(
+    "wheel",
+    (event) => {
+      if (event.ctrlKey) {
+        desktopGateCornerCheckNotice = "浏览器缩放已调整。确认四角同时可见后，请从左上角重新连线。";
+        return;
+      }
+      event.preventDefault();
+      reset("检测到滚轮操作。请按住 Ctrl 键并滚动鼠标滚轮调整浏览器缩放，确认四角同时可见后重新连线。");
+    },
+    { passive: false }
+  );
+
+  let pointerId: number | null = null;
+
+  surface.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    const point = pointFromEvent(event);
+    if (!isOnTarget(point, 0)) {
+      reset("请从左上角圆点开始，按住鼠标左键后连续经过四个角。");
+      return;
+    }
+    pointerId = event.pointerId;
+    nextCorner = 1;
+    connectedCorners.length = 0;
+    connectedCorners.push(centerOfTarget(0));
+    previewPoint = point;
+    redraw();
+    surface.setPointerCapture(event.pointerId);
+  });
+
+  surface.addEventListener("pointermove", (event) => {
+    if (pointerId !== event.pointerId || nextCorner >= targets.length) return;
+    const point = pointFromEvent(event);
+    previewPoint = point;
+    redraw();
+    if (!isOnTarget(point, nextCorner)) return;
+
+    connectedCorners.push(centerOfTarget(nextCorner));
+    nextCorner += 1;
+    redraw();
+    if (nextCorner === targets.length) {
+      desktopGateCornerCheckComplete = true;
+      desktopGateCornerCheckNotice = "四个角已依次连接。";
+      renderDesktopPreflightGate();
+      return;
+    }
+    desktopGateCornerCheckNotice = `已连接 ${nextCorner}/4 个角，请继续按住鼠标左键经过下一个圆点。`;
+    const hint = els.desktopGate.querySelector<HTMLElement>("#cornerProbeHint");
+    if (hint) hint.textContent = desktopGateCornerCheckNotice;
+  });
+
+  surface.addEventListener("pointerup", (event) => {
+    if (pointerId !== event.pointerId || desktopGateCornerCheckComplete) return;
+    reset("连线未经过全部四个角。请从左上角重新开始并保持按住鼠标左键。");
+  });
+}
+
 function renderDesktopPreflightGate(): void {
-  const viewportReady = hasDesktopViewport();
   const pointerReady = hasDesktopPointer();
   const hoverReady = hasDesktopHover();
   const keyboardReady = desktopInputProof.keyboard;
   const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
-  const prerequisitesReady = viewportReady && pointerReady && hoverReady && keyboardReady && mouseReady;
+  const prerequisitesReady = pointerReady && hoverReady && keyboardReady && mouseReady;
+
+  if (!desktopGateIntroductionAcknowledged) {
+    if (!pausedByDesktopGate && engine.state.phase !== "idle" && engine.state.phase !== "finished") {
+      engine.pause(performance.now());
+      pausedByDesktopGate = true;
+    }
+
+    els.desktopGate.innerHTML = `
+      <section class="desktop-preflight-card desktop-entry-card">
+        <h1>欢迎参加学术调查</h1>
+        <p>感谢您参与本次学术研究。初始酬金为 <strong>100 元人民币</strong>，最终酬金取决于任务中的决策，介乎 <strong>0 元–92 元人民币</strong>。</p>
+        <p>任务包括练习与正式任务，预计 <strong>15–20 分钟</strong>。参与完全自愿，可随时退出；退出无法获得酬金。作答匿名，数据仅用于学术研究。</p>
+        <p class="hint">请使用台式机或笔记本电脑。开始后请保持页面可见，不要缩放或离开网页。</p>
+        <div class="desktop-preflight-actions">
+          <button class="btn primary" id="btnDesktopGateCheck">开始设备检查</button>
+        </div>
+      </section>
+    `;
+    els.desktopGate.style.display = "grid";
+    desktopGateVisible = true;
+    els.desktopGate
+      .querySelector<HTMLButtonElement>("#btnDesktopGateCheck")
+      ?.addEventListener("click", () => {
+        desktopGateIntroductionAcknowledged = true;
+        renderDesktopPreflightGate();
+      });
+    return;
+  }
+
+  if (desktopGateCornerCheckActive && !desktopGateEnteredOnce) {
+    renderDesktopCornerCheck();
+    return;
+  }
+
   const canEnter = prerequisitesReady && desktopGateEnteredOnce;
 
   if (canEnter) {
@@ -353,9 +536,6 @@ function renderDesktopPreflightGate(): void {
     pausedByDesktopGate = true;
   }
 
-  const viewportLabel = viewportReady
-    ? `窗口尺寸已满足（至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}）`
-    : `请将浏览器窗口调整到至少 ${DESKTOP_MIN_VIEWPORT_WIDTH}×${DESKTOP_MIN_VIEWPORT_HEIGHT}`;
   const pointerLabel = pointerReady ? "检测到精细指针设备" : "请进行精细指针设备检测";
   const hoverLabel = hoverReady ? "检测到悬停能力" : "请进行悬停能力检测";
   const keyboardLabel = keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键";
@@ -367,22 +547,16 @@ function renderDesktopPreflightGate(): void {
           桌面端校验已通过。
         </div>
         <div class="desktop-preflight-actions">
-          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
+          <button class="btn primary" id="btnDesktopGateCornerCheck">下一步：显示区域检查</button>
         </div>
       `
     : "";
 
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card desktop-entry-card">
-      <h1>欢迎参加学术调查</h1>
-      <p>感谢您参与本次学术研究。我们是中山大学学术研究团队。本研究的初始酬金为 <strong>100 元人民币</strong>，但实际酬金将完全取决于您在任务中的决策，介乎 <strong>0 元–92 元人民币</strong>。</p>
-      <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。完成整个调查需时 <strong>15–20 分钟</strong>。</p>
-      <p>本次参与完全自愿，您可以随时退出，但退出无法获得酬金。作答完全匿名，数据仅用于学术研究，请放心作答。</p>
-      <p>为了确保您能顺利开展实验，请先完成下面的设备与环境检测。</p>
-      <p class="hint">注意：如果你使用台式机或笔记本电脑完成此任务，建议在开始前将浏览器屏幕最大化。在完成决策任务期间，请不要关闭此窗口，也不要以其他任何方式离开网页。</p>
-      <p>为保证实验环境一致，进入实验前必须同时满足桌面窗口尺寸、精细指针、悬停能力，以及真实键盘和鼠标交互。</p>
+      <h1>设备检查</h1>
+      <p>请按一次实体键盘按键，并移动、点击一次鼠标。</p>
       <div class="desktop-preflight-checklist">
-        <div class="${viewportReady ? "ready" : ""}">${viewportReady ? "✓" : "•"} ${viewportLabel}</div>
         <div class="${pointerReady ? "ready" : ""}">${pointerReady ? "✓" : "•"} ${pointerLabel}</div>
         <div class="${hoverReady ? "ready" : ""}">${hoverReady ? "✓" : "•"} ${hoverLabel}</div>
         <div class="${keyboardReady ? "ready" : ""}">${keyboardReady ? "✓" : "•"} ${keyboardLabel}</div>
@@ -396,12 +570,171 @@ function renderDesktopPreflightGate(): void {
 
   if (prerequisitesReady) {
     els.desktopGate
-      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
+      .querySelector<HTMLButtonElement>("#btnDesktopGateCornerCheck")
       ?.addEventListener("click", () => {
-        desktopGateEnteredOnce = true;
+        desktopGateCornerCheckActive = true;
+        desktopGateCornerCheckComplete = false;
+        desktopGateCornerCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。每命中一个角将自动以直线连接。";
         renderDesktopPreflightGate();
       });
   }
+}
+
+function getViewportSignature(): string {
+  const viewport = window.visualViewport;
+  return [
+    window.innerWidth,
+    window.innerHeight,
+    Math.round(viewport?.width ?? window.innerWidth),
+    Math.round(viewport?.height ?? window.innerHeight),
+    Math.round((window.devicePixelRatio || 1) * 100)
+  ].join("x");
+}
+
+function isTaskInProgress(): boolean {
+  return engine.state.phase !== "idle" && engine.state.phase !== "finished";
+}
+
+function isExperimentRegionFullyVisible(): boolean {
+  const rect = els.stage.getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const left = viewport?.offsetLeft ?? 0;
+  const top = viewport?.offsetTop ?? 0;
+  const right = left + (viewport?.width ?? window.innerWidth);
+  const bottom = top + (viewport?.height ?? window.innerHeight);
+  // A one-CSS-pixel tolerance avoids false alarms from fractional layout pixels.
+  const tolerance = 1;
+
+  return (
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.left >= left - tolerance &&
+    rect.top >= top - tolerance &&
+    rect.right <= right + tolerance &&
+    rect.bottom <= bottom + tolerance
+  );
+}
+
+function logAttentionEvent(event: "attention_lost" | "attention_restored", issue: AttentionIssue, nowMs: number): void {
+  // Practice data is never submitted, so keep the persisted audit trail limited
+  // to the formal decision task.
+  if (isPracticeMode) return;
+
+  logger.log({
+    nowMs,
+    tSec: engine.state.elapsedSec,
+    event,
+    phase: engine.state.phase,
+    lightIndex: engine.state.lightIndex,
+    lightColor: engine.getCurrentLightColor(),
+    money: engine.state.money,
+    note: issue
+  });
+}
+
+function attentionIssueMessage(issue: AttentionIssue): string {
+  switch (issue) {
+    case "document_hidden":
+      return "检测到实验页面被切换到后台、最小化或暂时不可见。";
+    case "window_blurred":
+      return "检测到浏览器窗口已失去焦点，可能切换到了其他窗口。";
+    case "viewport_changed":
+      return "检测到浏览器窗口大小或页面缩放发生了变化。";
+    case "experiment_region_not_fully_visible":
+      return "检测到红绿灯实验区没有完整显示在当前浏览器视口内。";
+  }
+}
+
+function renderAttentionWarning(): void {
+  if (!currentAttentionIssue) return;
+
+  els.attentionWarning.innerHTML = `
+    <section class="attention-warning-card" aria-labelledby="attentionWarningTitle">
+      <h1 id="attentionWarningTitle">实验已暂停</h1>
+      <p>${attentionIssueMessage(currentAttentionIssue)}</p>
+      <p>请确认红绿灯实验区的四周都完整可见；页面其他位置可以滚动，不影响本实验。确认后点击继续。</p>
+      <div class="attention-warning-actions">
+        <button class="btn primary" id="btnResumeAfterAttentionWarning">我已确认，继续实验</button>
+      </div>
+      <p class="hint" id="attentionWarningHint"></p>
+    </section>
+  `;
+  els.attentionWarning.style.display = "grid";
+
+  els.attentionWarning
+    .querySelector<HTMLButtonElement>("#btnResumeAfterAttentionWarning")
+    ?.addEventListener("click", () => {
+      if (!isExperimentRegionFullyVisible()) {
+        currentAttentionIssue = "experiment_region_not_fully_visible";
+        const hint = els.attentionWarning.querySelector<HTMLElement>("#attentionWarningHint");
+        if (hint) hint.textContent = "红绿灯实验区仍未完整显示。请先滚动或调整浏览器窗口/缩放后再继续。";
+        return;
+      }
+
+      const issue = currentAttentionIssue;
+      if (!issue) return;
+      const nowMs = performance.now();
+      attentionWarningVisible = false;
+      currentAttentionIssue = null;
+      els.attentionWarning.style.display = "none";
+      engine.resume(nowMs);
+      logAttentionEvent("attention_restored", issue, nowMs);
+      lastViewportSignature = getViewportSignature();
+    });
+}
+
+function pauseForAttentionIssue(issue: AttentionIssue): void {
+  if (!isTaskInProgress() || attentionWarningVisible) return;
+
+  const nowMs = performance.now();
+  engine.pause(nowMs);
+  if (!isTaskInProgress()) return;
+
+  attentionWarningVisible = true;
+  currentAttentionIssue = issue;
+  logAttentionEvent("attention_lost", issue, nowMs);
+  renderAttentionWarning();
+}
+
+function scheduleExperimentVisibilityCheck(): void {
+  if (!isTaskInProgress() || attentionWarningVisible || visibilityCheckQueued) return;
+  visibilityCheckQueued = true;
+  requestAnimationFrame(() => {
+    visibilityCheckQueued = false;
+    if (!isTaskInProgress() || attentionWarningVisible || document.hidden) return;
+    if (!isExperimentRegionFullyVisible()) {
+      pauseForAttentionIssue("experiment_region_not_fully_visible");
+    }
+  });
+}
+
+function installExperimentVisibilityMonitor(): void {
+  const observer = new IntersectionObserver(
+    () => {
+      scheduleExperimentVisibilityCheck();
+    },
+    { threshold: [0, 1] }
+  );
+  observer.observe(els.stage);
+
+  if (typeof ResizeObserver !== "undefined") {
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleExperimentVisibilityCheck();
+    });
+    resizeObserver.observe(els.stage);
+  }
+
+  document.addEventListener("scroll", scheduleExperimentVisibilityCheck, true);
+  window.visualViewport?.addEventListener("scroll", scheduleExperimentVisibilityCheck);
+  window.visualViewport?.addEventListener("resize", () => {
+    const nextSignature = getViewportSignature();
+    if (nextSignature !== lastViewportSignature) {
+      lastViewportSignature = nextSignature;
+      pauseForAttentionIssue("viewport_changed");
+      return;
+    }
+    scheduleExperimentVisibilityCheck();
+  });
 }
 
 function openModal(html: string): void {
@@ -436,13 +769,26 @@ function buildFormalSubmission(): SessionSubmission {
 
 function showInstructions(): void {
   openModal(`
-    <h1>指导语</h1>
+    <h1>操作说明（1/3）</h1>
     <p>在本次任务中，您将控制一个<strong>圆点</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
     <ul>
       <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，圆点会靠近一个红绿信号灯并停下等待。</li>
-      <li>此时按钮会由<strong>【开始】</strong>变为<strong>【移动】</strong>。要让圆点再次移动，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮。要让圆点再次移动并通过红绿灯，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
+      <li>按钮会变为<strong>【移动】</strong>。再次点击即可让圆点继续移动并通过红绿灯。</li>
     </ul>
-    <h2>示例短片</h2>
+    <div class="actions">
+      <button class="btn primary" id="btnToInstructionVideo">下一步：观看示例短片</button>
+    </div>
+  `);
+
+  document.querySelector<HTMLButtonElement>("#btnToInstructionVideo")?.addEventListener("click", () => {
+    showInstructionVideo();
+  });
+}
+
+function showInstructionVideo(): void {
+  openModal(`
+    <h1>示例短片（2/3）</h1>
+    <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
     <div class="instruction-video">
       <video controls preload="metadata" playsinline poster="/demo-poster.svg">
         <source src="/demo.mp4" type="video/mp4" />
@@ -450,16 +796,35 @@ function showInstructions(): void {
       </video>
       <a class="video-fallback-link" href="/demo.mp4" target="_blank" rel="noopener">打开示例短片</a>
     </div>
-    <h2>任务规则</h2>
-    <p>在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
-    <h2>酬金计算</h2>
-    <p>任务酬金取决于您将圆点移至终点线所花费的时间。注意：计时从点击<strong>【开始】</strong>按钮起计时。其中，从起点到红绿灯处，耗时 <strong>${engine.config.segmentDurationSec} 秒</strong>，从红绿灯处抵达终点线，耗时 <strong>${engine.config.segmentDurationSec} 秒</strong>。</p>
-    <p>您的初始报酬为 <strong>100 元人民币整</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${engine.config.moneyLossPerSec}</strong>，直至圆点抵达终点线。红灯等待 <strong>${engine.config.redWaitSec} 秒</strong>后变为绿灯。</p>
     <div class="actions">
+      <button class="btn" id="btnBackToOperation">上一步</button>
+      <button class="btn primary" id="btnToTaskRules">下一步：任务规则</button>
+    </div>
+  `);
+
+  document.querySelector<HTMLButtonElement>("#btnBackToOperation")?.addEventListener("click", () => {
+    showInstructions();
+  });
+  document.querySelector<HTMLButtonElement>("#btnToTaskRules")?.addEventListener("click", () => {
+    showTaskRules();
+  });
+}
+
+function showTaskRules(): void {
+  openModal(`
+    <h1>任务规则和酬金（3/3）</h1>
+    <p>任务规则：在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
+    <p>点击<strong>【开始】</strong>后开始计时。从起点到红绿灯、以及从红绿灯到终点线，各需 <strong>${engine.config.segmentDurationSec} 秒</strong>。</p>
+    <p>初始报酬为 <strong>100 元人民币整</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${engine.config.moneyLossPerSec}</strong>；红灯等待 <strong>${engine.config.redWaitSec} 秒</strong>后变为绿灯。</p>
+    <div class="actions">
+      <button class="btn" id="btnBackToInstructionVideo">上一步</button>
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
     </div>
   `);
 
+  document.querySelector<HTMLButtonElement>("#btnBackToInstructionVideo")?.addEventListener("click", () => {
+    showInstructionVideo();
+  });
   document.querySelector<HTMLButtonElement>("#btnToCompTest")?.addEventListener("click", () => {
     showComprehensionTest();
   });
@@ -513,7 +878,7 @@ function showComprehensionTest(): void {
   document
     .querySelector<HTMLButtonElement>("#btnBackToInstructions")
     ?.addEventListener("click", () => {
-      showInstructions();
+      showTaskRules();
     });
 
   document.querySelector<HTMLButtonElement>("#btnBeginExperiment")?.addEventListener("click", () => {
@@ -745,6 +1110,7 @@ async function bootstrapDesktopApp(): Promise<void> {
   lastPhase = engine.state.phase;
   finishGate = false;
 
+  installExperimentVisibilityMonitor();
   renderDesktopPreflightGate();
   loop();
 }
@@ -757,6 +1123,13 @@ window.addEventListener("online", () => {
 
 window.addEventListener("resize", () => {
   renderDesktopPreflightGate();
+  const nextSignature = getViewportSignature();
+  if (nextSignature !== lastViewportSignature) {
+    lastViewportSignature = nextSignature;
+    pauseForAttentionIssue("viewport_changed");
+    return;
+  }
+  scheduleExperimentVisibilityCheck();
 });
 
 window.addEventListener("keydown", (e) => {
@@ -787,13 +1160,16 @@ window.addEventListener("mousedown", () => {
 });
 
 document.addEventListener("visibilitychange", () => {
-  const nowMs = performance.now();
   if (document.hidden) {
-    engine.pause(nowMs);
+    pauseForAttentionIssue("document_hidden");
     return;
   }
-  engine.resume(nowMs);
   renderDesktopPreflightGate();
+  scheduleExperimentVisibilityCheck();
+});
+
+window.addEventListener("blur", () => {
+  pauseForAttentionIssue("window_blurred");
 });
 
 function updateHud(): void {

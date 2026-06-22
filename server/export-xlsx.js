@@ -352,6 +352,10 @@ function formatEvent(v) {
       return "闯红灯";
     case "finish":
       return "到达终点";
+    case "attention_lost":
+      return "注意力/可见性中断";
+    case "attention_restored":
+      return "恢复实验";
     default:
       return String(v ?? "");
   }

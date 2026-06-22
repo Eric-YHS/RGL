@@ -17,7 +17,9 @@ const PERSISTED_EVENTS = new Set<string>([
   "pass_light",
   "violation",
   "finish",
-  "comprehension_answer"
+  "comprehension_answer",
+  "attention_lost",
+  "attention_restored"
 ]);
 
 export type SessionMeta = {
