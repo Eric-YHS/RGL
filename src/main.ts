@@ -309,7 +309,7 @@ let desktopGateEnteredOnce = false;
 let desktopGateIntroductionAcknowledged = false;
 let instructionsShownOnce = false;
 let practiceCompletedOnce = false;
-type DisplayCheckMode = "initial" | "restart" | "before_start";
+type DisplayCheckMode = "enter_practice" | "enter_formal" | "restart" | "before_start";
 const DISPLAY_CHECK_MAX_DURATION_MS = 6000;
 let displayCheckMode: DisplayCheckMode | null = null;
 let displayCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。请连续完成，不要滚动页面。";
@@ -411,16 +411,24 @@ function renderDisplayCornerCheck(): void {
     desktopGateVisible = false;
     lastViewportSignature = getViewportSignature();
 
-    if (mode === "initial") {
-      desktopGateEnteredOnce = true;
-      renderDesktopPreflightGate();
+    if (mode === "enter_practice") {
+      enterPracticeMode();
+      closeModal();
+      return;
+    }
+    if (mode === "enter_formal") {
+      enterFormalMode();
+      closeModal();
       return;
     }
     if (mode === "restart") {
       restartCurrentTask();
       return;
     }
-    updateHud();
+    if (mode === "before_start") {
+      desktopGateEnteredOnce = true;
+      updateHud();
+    }
   };
 
   surface.addEventListener(
@@ -566,7 +574,7 @@ function renderDesktopPreflightGate(): void {
           桌面端校验已通过。
         </div>
         <div class="desktop-preflight-actions">
-          <button class="btn primary" id="btnDesktopGateContinue">下一步：检查实验显示区域</button>
+          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
         </div>
       `
     : "";
@@ -591,7 +599,8 @@ function renderDesktopPreflightGate(): void {
     els.desktopGate
       .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
       ?.addEventListener("click", () => {
-        startDisplayCornerCheck("initial");
+        desktopGateEnteredOnce = true;
+        renderDesktopPreflightGate();
       });
   }
 }
@@ -609,6 +618,15 @@ function getViewportSignature(): string {
 
 function isTaskInProgress(): boolean {
   return engine.state.phase !== "idle" && engine.state.phase !== "finished";
+}
+
+function isTaskMonitoringArmed(): boolean {
+  return (
+    desktopGateReady &&
+    displayCheckCertified &&
+    !desktopGateVisible &&
+    engine.state.phase !== "finished"
+  );
 }
 
 function isExperimentRegionFullyVisible(): boolean {
@@ -697,12 +715,11 @@ function renderAttentionWarning(): void {
     });
 }
 
-function pauseForAttentionIssue(issue: AttentionIssue): void {
-  if (!isTaskInProgress() || attentionWarningVisible) return;
+function pauseForAttentionIssue(issue: AttentionIssue, force = false): void {
+  if ((!force && !isTaskMonitoringArmed()) || attentionWarningVisible) return;
 
   const nowMs = performance.now();
-  engine.pause(nowMs);
-  if (!isTaskInProgress()) return;
+  if (isTaskInProgress()) engine.pause(nowMs);
 
   attentionWarningVisible = true;
   currentAttentionIssue = issue;
@@ -711,11 +728,11 @@ function pauseForAttentionIssue(issue: AttentionIssue): void {
 }
 
 function scheduleExperimentVisibilityCheck(): void {
-  if (!isTaskInProgress() || attentionWarningVisible || visibilityCheckQueued) return;
+  if (!isTaskMonitoringArmed() || attentionWarningVisible || visibilityCheckQueued) return;
   visibilityCheckQueued = true;
   requestAnimationFrame(() => {
     visibilityCheckQueued = false;
-    if (!isTaskInProgress() || attentionWarningVisible || document.hidden) return;
+    if (!isTaskMonitoringArmed() || attentionWarningVisible || document.hidden) return;
     if (!isExperimentRegionFullyVisible()) {
       pauseForAttentionIssue("experiment_region_not_fully_visible");
     }
@@ -747,6 +764,7 @@ function installExperimentVisibilityMonitor(): void {
   window.visualViewport?.addEventListener("resize", () => {
     const nextSignature = getViewportSignature();
     if (nextSignature !== lastViewportSignature) {
+      const wasMonitoring = isTaskMonitoringArmed();
       lastViewportSignature = nextSignature;
       if (
         invalidateDisplayCheckForEnvironmentChange(
@@ -755,7 +773,7 @@ function installExperimentVisibilityMonitor(): void {
       ) {
         return;
       }
-      pauseForAttentionIssue("viewport_changed");
+      pauseForAttentionIssue("viewport_changed", wasMonitoring);
       return;
     }
     scheduleExperimentVisibilityCheck();
@@ -954,8 +972,7 @@ function showPracticeReady(): void {
     });
 
     document.querySelector<HTMLButtonElement>("#btnEnterPractice")?.addEventListener("click", () => {
-      enterPracticeMode();
-      closeModal();
+      startDisplayCornerCheck("enter_practice");
     });
   } else {
     // 练习完成后：显示返回导语、继续练习、进入正式决策任务
@@ -979,8 +996,7 @@ function showPracticeReady(): void {
     });
 
     document.querySelector<HTMLButtonElement>("#btnEnterFormal")?.addEventListener("click", () => {
-      enterFormalMode();
-      closeModal();
+      startDisplayCornerCheck("enter_formal");
     });
   }
 }
@@ -992,6 +1008,7 @@ function enterPracticeMode(): void {
   logger = practiceLogger;
   engine = practiceEngine;
   if (world) {
+    world.dispose();
     world = new World2D(els.canvas, practiceConfig);
   }
   lastPhase = engine.state.phase;
@@ -1006,6 +1023,7 @@ function enterFormalMode(): void {
   logger = newLogger;
   engine = newEngine;
   if (world) {
+    world.dispose();
     world = new World2D(els.canvas, formalConfig);
   }
   lastPhase = engine.state.phase;
@@ -1108,7 +1126,7 @@ function showTaskSubmitScreen(): void {
 }
 
 els.btnAction.addEventListener("click", () => {
-  if (!world || engine.state.phase === "finished") return;
+  if (!world || engine.state.phase === "finished" || attentionWarningVisible || displayCheckMode) return;
 
   const nowMs = performance.now();
   if (engine.state.phase === "idle") {
@@ -1126,7 +1144,12 @@ els.btnAction.addEventListener("click", () => {
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
-    if (engine.state.phase !== "idle" && engine.state.phase !== "finished") {
+    if (
+      !attentionWarningVisible &&
+      !displayCheckMode &&
+      engine.state.phase !== "idle" &&
+      engine.state.phase !== "finished"
+    ) {
       e.preventDefault();
       engine.pressWalk(performance.now());
     }
@@ -1173,6 +1196,7 @@ window.addEventListener("resize", () => {
   renderDesktopPreflightGate();
   const nextSignature = getViewportSignature();
   if (nextSignature !== lastViewportSignature) {
+    const wasMonitoring = isTaskMonitoringArmed();
     lastViewportSignature = nextSignature;
     if (
       invalidateDisplayCheckForEnvironmentChange(
@@ -1181,7 +1205,7 @@ window.addEventListener("resize", () => {
     ) {
       return;
     }
-    pauseForAttentionIssue("viewport_changed");
+    pauseForAttentionIssue("viewport_changed", wasMonitoring);
     return;
   }
   scheduleExperimentVisibilityCheck();
@@ -1216,8 +1240,9 @@ window.addEventListener("mousedown", () => {
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    const wasMonitoring = isTaskMonitoringArmed();
     invalidateDisplayCheckForEnvironmentChange("检测到您离开了实验页面。返回后请从左上角重新开始检查。");
-    pauseForAttentionIssue("document_hidden");
+    pauseForAttentionIssue("document_hidden", wasMonitoring);
     return;
   }
   renderDesktopPreflightGate();
@@ -1225,8 +1250,9 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("blur", () => {
+  const wasMonitoring = isTaskMonitoringArmed();
   invalidateDisplayCheckForEnvironmentChange("检测到浏览器窗口失去焦点。请返回后从左上角重新开始检查。");
-  pauseForAttentionIssue("window_blurred");
+  pauseForAttentionIssue("window_blurred", wasMonitoring);
 });
 
 function updateHud(): void {
