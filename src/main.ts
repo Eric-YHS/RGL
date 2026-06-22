@@ -307,9 +307,6 @@ let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateEnteredOnce = false;
 let desktopGateIntroductionAcknowledged = false;
-let desktopGateCornerCheckActive = false;
-let desktopGateCornerCheckComplete = false;
-let desktopGateCornerCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。每命中一个角将自动以直线连接。";
 let instructionsShownOnce = false;
 let practiceCompletedOnce = false;
 type AttentionIssue =
@@ -329,140 +326,6 @@ function hasDesktopPointer(): boolean {
 
 function hasDesktopHover(): boolean {
   return window.matchMedia("(hover: hover)").matches;
-}
-
-function renderDesktopCornerCheck(): void {
-  const action = desktopGateCornerCheckComplete
-    ? `
-        <div class="corner-probe-success">显示区域检查完成。</div>
-        <div class="desktop-preflight-actions">
-          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
-        </div>
-      `
-    : "";
-
-  els.desktopGate.innerHTML = `
-    <section class="corner-probe" id="cornerProbe" aria-label="显示区域检查">
-      <svg class="corner-probe-line" id="cornerProbeLine" aria-hidden="true">
-        <polyline fill="none" stroke="#17689a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-      <button type="button" class="corner-probe-target top-left" data-corner="0" aria-label="左上角"></button>
-      <button type="button" class="corner-probe-target top-right" data-corner="1" aria-label="右上角"></button>
-      <button type="button" class="corner-probe-target bottom-right" data-corner="2" aria-label="右下角"></button>
-      <button type="button" class="corner-probe-target bottom-left" data-corner="3" aria-label="左下角"></button>
-      <div class="corner-probe-center">
-        <h1>显示区域检查</h1>
-        <p id="cornerProbeHint">${desktopGateCornerCheckNotice}</p>
-        <p class="hint">若检测到滚轮操作，请按住 <strong>Ctrl</strong> 键并滚动鼠标滚轮调整浏览器缩放，然后重新连线。</p>
-      </div>
-      ${action}
-    </section>
-  `;
-  els.desktopGate.style.display = "grid";
-  desktopGateVisible = true;
-
-  if (desktopGateCornerCheckComplete) {
-    els.desktopGate
-      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
-      ?.addEventListener("click", () => {
-        desktopGateEnteredOnce = true;
-        renderDesktopPreflightGate();
-      });
-    return;
-  }
-
-  const surface = els.desktopGate.querySelector<HTMLElement>("#cornerProbe");
-  const line = els.desktopGate.querySelector<SVGPolylineElement>("#cornerProbeLine polyline");
-  const targets = Array.from(els.desktopGate.querySelectorAll<HTMLElement>("[data-corner]"));
-  if (!surface || !line || targets.length !== 4) return;
-
-  let nextCorner = 0;
-  const connectedCorners: Array<{ x: number; y: number }> = [];
-  let previewPoint: { x: number; y: number } | null = null;
-
-  const pointFromEvent = (event: MouseEvent): { x: number; y: number } => {
-    const rect = surface.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  };
-  const centerOfTarget = (index: number): { x: number; y: number } => {
-    const surfaceRect = surface.getBoundingClientRect();
-    const targetRect = targets[index].getBoundingClientRect();
-    return {
-      x: targetRect.left - surfaceRect.left + targetRect.width / 2,
-      y: targetRect.top - surfaceRect.top + targetRect.height / 2
-    };
-  };
-  const isOnTarget = (point: { x: number; y: number }, index: number): boolean => {
-    const targetRect = targets[index].getBoundingClientRect();
-    const center = centerOfTarget(index);
-    return Math.hypot(point.x - center.x, point.y - center.y) <= Math.max(targetRect.width, targetRect.height) * 1.2;
-  };
-  const redraw = (): void => {
-    const points = previewPoint ? [...connectedCorners, previewPoint] : connectedCorners;
-    line.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
-  };
-  const reset = (notice: string): void => {
-    desktopGateCornerCheckNotice = notice;
-    desktopGateCornerCheckComplete = false;
-    renderDesktopPreflightGate();
-  };
-
-  surface.addEventListener(
-    "wheel",
-    (event) => {
-      if (event.ctrlKey) {
-        desktopGateCornerCheckNotice = "浏览器缩放已调整。确认四角同时可见后，请从左上角重新连线。";
-        return;
-      }
-      event.preventDefault();
-      reset("检测到滚轮操作。请按住 Ctrl 键并滚动鼠标滚轮调整浏览器缩放，确认四角同时可见后重新连线。");
-    },
-    { passive: false }
-  );
-
-  let pointerId: number | null = null;
-
-  surface.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return;
-    const point = pointFromEvent(event);
-    if (!isOnTarget(point, 0)) {
-      reset("请从左上角圆点开始，按住鼠标左键后连续经过四个角。");
-      return;
-    }
-    pointerId = event.pointerId;
-    nextCorner = 1;
-    connectedCorners.length = 0;
-    connectedCorners.push(centerOfTarget(0));
-    previewPoint = point;
-    redraw();
-    surface.setPointerCapture(event.pointerId);
-  });
-
-  surface.addEventListener("pointermove", (event) => {
-    if (pointerId !== event.pointerId || nextCorner >= targets.length) return;
-    const point = pointFromEvent(event);
-    previewPoint = point;
-    redraw();
-    if (!isOnTarget(point, nextCorner)) return;
-
-    connectedCorners.push(centerOfTarget(nextCorner));
-    nextCorner += 1;
-    redraw();
-    if (nextCorner === targets.length) {
-      desktopGateCornerCheckComplete = true;
-      desktopGateCornerCheckNotice = "四个角已依次连接。";
-      renderDesktopPreflightGate();
-      return;
-    }
-    desktopGateCornerCheckNotice = `已连接 ${nextCorner}/4 个角，请继续按住鼠标左键经过下一个圆点。`;
-    const hint = els.desktopGate.querySelector<HTMLElement>("#cornerProbeHint");
-    if (hint) hint.textContent = desktopGateCornerCheckNotice;
-  });
-
-  surface.addEventListener("pointerup", (event) => {
-    if (pointerId !== event.pointerId || desktopGateCornerCheckComplete) return;
-    reset("连线未经过全部四个角。请从左上角重新开始并保持按住鼠标左键。");
-  });
 }
 
 function renderDesktopPreflightGate(): void {
@@ -497,11 +360,6 @@ function renderDesktopPreflightGate(): void {
         desktopGateIntroductionAcknowledged = true;
         renderDesktopPreflightGate();
       });
-    return;
-  }
-
-  if (desktopGateCornerCheckActive && !desktopGateEnteredOnce) {
-    renderDesktopCornerCheck();
     return;
   }
 
@@ -547,7 +405,7 @@ function renderDesktopPreflightGate(): void {
           桌面端校验已通过。
         </div>
         <div class="desktop-preflight-actions">
-          <button class="btn primary" id="btnDesktopGateCornerCheck">下一步：显示区域检查</button>
+          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
         </div>
       `
     : "";
@@ -570,11 +428,9 @@ function renderDesktopPreflightGate(): void {
 
   if (prerequisitesReady) {
     els.desktopGate
-      .querySelector<HTMLButtonElement>("#btnDesktopGateCornerCheck")
+      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
       ?.addEventListener("click", () => {
-        desktopGateCornerCheckActive = true;
-        desktopGateCornerCheckComplete = false;
-        desktopGateCornerCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。每命中一个角将自动以直线连接。";
+        desktopGateEnteredOnce = true;
         renderDesktopPreflightGate();
       });
   }
@@ -737,6 +593,28 @@ function installExperimentVisibilityMonitor(): void {
 function openModal(html: string): void {
   els.modalCard.innerHTML = html;
   els.modal.style.display = "grid";
+}
+
+function showExperimentRegionRequiredBeforeStart(): void {
+  openModal(`
+    <h1>请完整显示红绿灯实验区</h1>
+    <p>开始前，请滚动或调整浏览器窗口，使红绿灯实验区的四条边都处于当前可视范围内。</p>
+    <p class="hint">检测范围仅为本实验任务区；页面其它内容可以滚动。</p>
+    <div class="actions">
+      <button class="btn primary" id="btnRecheckExperimentRegion">我已调整，重新检查</button>
+    </div>
+  `);
+
+  document
+    .querySelector<HTMLButtonElement>("#btnRecheckExperimentRegion")
+    ?.addEventListener("click", () => {
+      if (isExperimentRegionFullyVisible()) {
+        closeModal();
+        return;
+      }
+      const hint = els.modalCard.querySelector<HTMLElement>(".hint");
+      if (hint) hint.textContent = "红绿灯实验区仍未完整显示。请继续调整后重新检查。";
+    });
 }
 
 function closeModal(): void {
@@ -1084,6 +962,10 @@ els.btnAction.addEventListener("click", () => {
 
   const nowMs = performance.now();
   if (engine.state.phase === "idle") {
+    if (!isExperimentRegionFullyVisible()) {
+      showExperimentRegionRequiredBeforeStart();
+      return;
+    }
     closeModal();
     engine.start(nowMs);
     return;
