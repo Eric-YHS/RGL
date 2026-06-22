@@ -461,6 +461,12 @@ function isExperimentRegionFullyVisible(): boolean {
   // A one-CSS-pixel tolerance avoids false alarms from fractional layout pixels.
   const tolerance = 1;
 
+  // The decision task must never require horizontal scrolling. This also
+  // catches a canvas whose drawing area overflows while its parent still fits.
+  if (document.documentElement.scrollWidth > document.documentElement.clientWidth + tolerance) {
+    return false;
+  }
+
   return targets.every((target) => {
     const rect = target.getBoundingClientRect();
     return (
