@@ -307,7 +307,7 @@ let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateIntroductionAcknowledged = false;
 let practiceCompletedOnce = false;
-type DisplayCheckMode = "enter_practice" | "enter_formal" | "restart" | "before_start" | "enter_instructions";
+type DisplayCheckMode = "enter_practice" | "enter_formal" | "restart" | "before_start" | "enter_comprehension";
 const DISPLAY_CHECK_MAX_DURATION_MS = 6000;
 let displayCheckMode: DisplayCheckMode | null = null;
 let displayCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。请连续完成，不要滚动页面。";
@@ -429,16 +429,6 @@ function renderDisplayCornerCheck(): void {
     renderDisplayCornerCheck();
   };
   const complete = (): void => {
-    const pointerReady = hasDesktopPointer();
-    const hoverReady = hasDesktopHover();
-    const keyboardReady = desktopInputProof.keyboard;
-    const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
-    const prerequisitesReady = pointerReady && hoverReady && keyboardReady && mouseReady;
-    if (!prerequisitesReady) {
-      reset("请完成全部设备检查：按一次键盘按键，并确保使用鼠标完成四角连线。");
-      return;
-    }
-
     displayCheckCertified = true;
     displayCheckMode = null;
     els.desktopGate.classList.remove("display-corner-check-active");
@@ -446,7 +436,7 @@ function renderDisplayCornerCheck(): void {
     desktopGateVisible = false;
     lastViewportSignature = getViewportSignature();
 
-    if (mode === "enter_instructions") {
+    if (mode === "enter_comprehension") {
       desktopGateReady = true;
       showComprehensionTest();
       return;
@@ -813,7 +803,7 @@ function showInstructions(): void {
   `);
 
   document.querySelector<HTMLButtonElement>("#btnToDeviceCheck")?.addEventListener("click", () => {
-    startDisplayCornerCheck("enter_instructions");
+    startDisplayCornerCheck("enter_comprehension");
   });
 }
 
