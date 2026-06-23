@@ -782,6 +782,7 @@ function showInstructions(): void {
     <ul>
       <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，圆点会靠近一个红绿信号灯并停下等待。</li>
       <li>按钮会变为<strong>【移动】</strong>。再次点击即可让圆点继续移动并通过红绿灯。</li>
+      <li>您可以在任意时刻点击【移动】按钮。</li>
     </ul>
     <h2>任务规则</h2>
     <p>任务规则：在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
