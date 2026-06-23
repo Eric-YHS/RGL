@@ -559,7 +559,7 @@ function renderDesktopPreflightGate(): void {
       <p>任务包括练习与正式任务，预计 <strong>15–20 分钟</strong>。参与完全自愿，可随时退出；退出无法获得酬金。作答匿名，数据仅用于学术研究。</p>
       <p class="hint">请使用台式机或笔记本电脑。开始后请保持页面可见，不要缩放或离开网页。</p>
       <div class="desktop-preflight-actions">
-        <button class="btn primary" id="btnDesktopGateCheck">开始设备检查</button>
+        <button class="btn primary" id="btnDesktopGateCheck">阅读任务指导</button>
       </div>
     </section>
   `;
@@ -569,6 +569,12 @@ function renderDesktopPreflightGate(): void {
     .querySelector<HTMLButtonElement>("#btnDesktopGateCheck")
     ?.addEventListener("click", () => {
       desktopGateIntroductionAcknowledged = true;
+      els.desktopGate.style.display = "none";
+      desktopGateVisible = false;
+      if (pausedByDesktopGate) {
+        engine.resume(performance.now());
+        pausedByDesktopGate = false;
+      }
       showInstructions();
     });
 }
