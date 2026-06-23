@@ -429,6 +429,16 @@ function renderDisplayCornerCheck(): void {
     renderDisplayCornerCheck();
   };
   const complete = (): void => {
+    const pointerReady = hasDesktopPointer();
+    const hoverReady = hasDesktopHover();
+    const keyboardReady = desktopInputProof.keyboard;
+    const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
+    const prerequisitesReady = pointerReady && hoverReady && keyboardReady && mouseReady;
+    if (!prerequisitesReady) {
+      reset("请完成全部设备检查：按一次键盘按键，并移动、点击鼠标。");
+      return;
+    }
+
     displayCheckCertified = true;
     displayCheckMode = null;
     els.desktopGate.classList.remove("display-corner-check-active");
