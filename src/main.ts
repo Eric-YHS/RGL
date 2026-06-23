@@ -305,11 +305,9 @@ const desktopInputProof: DesktopInputProof = {
 let desktopGateReady = false;
 let desktopGateVisible = false;
 let pausedByDesktopGate = false;
-let desktopGateEnteredOnce = false;
 let desktopGateIntroductionAcknowledged = false;
-let instructionsShownOnce = false;
 let practiceCompletedOnce = false;
-type DisplayCheckMode = "enter_practice" | "enter_formal" | "restart" | "before_start";
+type DisplayCheckMode = "enter_practice" | "enter_formal" | "restart" | "before_start" | "enter_instructions";
 const DISPLAY_CHECK_MAX_DURATION_MS = 6000;
 let displayCheckMode: DisplayCheckMode | null = null;
 let displayCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。请连续完成，不要滚动页面。";
@@ -331,6 +329,30 @@ function hasDesktopPointer(): boolean {
 
 function hasDesktopHover(): boolean {
   return window.matchMedia("(hover: hover)").matches;
+}
+
+function renderCornerCheckStatusItems(): string {
+  const pointerReady = hasDesktopPointer();
+  const hoverReady = hasDesktopHover();
+  const keyboardReady = desktopInputProof.keyboard;
+  const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
+
+  const items = [
+    { ready: pointerReady, label: pointerReady ? "检测到精细指针设备" : "请进行精细指针设备检测" },
+    { ready: hoverReady, label: hoverReady ? "检测到悬停能力" : "请进行悬停能力检测" },
+    { ready: keyboardReady, label: keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键" },
+    { ready: mouseReady, label: mouseReady ? "已检测到鼠标移动和点击" : "请移动鼠标并点击一次" }
+  ];
+
+  return items
+    .map((item) => `<div class="${item.ready ? "ready" : ""}">${item.ready ? "✓" : "•"} ${item.label}</div>`)
+    .join("");
+}
+
+function updateCornerCheckStatus(): void {
+  const container = els.desktopGate.querySelector<HTMLElement>("#displayCornerCheckStatus");
+  if (!container) return;
+  container.innerHTML = renderCornerCheckStatusItems();
 }
 
 function startDisplayCornerCheck(
@@ -360,6 +382,9 @@ function renderDisplayCornerCheck(): void {
       <div class="display-corner-check-instructions">
         <h1>实验显示区域检查</h1>
         <p id="displayCornerCheckHint">${displayCheckNotice}</p>
+        <div class="display-corner-check-status" id="displayCornerCheckStatus">
+          ${renderCornerCheckStatusItems()}
+        </div>
         <p class="hint">如需调整浏览器缩放，请按住 Ctrl（Mac 为 ⌘）并滚动鼠标滚轮；调整后请重新从左上角开始。普通滚轮不能使用。</p>
       </div>
     </section>
@@ -404,6 +429,16 @@ function renderDisplayCornerCheck(): void {
     renderDisplayCornerCheck();
   };
   const complete = (): void => {
+    const pointerReady = hasDesktopPointer();
+    const hoverReady = hasDesktopHover();
+    const keyboardReady = desktopInputProof.keyboard;
+    const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
+    const prerequisitesReady = pointerReady && hoverReady && keyboardReady && mouseReady;
+    if (!prerequisitesReady) {
+      reset("请完成全部设备检查：按一次键盘按键，并确保使用鼠标完成四角连线。");
+      return;
+    }
+
     displayCheckCertified = true;
     displayCheckMode = null;
     els.desktopGate.classList.remove("display-corner-check-active");
@@ -411,6 +446,11 @@ function renderDisplayCornerCheck(): void {
     desktopGateVisible = false;
     lastViewportSignature = getViewportSignature();
 
+    if (mode === "enter_instructions") {
+      desktopGateReady = true;
+      showInstructions();
+      return;
+    }
     if (mode === "enter_practice") {
       enterPracticeMode();
       closeModal();
@@ -426,7 +466,6 @@ function renderDisplayCornerCheck(): void {
       return;
     }
     if (mode === "before_start") {
-      desktopGateEnteredOnce = true;
       updateHud();
     }
   };
@@ -502,63 +541,9 @@ function renderDesktopPreflightGate(): void {
     renderDisplayCornerCheck();
     return;
   }
-  const pointerReady = hasDesktopPointer();
-  const hoverReady = hasDesktopHover();
-  const keyboardReady = desktopInputProof.keyboard;
-  const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
-  const prerequisitesReady = pointerReady && hoverReady && keyboardReady && mouseReady;
-
-  if (!desktopGateIntroductionAcknowledged) {
-    if (!pausedByDesktopGate && engine.state.phase !== "idle" && engine.state.phase !== "finished") {
-      engine.pause(performance.now());
-      pausedByDesktopGate = true;
-    }
-
-    els.desktopGate.innerHTML = `
-      <section class="desktop-preflight-card desktop-entry-card">
-        <h1>欢迎参加学术调查</h1>
-        <p>感谢您参与本次学术研究。初始酬金为 <strong>100 元人民币</strong>，最终酬金取决于任务中的决策，介乎 <strong>0 元–92 元人民币</strong>。</p>
-        <p>任务包括练习与正式任务，预计 <strong>15–20 分钟</strong>。参与完全自愿，可随时退出；退出无法获得酬金。作答匿名，数据仅用于学术研究。</p>
-        <p class="hint">请使用台式机或笔记本电脑。开始后请保持页面可见，不要缩放或离开网页。</p>
-        <div class="desktop-preflight-actions">
-          <button class="btn primary" id="btnDesktopGateCheck">开始设备检查</button>
-        </div>
-      </section>
-    `;
-    els.desktopGate.style.display = "grid";
-    desktopGateVisible = true;
-    els.desktopGate
-      .querySelector<HTMLButtonElement>("#btnDesktopGateCheck")
-      ?.addEventListener("click", () => {
-        desktopGateIntroductionAcknowledged = true;
-        renderDesktopPreflightGate();
-      });
-    return;
-  }
-
-  const canEnter = prerequisitesReady && desktopGateEnteredOnce;
-
-  if (canEnter) {
-    if (desktopGateVisible) {
-      els.desktopGate.style.display = "none";
-      desktopGateVisible = false;
-    }
-
-    if (pausedByDesktopGate) {
-      engine.resume(performance.now());
-      pausedByDesktopGate = false;
-    }
-
-    if (!desktopGateReady) {
-      desktopGateReady = true;
-    }
-
-    // First time the desktop gate clears, walk the participant through the
-    // instructions -> comprehension test -> ready-to-start flow.
-    if (!instructionsShownOnce) {
-      instructionsShownOnce = true;
-      showInstructions();
-    }
+  if (desktopGateIntroductionAcknowledged) {
+    // The participant has already passed the welcome gate and is either in the
+    // combined device + corner check or reading the instructions. Nothing to render.
     return;
   }
 
@@ -567,46 +552,25 @@ function renderDesktopPreflightGate(): void {
     pausedByDesktopGate = true;
   }
 
-  const pointerLabel = pointerReady ? "检测到精细指针设备" : "请进行精细指针设备检测";
-  const hoverLabel = hoverReady ? "检测到悬停能力" : "请进行悬停能力检测";
-  const keyboardLabel = keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键";
-  const mouseLabel = mouseReady ? "已检测到鼠标移动和点击" : "请移动鼠标并点击一次";
-
-  const readyNotice = prerequisitesReady
-    ? `
-        <div class="desktop-preflight-ready">
-          桌面端校验已通过。
-        </div>
-        <div class="desktop-preflight-actions">
-          <button class="btn primary" id="btnDesktopGateContinue">继续阅读指导语</button>
-        </div>
-      `
-    : "";
-
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card desktop-entry-card">
-      <h1>设备检查</h1>
-      <p>请按一次实体键盘按键，并移动、点击一次鼠标。</p>
-      <div class="desktop-preflight-checklist">
-        <div class="${pointerReady ? "ready" : ""}">${pointerReady ? "✓" : "•"} ${pointerLabel}</div>
-        <div class="${hoverReady ? "ready" : ""}">${hoverReady ? "✓" : "•"} ${hoverLabel}</div>
-        <div class="${keyboardReady ? "ready" : ""}">${keyboardReady ? "✓" : "•"} ${keyboardLabel}</div>
-        <div class="${mouseReady ? "ready" : ""}">${mouseReady ? "✓" : "•"} ${mouseLabel}</div>
+      <h1>欢迎参加学术调查</h1>
+      <p>感谢您参与本次学术研究。初始酬金为 <strong>100 元人民币</strong>，最终酬金取决于任务中的决策，介乎 <strong>0 元–92 元人民币</strong>。</p>
+      <p>任务包括练习与正式任务，预计 <strong>15–20 分钟</strong>。参与完全自愿，可随时退出；退出无法获得酬金。作答匿名，数据仅用于学术研究。</p>
+      <p class="hint">请使用台式机或笔记本电脑。开始后请保持页面可见，不要缩放或离开网页。</p>
+      <div class="desktop-preflight-actions">
+        <button class="btn primary" id="btnDesktopGateCheck">开始设备检查</button>
       </div>
-      ${readyNotice}
     </section>
   `;
   els.desktopGate.style.display = "grid";
   desktopGateVisible = true;
-
-  if (prerequisitesReady) {
-    els.desktopGate
-      .querySelector<HTMLButtonElement>("#btnDesktopGateContinue")
-      ?.addEventListener("click", () => {
-        desktopGateEnteredOnce = true;
-        renderDesktopPreflightGate();
-      });
-  }
+  els.desktopGate
+    .querySelector<HTMLButtonElement>("#btnDesktopGateCheck")
+    ?.addEventListener("click", () => {
+      desktopGateIntroductionAcknowledged = true;
+      startDisplayCornerCheck("enter_instructions");
+    });
 }
 
 function getViewportSignature(): string {
@@ -816,25 +780,14 @@ function buildFormalSubmission(): SessionSubmission {
 
 function showInstructions(): void {
   openModal(`
-    <h1>操作说明（1/3）</h1>
+    <h1>任务指导</h1>
+    <h2>操作说明</h2>
     <p>在本次任务中，您将控制一个<strong>圆点</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
     <ul>
       <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，圆点会靠近一个红绿信号灯并停下等待。</li>
       <li>按钮会变为<strong>【移动】</strong>。再次点击即可让圆点继续移动并通过红绿灯。</li>
     </ul>
-    <div class="actions">
-      <button class="btn primary" id="btnToInstructionVideo">下一步：观看示例短片</button>
-    </div>
-  `);
-
-  document.querySelector<HTMLButtonElement>("#btnToInstructionVideo")?.addEventListener("click", () => {
-    showInstructionVideo();
-  });
-}
-
-function showInstructionVideo(): void {
-  openModal(`
-    <h1>示例短片（2/3）</h1>
+    <h2>示例短片</h2>
     <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
     <div class="instruction-video">
       <video controls preload="metadata" playsinline poster="/demo-poster.svg">
@@ -843,35 +796,16 @@ function showInstructionVideo(): void {
       </video>
       <a class="video-fallback-link" href="/demo.mp4" target="_blank" rel="noopener">打开示例短片</a>
     </div>
-    <div class="actions">
-      <button class="btn" id="btnBackToOperation">上一步</button>
-      <button class="btn primary" id="btnToTaskRules">下一步：任务规则</button>
-    </div>
-  `);
-
-  document.querySelector<HTMLButtonElement>("#btnBackToOperation")?.addEventListener("click", () => {
-    showInstructions();
-  });
-  document.querySelector<HTMLButtonElement>("#btnToTaskRules")?.addEventListener("click", () => {
-    showTaskRules();
-  });
-}
-
-function showTaskRules(): void {
-  openModal(`
-    <h1>任务规则和酬金（3/3）</h1>
+    <h2>任务规则</h2>
     <p>任务规则：在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
     <p>点击<strong>【开始】</strong>后开始计时。从起点到红绿灯、以及从红绿灯到终点线，各需 <strong>${engine.config.segmentDurationSec} 秒</strong>。</p>
+    <h2>酬金</h2>
     <p>初始报酬为 <strong>100 元人民币整</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${engine.config.moneyLossPerSec}</strong>；红灯等待 <strong>${engine.config.redWaitSec} 秒</strong>后变为绿灯。</p>
     <div class="actions">
-      <button class="btn" id="btnBackToInstructionVideo">上一步</button>
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
     </div>
   `);
 
-  document.querySelector<HTMLButtonElement>("#btnBackToInstructionVideo")?.addEventListener("click", () => {
-    showInstructionVideo();
-  });
   document.querySelector<HTMLButtonElement>("#btnToCompTest")?.addEventListener("click", () => {
     showComprehensionTest();
   });
@@ -925,7 +859,7 @@ function showComprehensionTest(): void {
   document
     .querySelector<HTMLButtonElement>("#btnBackToInstructions")
     ?.addEventListener("click", () => {
-      showTaskRules();
+      showInstructions();
     });
 
   document.querySelector<HTMLButtonElement>("#btnBeginExperiment")?.addEventListener("click", () => {
@@ -1224,21 +1158,21 @@ window.addEventListener("keydown", (e) => {
     !["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab"].includes(e.key)
   ) {
     desktopInputProof.keyboard = true;
-    renderDesktopPreflightGate();
+    updateCornerCheckStatus();
   }
 });
 
 window.addEventListener("mousemove", () => {
   if (!desktopInputProof.mouseMove) {
     desktopInputProof.mouseMove = true;
-    renderDesktopPreflightGate();
+    updateCornerCheckStatus();
   }
 });
 
 window.addEventListener("mousedown", () => {
   if (!desktopInputProof.mouseClick) {
     desktopInputProof.mouseClick = true;
-    renderDesktopPreflightGate();
+    updateCornerCheckStatus();
   }
 });
 

@@ -5,11 +5,11 @@ const UI_FONT_FAMILY = '"Experiment Sans", sans-serif';
 const MONEY_FONT_FAMILY = '"Experiment Mono", monospace';
 const CIRCLE_RADIUS = 16;
 const CIRCLE_COLOR = "#2f6fed";
-const RED_ON = "#f20f16";
-const RED_OFF = "#e9b7b7";
-const YELLOW_OFF = "#dcc36d";
-const GREEN_ON = "#37a447";
-const GREEN_OFF = "#b9d4b7";
+const RED_ON = "#ff0f1f";
+const RED_OFF = "#8a4545";
+const YELLOW_OFF = "#8f7a3a";
+const GREEN_ON = "#00f050";
+const GREEN_OFF = "#3d6e3d";
 const STRONG_LINE_COLOR = "#111111";
 const SECONDARY_LINE_COLOR = "#555555";
 const GUIDE_LINE_COLOR = "#8c8c8c";
@@ -265,8 +265,20 @@ export class World2D {
   ): void {
     ctx.save();
     if (active) {
+      const pulse = Math.abs(Math.sin(nowMs * 0.004));
+      const glowRadius = 16 + pulse * 12;
+
+      // Outer halo for a neon/fluorescent look.
+      ctx.fillStyle = activeColor;
+      ctx.globalAlpha = 0.18 + pulse * 0.1;
+      ctx.beginPath();
+      ctx.arc(x, y, r + glowRadius * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Strong colored glow around the bulb.
       ctx.shadowColor = activeColor;
-      ctx.shadowBlur = 6 + Math.abs(Math.sin(nowMs * 0.004)) * 4;
+      ctx.shadowBlur = glowRadius;
       ctx.fillStyle = activeColor;
     } else {
       ctx.shadowBlur = 0;
@@ -275,6 +287,14 @@ export class World2D {
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
+
+    // Subtle rim so both on and off bulbs keep their shape against the housing.
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = active ? "rgba(255, 255, 255, 0.35)" : "rgba(0, 0, 0, 0.22)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 
