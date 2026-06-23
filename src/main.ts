@@ -307,6 +307,8 @@ let desktopGateVisible = false;
 let pausedByDesktopGate = false;
 let desktopGateIntroductionAcknowledged = false;
 let practiceCompletedOnce = false;
+let resumeDeviceCornerCheck: (() => void) | null = null;
+
 type DisplayCheckMode = "enter_practice" | "enter_formal" | "restart" | "before_start" | "enter_comprehension";
 const DISPLAY_CHECK_MAX_DURATION_MS = 6000;
 let displayCheckMode: DisplayCheckMode | null = null;
@@ -428,14 +430,13 @@ function renderDisplayCornerCheck(): void {
     displayCheckNotice = notice;
     renderDisplayCornerCheck();
   };
-  const complete = (): void => {
+  let cornerCheckCompleted = false;
+  resumeDeviceCornerCheck = () => {
     const pointerReady = hasDesktopPointer();
     const hoverReady = hasDesktopHover();
     const keyboardReady = desktopInputProof.keyboard;
     const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
-    const prerequisitesReady = pointerReady && hoverReady && keyboardReady && mouseReady;
-    if (!prerequisitesReady) {
-      reset("请完成全部设备检查：按一次键盘按键，并移动、点击鼠标。");
+    if (!cornerCheckCompleted || !pointerReady || !hoverReady || !keyboardReady || !mouseReady) {
       return;
     }
 
@@ -468,6 +469,19 @@ function renderDisplayCornerCheck(): void {
     if (mode === "before_start") {
       updateHud();
     }
+  };
+  const completeCornerCheck = (): void => {
+    const pointerReady = hasDesktopPointer();
+    const hoverReady = hasDesktopHover();
+    const keyboardReady = desktopInputProof.keyboard;
+    const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
+    if (!pointerReady || !hoverReady || !keyboardReady || !mouseReady) {
+      displayCheckNotice = "连线已完成，请继续完成全部设备检查：按一次键盘按键，并移动、点击鼠标。";
+      renderDisplayCornerCheck();
+      return;
+    }
+    cornerCheckCompleted = true;
+    resumeDeviceCornerCheck?.();
   };
 
   surface.addEventListener(
@@ -516,7 +530,7 @@ function renderDisplayCornerCheck(): void {
     connectedCorners.push(centerOfTarget(nextCorner));
     nextCorner += 1;
     redraw();
-    if (nextCorner === targets.length) complete();
+    if (nextCorner === targets.length) completeCornerCheck();
   });
 
   surface.addEventListener("pointerup", (event) => {
@@ -1150,6 +1164,7 @@ window.addEventListener("keydown", (e) => {
   ) {
     desktopInputProof.keyboard = true;
     updateCornerCheckStatus();
+    resumeDeviceCornerCheck?.();
   }
 });
 
@@ -1157,6 +1172,7 @@ window.addEventListener("mousemove", () => {
   if (!desktopInputProof.mouseMove) {
     desktopInputProof.mouseMove = true;
     updateCornerCheckStatus();
+    resumeDeviceCornerCheck?.();
   }
 });
 
@@ -1164,6 +1180,7 @@ window.addEventListener("mousedown", () => {
   if (!desktopInputProof.mouseClick) {
     desktopInputProof.mouseClick = true;
     updateCornerCheckStatus();
+    resumeDeviceCornerCheck?.();
   }
 });
 
