@@ -783,15 +783,6 @@ function showInstructions(): void {
       <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，圆点会靠近一个红绿信号灯并停下等待。</li>
       <li>按钮会变为<strong>【移动】</strong>。再次点击即可让圆点继续移动并通过红绿灯。</li>
     </ul>
-    <h2>示例短片</h2>
-    <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
-    <div class="instruction-video">
-      <video controls preload="metadata" playsinline poster="/demo-poster.svg">
-        <source src="/demo.mp4" type="video/mp4" />
-        当前浏览器无法直接播放示例短片，请点击下方链接打开。
-      </video>
-      <a class="video-fallback-link" href="/demo.mp4" target="_blank" rel="noopener">打开示例短片</a>
-    </div>
     <h2>任务规则</h2>
     <p>任务规则：在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
     <p>点击<strong>【开始】</strong>后开始计时。从起点到红绿灯、以及从红绿灯到终点线，各需 <strong>${engine.config.segmentDurationSec} 秒</strong>。</p>
