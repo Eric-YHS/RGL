@@ -851,16 +851,9 @@ function showComprehensionTest(): void {
     </div>
     <div class="hint" id="compHint"></div>
     <div class="actions">
-      <button class="btn" id="btnBackToInstructions">上一步</button>
       <button class="btn primary" id="btnBeginExperiment">我已作答，下一步</button>
     </div>
   `);
-
-  document
-    .querySelector<HTMLButtonElement>("#btnBackToInstructions")
-    ?.addEventListener("click", () => {
-      showInstructions();
-    });
 
   document.querySelector<HTMLButtonElement>("#btnBeginExperiment")?.addEventListener("click", () => {
     const nowMs = performance.now();
@@ -872,7 +865,7 @@ function showComprehensionTest(): void {
       return;
     }
     if (choice1 !== "less" || choice2 !== "wait") {
-      if (hint) hint.textContent = "回答不正确，请重新阅读指导语后再继续。";
+      if (hint) hint.textContent = "回答不正确，请重新选择答案。";
       return;
     }
 
