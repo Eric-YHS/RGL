@@ -448,7 +448,7 @@ function renderDisplayCornerCheck(): void {
 
     if (mode === "enter_instructions") {
       desktopGateReady = true;
-      showInstructions();
+      showComprehensionTest();
       return;
     }
     if (mode === "enter_practice") {
@@ -569,7 +569,7 @@ function renderDesktopPreflightGate(): void {
     .querySelector<HTMLButtonElement>("#btnDesktopGateCheck")
     ?.addEventListener("click", () => {
       desktopGateIntroductionAcknowledged = true;
-      startDisplayCornerCheck("enter_instructions");
+      showInstructions();
     });
 }
 
@@ -802,12 +802,12 @@ function showInstructions(): void {
     <h2>酬金</h2>
     <p>初始报酬为 <strong>100 元人民币整</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${engine.config.moneyLossPerSec}</strong>；红灯等待 <strong>${engine.config.redWaitSec} 秒</strong>后变为绿灯。</p>
     <div class="actions">
-      <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
+      <button class="btn primary" id="btnToDeviceCheck">下一步：设备检查</button>
     </div>
   `);
 
-  document.querySelector<HTMLButtonElement>("#btnToCompTest")?.addEventListener("click", () => {
-    showComprehensionTest();
+  document.querySelector<HTMLButtonElement>("#btnToDeviceCheck")?.addEventListener("click", () => {
+    startDisplayCornerCheck("enter_instructions");
   });
 }
 
