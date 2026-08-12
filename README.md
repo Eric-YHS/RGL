@@ -53,6 +53,8 @@ npm run dev:web
 
 ## 导出 XLSX
 
+### 命令行导出（保留原有行为）
+
 - 导出全部数据：
 
 ```bash
@@ -65,13 +67,28 @@ npm run export:xlsx
 npm run export:xlsx -- --pid 001
 ```
 
-- 按会话 ID 导出（例如 `session_id=2`）：
+- 按会话 ID 导出（支持逗号列表，例如 2,3,4）：
 
 ```bash
-npm run export:xlsx -- --session-id 2
+npm run export:xlsx -- --session-id 2,3,4
+```
+
+- 按时间范围（UTC ISO，左闭右开）/任务类型/呈现方式：
+
+```bash
+npm run export:xlsx -- --from 2026-08-07T04:00:00.000Z --to 2026-08-10T00:00:00.000Z --run-kind formal --reveal-mode full
 ```
 
 默认输出到：`exports/honglvdeng_export_时间戳.xlsx`
+
+### 网站管理页导出（`/admin/`）
+
+生产地址：`https://experiments.top/admin/`（本地：`http://localhost:5173/admin/`）
+
+- 输入管理员令牌后可按北京时间、会话 ID、被试编号、任务类型、呈现方式筛选预览并直接下载 XLSX。
+- 默认不包含 IP、User-Agent、屏幕/视口尺寸、平台、时区、语言等敏感字段，需主动勾选。
+- 令牌只存 `sessionStorage`，后端只保存令牌 SHA-256 摘要。
+- 管理 API 默认关闭（`EXPORT_ADMIN_ENABLED` 不为 `true` 时返回 404）。
 
 ## 后端环境变量
 
@@ -79,6 +96,29 @@ npm run export:xlsx -- --session-id 2
 - `PORT`：默认 `8787`
 - `DB_PATH`：默认 `<repo>/data/experiment.db`
 - `CORS_ORIGIN`：可选，逗号分隔的允许来源（同域部署可不设）
+
+### 管理导出相关
+
+- `EXPORT_ADMIN_ENABLED`：必须为 `true` 才启用 `/api/admin/export/*`（默认关闭）
+- `EXPORT_ADMIN_TOKEN_SHA256`：管理员令牌 UTF-8 字节的 SHA-256 十六进制摘要（64 字符），绝不写明文
+- `EXPORT_MAX_SESSIONS` / `EXPORT_MAX_EVENTS`：单次导出上限（默认 5000 / 100000）
+- `EXPORT_TIME_ZONE`：默认 `Asia/Shanghai`
+
+生成摘要示例：
+
+```bash
+printf '%s' '你的至少32字节随机令牌' | sha256sum
+```
+
+生产配置写入 `/etc/honglvdeng-api.env`（真实值不入库不入 Git）。
+
+## 测试
+
+后端测试（`node:test`，无需额外框架）：
+
+```bash
+npm --prefix server test
+```
 
 ## 前端环境变量
 

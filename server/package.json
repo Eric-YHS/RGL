@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node index.js",
     "start": "node index.js",
-    "export:xlsx": "node export-xlsx.js"
+    "export:xlsx": "node export-xlsx.js",
+    "test": "node --test test/"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",

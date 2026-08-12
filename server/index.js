@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import cors from "cors";
 import Database from "better-sqlite3";
 import express from "express";
+import { createAdminExportRouter } from "./admin-export-routes.js";
 import { loadRuntimeEnvironment } from "./runtime-env.js";
 
 loadRuntimeEnvironment();
@@ -81,6 +82,7 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_sessions_participant ON sessions(participant_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at);
 CREATE INDEX IF NOT EXISTS idx_events_session_id ON events(session_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at_iso);
 `);
 
 const insertSessionStmt = db.prepare(`
@@ -246,6 +248,8 @@ if (CORS_ORIGIN.trim()) {
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "honglvdeng-api", nowIso: new Date().toISOString() });
 });
+
+app.use("/api/admin/export", createAdminExportRouter({ db }));
 
 app.post(
   "/api/submissions",

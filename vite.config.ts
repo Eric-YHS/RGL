@@ -94,6 +94,14 @@ async function pruneDirByKeepSet(
 
 export default defineConfig({
   plugins: [pruneUnusedDistStaticAssets()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        admin: "admin/index.html"
+      }
+    }
+  },
   server: {
     // Allow temporary tunnel hostnames (e.g. localhost.run) during external testing.
     allowedHosts: true,

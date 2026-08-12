@@ -1,0 +1,258 @@
+/* src/admin-export.css —— /admin/ 导出管理页面样式（桌面优先，手机可用） */
+
+:root {
+  --bg: #f3f5f7;
+  --card: #ffffff;
+  --border: #d9dee4;
+  --text: #1f2733;
+  --muted: #6b7683;
+  --primary: #1a6dff;
+  --primary-hover: #1458d6;
+  --err: #c62828;
+  --ok: #1b7f3b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#admin-app {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+.page-header h1 {
+  font-size: 22px;
+  margin: 0 0 4px;
+}
+
+.page-sub {
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.card h2 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 6px 0 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+button {
+  font: inherit;
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+button.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  color: #fff;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="datetime-local"],
+select {
+  font: inherit;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  min-width: 0;
+}
+
+input[type="password"] {
+  width: 320px;
+  max-width: 100%;
+}
+
+.quick-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button.quick {
+  padding: 4px 14px;
+  font-size: 13px;
+}
+
+.filter-group {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.label {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.filter-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.filter-grid input,
+.filter-grid select {
+  width: 100%;
+}
+
+.status-line {
+  color: var(--muted);
+  margin: 8px 0 0;
+  min-height: 1.2em;
+}
+
+.status-line.err {
+  color: var(--err);
+}
+
+.status-line.ok {
+  color: var(--ok);
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.preview-table th,
+.preview-table td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.preview-table th {
+  background: #f7f9fb;
+  font-weight: 600;
+}
+
+.preview-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-table td.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 24px 8px;
+}
+
+.col-check {
+  width: 36px;
+  text-align: center;
+}
+
+.checkbox-group {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.page-info {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  #admin-app {
+    padding: 16px 10px 48px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  input[type="password"] {
+    width: 100%;
+  }
+
+  .preview-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
