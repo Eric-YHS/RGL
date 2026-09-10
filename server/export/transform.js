@@ -64,6 +64,9 @@ export function transformExportRows(raw, options) {
       ...(includeChinaTime ? ["提交时间_北京时间"] : []),
       "任务类型",
       "呈现方式",
+      "干预组别",
+      "干预材料",
+      "干预阅读时长_秒",
       "理解测验回答",
       "规则看法选项",
       "规则看法补充",
@@ -95,6 +98,9 @@ export function transformExportRows(raw, options) {
       ...(includeChinaTime ? { 提交时间_北京时间: toChinaTime(row.submitted_at_iso) } : {}),
       任务类型: formatRunKind(row.run_kind),
       呈现方式: formatRevealMode(row.reveal_mode),
+      干预组别: formatTreatmentGroup(row.treatment),
+      干预材料: row.treatment ?? "",
+      干预阅读时长_秒: Math.round((row.intervention_ms ?? 0) / 1000),
       理解测验回答: formatComprehensionAnswer(row.comprehension_answer),
       规则看法选项: formatPostRuleAttitude(row.post_rule_attitude),
       规则看法补充: row.post_rule_attitude_text ?? "",
@@ -334,6 +340,16 @@ export function formatRevealMode(v) {
 export function formatComprehensionAnswer(v) {
   if (v === "yes") return "是";
   if (v === "no") return "否";
+  // 多题格式（如 "q1=less;q2=wait"）原样导出，与客户端记录口径一致。
+  if (/^q\d+=[a-z_]+(;q\d+=[a-z_]+)*$/.test(v ?? "")) return v;
+  return "";
+}
+
+export function formatTreatmentGroup(v) {
+  const id = String(v ?? "").trim().toUpperCase();
+  if (id.startsWith("C")) return "控制组";
+  if (id.startsWith("P")) return "正面治理组";
+  if (id.startsWith("N")) return "负面治理组";
   return "";
 }
 

@@ -5,12 +5,15 @@ export function clampInt(value: number, min: number, max: number, fallback: numb
 
 export function formatMoney(amount: number): string {
   const clamped = Math.max(0, amount);
-  const fixed = clamped.toFixed(1);
-  return "￥".concat(fixed);
+  const rounded = Math.round(clamped * 10) / 10;
+  const text = Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
+  return "￥".concat(text);
 }
 
 export function formatSeconds(sec: number, digits = 1): string {
-  return `${Math.max(0, sec).toFixed(digits)}s`;
+  const clamped = Math.max(0, sec);
+  if (digits <= 0) return `${Math.floor(clamped)}s`;
+  return `${clamped.toFixed(digits)}s`;
 }
 
 export function csvEscape(value: unknown): string {

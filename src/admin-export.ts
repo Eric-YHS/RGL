@@ -53,7 +53,8 @@ const state = {
   total: 0,
   items: [] as PreviewItem[],
   selection: new Set<number>(),
-  downloading: false
+  downloading: false,
+  deleting: false
 };
 
 // ---------------------------------------------------------------------------
@@ -172,13 +173,12 @@ let prevPageBtn: HTMLButtonElement;
 let nextPageBtn: HTMLButtonElement;
 let selectPageBtn: HTMLButtonElement;
 let clearSelectionBtn: HTMLButtonElement;
-let chinaTimeCheckbox: HTMLInputElement;
-let sensitiveCheckbox: HTMLInputElement;
+let deleteSelectionBtn: HTMLButtonElement;
+let deleteStatus: HTMLElement;
 let limitHint: HTMLElement;
 let exportAllBtn: HTMLButtonElement;
 let exportSelectedBtn: HTMLButtonElement;
 let downloadStatus: HTMLElement;
-let sheetCheckboxes: Array<{ key: string; input: HTMLInputElement }> = [];
 let selectAllInput: HTMLInputElement;
 
 // ---------------------------------------------------------------------------
@@ -188,14 +188,7 @@ let selectAllInput: HTMLInputElement;
 function buildPage() {
   app.replaceChildren();
 
-  const header = el("header", { class: "page-header" }, [
-    el("h1", {}, ["红绿灯实验 · 数据导出管理"]),
-    el(
-      "p",
-      { class: "page-sub" },
-      ["仅供管理员使用；页面不对外公开，实验页面不提供入口。"]
-    )
-  ]);
+  const header = el("header", { class: "page-header" }, [el("h1", {}, ["红绿灯实验 · 数据导出管理"])]);
   app.append(header);
 
   // A. 管理员验证
@@ -275,6 +268,8 @@ function buildPage() {
   nextPageBtn = el("button", { id: "next-page" }, ["下一页"]) as HTMLButtonElement;
   selectPageBtn = el("button", { id: "select-page-btn" }, ["全选当前页"]) as HTMLButtonElement;
   clearSelectionBtn = el("button", { id: "clear-selection-btn" }, ["清空选择"]) as HTMLButtonElement;
+  deleteSelectionBtn = el("button", { id: "delete-selection-btn", class: "danger", disabled: "disabled" }, ["删除已勾选会话（0）"]) as HTMLButtonElement;
+  deleteStatus = el("p", { class: "status-line", id: "delete-status" });
 
   const table = el("table", { class: "preview-table" }, [
     el("thead", {}, [
@@ -299,30 +294,20 @@ function buildPage() {
     el("h2", {}, ["会话预览"]),
     previewSummary,
     table,
-    el("div", { class: "row" }, [pageInfo, prevPageBtn, nextPageBtn, el("span", { class: "spacer" }), selectPageBtn, clearSelectionBtn])
+    el("div", { class: "row" }, [
+      pageInfo,
+      prevPageBtn,
+      nextPageBtn,
+      el("span", { class: "spacer" }),
+      selectPageBtn,
+      clearSelectionBtn,
+      deleteSelectionBtn
+    ]),
+    deleteStatus
   ]);
   mainSection.append(previewCard);
 
-  // D. 导出选项
-  chinaTimeCheckbox = el("input", { type: "checkbox", id: "china-time" }) as HTMLInputElement;
-  chinaTimeCheckbox.checked = true;
-  sensitiveCheckbox = el("input", { type: "checkbox", id: "sensitive" }) as HTMLInputElement;
-  const sheetContainer = el("div", { class: "checkbox-group" });
-  const sheetDefs: Array<[string, string]> = [
-    ["summary", "导出说明"],
-    ["sessions", "会话数据"],
-    ["events", "事件明细"],
-    ["walks", "通行按键"],
-    ["violations", "闯红灯记录"]
-  ];
-  sheetCheckboxes = sheetDefs.map(([key, label]) => {
-    const input = el("input", { type: "checkbox" }) as HTMLInputElement;
-    input.checked = true;
-    const wrap = el("label", { class: "checkbox" }, [input, el("span", {}, [label])]);
-    sheetContainer.append(wrap);
-    return { key, input };
-  });
-
+  // D. 导出（内容固定：四张工作表 + UTC/北京时间 + 敏感技术字段，无选择控件）
   limitHint = el("p", { class: "status-line hint", id: "limit-hint" });
   exportAllBtn = el("button", { class: "primary", id: "export-all-btn" }, ["导出全部筛选结果"]) as HTMLButtonElement;
   exportSelectedBtn = el("button", { id: "export-selected-btn" }, ["仅导出已勾选会话"]) as HTMLButtonElement;
@@ -330,12 +315,6 @@ function buildPage() {
 
   const exportCard = el("section", { class: "card" }, [
     el("h2", {}, ["导出"]),
-    el("div", { class: "filter-group" }, [el("span", { class: "label" }, ["工作表"]), sheetContainer]),
-    el("label", { class: "checkbox" }, [chinaTimeCheckbox, el("span", {}, ["增加北京时间列（同时保留原始 UTC 时间）"])]),
-    el("label", { class: "checkbox" }, [
-      sensitiveCheckbox,
-      el("span", {}, ["包含敏感技术字段（IP 地址、User-Agent 原文、屏幕/视口尺寸、平台、时区、语言）"])
-    ]),
     limitHint,
     el("div", { class: "row" }, [exportAllBtn, exportSelectedBtn]),
     downloadStatus
@@ -373,14 +352,7 @@ function buildPage() {
     if (state.selection.size === 0) return;
     exportXlsx({ mode: "ids", sessionIds: [...state.selection].sort((a, b) => a - b) });
   });
-  sensitiveCheckbox.addEventListener("change", () => {
-    if (sensitiveCheckbox.checked) {
-      const ok = window.confirm(
-        "包含敏感技术字段后，导出文件将包含 IP 地址、User-Agent 原文、屏幕/视口尺寸、平台、时区、语言等个人信息。确认继续？"
-      );
-      if (!ok) sensitiveCheckbox.checked = false;
-    }
-  });
+  deleteSelectionBtn.addEventListener("click", deleteSelectedSessions);
 
   if (state.token) {
     verifyToken();
@@ -398,7 +370,7 @@ function showAuthSection() {
 function showMainSection() {
   authSection.hidden = true;
   mainSection.hidden = false;
-  limitHint.textContent = `单次导出上限：${state.status?.maxSessions ?? 5000} 个会话 / ${state.status?.maxEvents ?? 100000} 个事件；时间按北京时间（UTC+8）解释。`;
+  limitHint.textContent = `固定导出四张工作表：会话数据、事件明细、通行按键、闯红灯记录；始终包含原始 UTC 时间、北京时间和敏感技术字段（IP 地址、User-Agent 原文、屏幕/视口尺寸、平台、时区、语言）。单次导出上限：${state.status?.maxSessions ?? 5000} 个会话 / ${state.status?.maxEvents ?? 100000} 个事件；时间按北京时间（UTC+8）解释。`;
 }
 
 // ---------------------------------------------------------------------------
@@ -567,7 +539,9 @@ function renderPreview() {
   for (const item of state.items) {
     const checkbox = el("input", { type: "checkbox" }) as HTMLInputElement;
     checkbox.checked = state.selection.has(item.id);
+    checkbox.disabled = state.deleting;
     checkbox.addEventListener("change", () => {
+      if (state.deleting) return;
       if (checkbox.checked) state.selection.add(item.id);
       else state.selection.delete(item.id);
       renderPreview();
@@ -593,10 +567,15 @@ function renderPreview() {
     previewBody.append(tr);
   }
 
-  exportAllBtn.disabled = state.total === 0 || state.downloading;
-  exportSelectedBtn.disabled = state.selection.size === 0 || state.downloading;
-  selectPageBtn.disabled = state.items.length === 0;
-  clearSelectionBtn.disabled = state.selection.size === 0;
+  selectAllInput.disabled = state.deleting;
+  exportAllBtn.disabled = state.total === 0 || state.downloading || state.deleting;
+  exportSelectedBtn.disabled = state.selection.size === 0 || state.downloading || state.deleting;
+  selectPageBtn.disabled = state.items.length === 0 || state.deleting;
+  clearSelectionBtn.disabled = state.selection.size === 0 || state.deleting;
+  deleteSelectionBtn.disabled = state.selection.size === 0 || state.deleting;
+  deleteSelectionBtn.textContent = state.deleting
+    ? "处理中…"
+    : `删除已勾选会话（${state.selection.size}）`;
 }
 
 function toggleSelectPage(checked: boolean) {
@@ -641,8 +620,7 @@ type ExportSelection =
   | { mode: "ids"; sessionIds: number[] };
 
 async function exportXlsx(selection: ExportSelection) {
-  if (state.downloading) return;
-  const sheets = sheetCheckboxes.filter((entry) => entry.input.checked).map((entry) => entry.key);
+  if (state.downloading || state.deleting) return;
   const payload = {
     selection: selection.mode === "filters"
       ? {
@@ -658,10 +636,7 @@ async function exportXlsx(selection: ExportSelection) {
             revealMode: selection.filters.revealMode || undefined
           }
         }
-      : selection,
-    sheets,
-    includeSensitive: sensitiveCheckbox.checked,
-    includeChinaTime: chinaTimeCheckbox.checked
+      : selection
   };
 
   state.downloading = true;
@@ -706,6 +681,50 @@ function filenameFromDisposition(value: string | null): string | null {
   }
   const plain = /filename="?([^";]+)"?/i.exec(value);
   return plain ? plain[1] : null;
+}
+
+// ---------------------------------------------------------------------------
+// 删除已勾选会话
+// ---------------------------------------------------------------------------
+
+async function deleteSelectedSessions() {
+  if (state.deleting || state.selection.size === 0) return;
+  const ids = [...state.selection].sort((a, b) => a - b);
+  const confirmed = window.confirm(
+    `确定删除已勾选的 ${ids.length} 条会话吗？相关事件也会一并删除，且无法恢复。`
+  );
+  // 取消时不处理任何状态，也不清空当前勾选。
+  if (!confirmed) return;
+
+  state.deleting = true;
+  renderPreview();
+  setMessage(deleteStatus, "正在删除…", "");
+  try {
+    const res = await apiRequest("/api/admin/export/sessions", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionIds: ids })
+    });
+    if (!res.ok) {
+      // 失败：保留列表和勾选，只显示错误信息。
+      setMessage(deleteStatus, await readErrorMessage(res), "err");
+      return;
+    }
+    const body = (await res.json()) as { ok: boolean; deletedSessions: number; deletedEvents: number };
+    for (const id of ids) state.selection.delete(id);
+    setMessage(
+      deleteStatus,
+      `已删除 ${body.deletedSessions} 个会话和 ${body.deletedEvents} 条关联事件`,
+      "ok"
+    );
+    // 保留当前筛选条件，回到第 1 页重新查询，刷新命中数量和表格。
+    await runQuery();
+  } catch {
+    setMessage(deleteStatus, "网络错误，删除失败", "err");
+  } finally {
+    state.deleting = false;
+    renderPreview();
+  }
 }
 
 // ---------------------------------------------------------------------------

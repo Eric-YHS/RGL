@@ -39,10 +39,18 @@ npm run dev:web
 ## URL 参数
 
 - `pid`：被试编号（可选）
+- `treatment`：干预材料编号（可选），取值为 `C1`–`C5`（控制组科普文）、`P1`–`P5`（正面治理组）、`N1`–`N5`（负面治理组）。通常由见数平台随机化后传入，与问卷中的操纵检验题目联动。
 
 示例：
 
 - `http://localhost:5173/?pid=001`
+- `http://localhost:5173/?pid=001&treatment=N3`
+
+未传 `treatment` 时的兜底分配：有 `pid` 则按 `pid` 确定性哈希分组（同一被试退出再进仍进入同一组）；无 `pid` 则随机分配并持久化到 `localStorage`。
+
+## 实验流程（9.10 版）
+
+欢迎页 → 设备与显示区域检查 → 指导语 → 理解测试（2 题）→ 任务准备 → 练习任务 → 练习完成 → **干预材料**（练习后、正式任务前展示一篇，强制最低阅读 15 秒，记录阅读时长）→ 任务准备（可返回导语/继续练习/进入决策任务）→ 正式决策任务 → 任务完成（收益明细）→ 操纵检验跳转页（不允许返回，仅前往见数问卷）。
 
 ## 数据提交说明
 
@@ -50,6 +58,8 @@ npm run dev:web
 - 后端入库文件默认在：`data/experiment.db`
 - 同一个 `clientSessionId` 重复提交会自动去重（幂等）
 - 若网络异常，前端会将提交包暂存到 `localStorage`，恢复联网后自动补传
+- 提交包含 `treatment`（干预材料编号）与 `interventionMs`（干预阅读时长毫秒）；旧库启动时自动 `ALTER TABLE` 迁移，历史行默认为空
+- 「会话数据」导出表固定包含：`干预组别`、`干预材料`、`干预阅读时长_秒` 三列（位于「呈现方式」之后）
 
 ## 导出 XLSX
 
@@ -86,9 +96,34 @@ npm run export:xlsx -- --from 2026-08-07T04:00:00.000Z --to 2026-08-10T00:00:00.
 生产地址：`https://experiments.top/admin/`（本地：`http://localhost:5173/admin/`）
 
 - 输入管理员令牌后可按北京时间、会话 ID、被试编号、任务类型、呈现方式筛选预览并直接下载 XLSX。
-- 默认不包含 IP、User-Agent、屏幕/视口尺寸、平台、时区、语言等敏感字段，需主动勾选。
+- 管理页导出内容由后端固定，无任何勾选控件：
+  - 固定导出四张工作表，顺序为：`会话数据`、`事件明细`、`通行按键`、`闯红灯记录`（不再生成“导出说明”）；
+  - 固定包含原始 UTC 时间、北京时间和敏感技术字段（IP 地址、User-Agent 原文、屏幕/视口尺寸、平台、时区、语言）；
+  - 旧页面携带的 `sheets` / `includeChinaTime` / `includeSensitive` 参数会被忽略，不能改变实际结果。
 - 令牌只存 `sessionStorage`，后端只保存令牌 SHA-256 摘要。
 - 管理 API 默认关闭（`EXPORT_ADMIN_ENABLED` 不为 `true` 时返回 404）。
+- `ids` 模式（仅导出勾选会话）为全量语义：任一指定会话 ID 不存在时整个请求返回 404，不生成部分工作簿；重复 ID 在参数校验阶段返回 400。
+- 限流按可信客户端 IP 计（见下方环境变量），客户端伪造 `X-Forwarded-For` 不能绕过。
+
+### 会话删除（`/admin/` 表格底部按钮）
+
+- 勾选会话后在表格底部点击“删除已勾选会话（N）”，经确认后调用：
+
+  ```http
+  DELETE /api/admin/export/sessions
+  Content-Type: application/json
+  Authorization: Bearer <admin-token>
+
+  { "sessionIds": [1, 2, 3, 4] }
+  ```
+
+  成功响应：`{ "ok": true, "deletedSessions": 4, "deletedEvents": 26 }`。
+- `sessionIds` 必须是非空、唯一、正整数数组；空数组、重复 ID、字符串、小数、零或负数返回 `400`；超过 `EXPORT_MAX_SESSIONS` 上限返回 `413`。
+- 全量存在语义：任一 ID 不存在时返回 `404` 且一个也不删除，响应不暴露具体缺失 ID；不支持按筛选条件批量删除。
+- 关联事件通过 `events.session_id ... ON DELETE CASCADE` 在同一 SQLite 写事务内级联删除，任何异常都会完整回滚；删除前会校验 `PRAGMA foreign_keys = ON`。
+- 删除依据始终是当前列表里的 `sessions.id`，不能用 IP、User-Agent 等易变化字段对应会话。
+- 删除接口复用下载限流器（`EXPORT_DOWNLOAD_MAX_PER_10MIN`，与 `/xlsx` 共享同一额度），不新增环境变量。
+- 删除不可恢复：上线前请先备份 SQLite 数据库；本轮不实现回收站和恢复功能。
 
 ## 后端环境变量
 
@@ -101,7 +136,10 @@ npm run export:xlsx -- --from 2026-08-07T04:00:00.000Z --to 2026-08-10T00:00:00.
 
 - `EXPORT_ADMIN_ENABLED`：必须为 `true` 才启用 `/api/admin/export/*`（默认关闭）
 - `EXPORT_ADMIN_TOKEN_SHA256`：管理员令牌 UTF-8 字节的 SHA-256 十六进制摘要（64 字符），绝不写明文
-- `EXPORT_MAX_SESSIONS` / `EXPORT_MAX_EVENTS`：单次导出上限（默认 5000 / 100000）
+- `EXPORT_MAX_SESSIONS` / `EXPORT_MAX_EVENTS`：单次导出上限（默认 5000 / 100000）；超限在读取明细前终止，返回 413
+- `EXPORT_VERIFY_MAX_PER_10MIN`：`/status` 验证限流（默认每 IP 20 次/10 分钟）
+- `EXPORT_PREVIEW_MAX_PER_MIN`：`/sessions` 预览限流（默认每 IP 60 次/分钟）
+- `EXPORT_DOWNLOAD_MAX_PER_10MIN`：`/xlsx` 下载与 `DELETE /sessions` 删除共享限流（默认每 IP 10 次/10 分钟）
 - `EXPORT_TIME_ZONE`：默认 `Asia/Shanghai`
 
 生成摘要示例：
@@ -119,6 +157,8 @@ printf '%s' '你的至少32字节随机令牌' | sha256sum
 ```bash
 npm --prefix server test
 ```
+
+该命令通过 `server/test-runner.js` 跨平台启动：只运行 `server/test/` 下 `*.test.js` 文件（不把 `helpers.js` 等辅助模块计入测试数），Windows 与 Linux、Node 18 及以上均可直接执行。
 
 ## 前端环境变量
 
@@ -144,7 +184,8 @@ location /api/ {
   proxy_http_version 1.1;
   proxy_set_header Host $host;
   proxy_set_header X-Real-IP $remote_addr;
-  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  # 覆盖客户端传入值（不使用 $proxy_add_x_forwarded_for，避免信任用户伪造的链首地址）
+  proxy_set_header X-Forwarded-For $remote_addr;
   proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```

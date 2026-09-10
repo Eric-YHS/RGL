@@ -9,6 +9,7 @@ import {
   allowedOrigin,
   createIpRateLimiter,
   extractBearerToken,
+  extractClientIp,
   getAdminConfig,
   isAdminExportEnabled,
   verifyAdminToken
@@ -93,10 +94,36 @@ test("extractBearerToken: 只接受 Bearer 前缀", () => {
   assert.equal(extractBearerToken(req(undefined)), "");
 });
 
-test("createIpRateLimiter: 超过上限返回 429", () => {
+test("extractClientIp: 不信任 X-Forwarded-For，只使用 req.ip / socket 地址", () => {
+  // 伪造链首 XFF 一律被忽略：优先使用 Express 计算的 req.ip。
+  assert.equal(
+    extractClientIp({
+      ip: "203.0.113.7",
+      headers: { "x-forwarded-for": "6.6.6.6, 1.2.3.4" },
+      socket: { remoteAddress: "10.0.0.9" }
+    }),
+    "203.0.113.7"
+  );
+  // req.ip 缺失（非 Express 上下文）时回退到 socket 地址。
+  assert.equal(
+    extractClientIp({ headers: { "x-forwarded-for": "6.6.6.6" }, socket: { remoteAddress: "10.0.0.9" } }),
+    "10.0.0.9"
+  );
+  assert.equal(extractClientIp({ headers: {}, socket: {} }), "");
+});
+
+
+test("createIpRateLimiter: 伪造 X-Forwarded-For 无法改变限流桶", () => {
   const limiter = createIpRateLimiter({ windowMs: 60_000, max: 2 });
   const calls = [];
-  const req = { headers: {}, socket: { remoteAddress: "10.0.0.1" } };
+  // 同一真实客户端不断改变伪造的链首 XFF，仍落入同一个桶：
+  // req.ip 由 Express 根据 trust proxy 计算（本机代理之外不可伪造），XFF 头被忽略。
+  const forgedXff = ["1.1.1.1", "2.2.2.2", "3.3.3.3"];
+  const makeReq = (xff) => ({
+    ip: "10.0.0.1", // 信任 IP 恒定（攻击者无法通过请求头改变）
+    headers: { "x-forwarded-for": `${xff}, 9.9.9.9` },
+    socket: { remoteAddress: "10.0.0.1" }
+  });
   const res = {
     set() {},
     status(code) {
@@ -107,19 +134,42 @@ test("createIpRateLimiter: 超过上限返回 429", () => {
       return this;
     }
   };
+  for (const xff of forgedXff) {
+    limiter(makeReq(xff), res, () => calls.push("next"));
+  }
+  assert.deepEqual(calls, ["next", "next", 429], "第三次必须命中同一 IP 的桶");
 
-  limiter(req, res, () => calls.push("next"));
-  limiter(req, res, () => calls.push("next"));
-  limiter(req, res, () => calls.push("next"));
-
-  assert.deepEqual(calls, ["next", "next", 429]);
+  // 非 Express 上下文（无 req.ip）：回退 socket 地址，同样与 XFF 头无关。
+  const limiter2 = createIpRateLimiter({ windowMs: 60_000, max: 1 });
+  const calls2 = [];
+  const res2 = {
+    set() {},
+    status(code) {
+      calls2.push(code);
+      return this;
+    },
+    json() {
+      return this;
+    }
+  };
+  limiter2(
+    { headers: { "x-forwarded-for": "7.7.7.7" }, socket: { remoteAddress: "10.0.0.2" } },
+    res2,
+    () => calls2.push("next")
+  );
+  limiter2(
+    { headers: { "x-forwarded-for": "8.8.8.8" }, socket: { remoteAddress: "10.0.0.2" } },
+    res2,
+    () => calls2.push("next")
+  );
+  assert.deepEqual(calls2, ["next", 429]);
 });
 
-test("createIpRateLimiter: 不同 IP 互不影响", () => {
+test("createIpRateLimiter: 不同可信客户端 IP 互不影响", () => {
   const limiter = createIpRateLimiter({ windowMs: 60_000, max: 1 });
   const results = [];
   const make = (ip) => ({
-    req: { headers: {}, socket: { remoteAddress: ip } },
+    req: { ip, headers: {}, socket: { remoteAddress: ip } },
     res: {
       set() {},
       status(code) {

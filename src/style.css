@@ -194,6 +194,18 @@ canvas.webgl {
   color: #111111;
 }
 
+.center-controls .btn.action-selected {
+  background: var(--button);
+  border-color: var(--button-border);
+  color: var(--text);
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.center-controls .btn.action-selected:active {
+  transform: none;
+}
+
 .btn:disabled {
   opacity: 0.48;
   cursor: not-allowed;
@@ -227,7 +239,7 @@ canvas.webgl {
   min-height: 0;
   padding: 0;
   overflow: hidden;
-  background: rgba(238, 238, 238, 0.82);
+  background: var(--desktop);
 }
 
 .display-corner-check {
@@ -325,7 +337,10 @@ canvas.webgl {
 }
 
 .display-corner-check-status .ready {
-  color: var(--ok);
+  /* 需求批注：已满足的检测项弱化（后台化），只突出待完成项。 */
+  color: var(--muted);
+  font-size: 13px;
+  opacity: 0.6;
 }
 
 html.credamo-embedded .display-corner-check-status {
@@ -351,6 +366,29 @@ html.credamo-embedded .display-corner-check-status {
 .desktop-only-card,
 .desktop-preflight-card {
   max-width: 760px;
+}
+
+.desktop-entry-zoom-hints {
+  margin: 0;
+  padding: 6px 24px;
+  /* 需求批注：缩放提示保留但弱化，字号调小。 */
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  background: rgba(23, 104, 154, 0.04);
+  border-bottom: 1px solid rgba(23, 104, 154, 0.12);
+}
+
+.desktop-entry-zoom-hints p {
+  margin: 0;
+}
+
+.desktop-entry-zoom-hints p + p {
+  margin-top: 2px;
+}
+
+.desktop-entry-zoom-hints strong {
+  color: var(--primary-dark);
 }
 
 .desktop-entry-card {
@@ -626,6 +664,25 @@ html.credamo-embedded .display-corner-check-status {
   padding: 12px 14px;
   border: 1px solid var(--soft-border);
   background: #ffffff;
+}
+
+.intervention-material {
+  margin: 14px 24px 0;
+  padding: 14px 18px;
+  border: 1px solid var(--soft-border);
+  background: #ffffff;
+}
+
+.intervention-material p {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.9;
+  text-align: justify;
+}
+
+.intervention-material p + p {
+  margin-top: 12px;
 }
 
 .comp-question p {

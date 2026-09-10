@@ -26,6 +26,7 @@ export type SessionMeta = {
   participantId: string;
   startedAtIso: string;
   runKind: "practice" | "formal";
+  treatment: string;
 };
 
 export type ClientDeviceInfo = {
@@ -52,6 +53,8 @@ export type SessionSubmission = {
   submittedAtIso: string;
   runKind: SessionMeta["runKind"];
   revealMode: ExperimentConfig["revealMode"];
+  treatment: string;
+  interventionMs: number;
   comprehensionAnswer: string;
   postRuleAttitude: "A" | "B" | "C" | "D" | "";
   postRuleAttitudeText: string;
@@ -223,6 +226,7 @@ export class ExperimentLogger {
     submittedAtIso: string;
     summary: SubmissionSummary;
     device: ClientDeviceInfo;
+    interventionMs?: number;
   }): SessionSubmission {
     return {
       clientSessionId: args.clientSessionId,
@@ -231,6 +235,8 @@ export class ExperimentLogger {
       submittedAtIso: args.submittedAtIso,
       runKind: this.meta.runKind,
       revealMode: this.config.revealMode,
+      treatment: this.meta.treatment,
+      interventionMs: Math.max(0, Math.round(args.interventionMs ?? 0)),
       comprehensionAnswer: this.comprehensionAnswer,
       postRuleAttitude: this.postRuleAttitude,
       postRuleAttitudeText: this.postRuleAttitudeText,

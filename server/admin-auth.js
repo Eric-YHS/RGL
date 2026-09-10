@@ -53,12 +53,20 @@ export function allowedOrigin(req) {
   return readOriginAllowlist().has(origin);
 }
 
-/** 管理接口前置中间件：启用检查 → 同源检查 → 令牌检查。 */
-export function requireAdmin(req, res, next) {
+/**
+ * 功能开关检查（必须最先执行，早于任何限流器）：
+ * 管理功能关闭时所有管理 API 一律 404，不消耗限流额度、不产生 429。
+ */
+export function adminEnabled(req, res, next) {
   if (!isAdminExportEnabled()) {
     res.status(404).json({ ok: false, error: "Not found" });
     return;
   }
+  next();
+}
+
+/** 管理接口鉴权中间件：同源检查 → 令牌检查（限流由路由在调用前执行）。 */
+export function requireAdmin(req, res, next) {
   if (!allowedOrigin(req)) {
     res.status(403).json({ ok: false, error: "Origin not allowed" });
     return;
@@ -100,17 +108,14 @@ export function createIpRateLimiter({ windowMs, max }) {
   };
 }
 
+/**
+ * 可信客户端 IP：只使用 Express 计算的 req.ip。
+ * 生产环境 app.set("trust proxy", "loopback")，只有本机 Nginx 转发的 X-Forwarded-For 才会被采纳；
+ * 不直接读取请求头链首，客户端伪造的 X-Forwarded-For 无法影响限流桶与审计日志。
+ * 非 Express 上下文（单元测试直接构造 req）回退到 socket 地址。
+ */
 export function extractClientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.trim()) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  if (Array.isArray(forwarded) && forwarded.length > 0) {
-    const first = String(forwarded[0]).trim();
-    if (first) return first;
-  }
-  return req.socket.remoteAddress ?? "";
+  return req.ip ?? req.socket.remoteAddress ?? "";
 }
 
 function sweepExpiredBuckets(hits, now) {

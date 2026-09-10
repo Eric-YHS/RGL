@@ -27,6 +27,14 @@ const SUBMISSION_RATE_LIMIT_MAX = readEnvInteger("SUBMISSION_RATE_LIMIT_MAX", 30
 });
 const POST_ALLOWED_ORIGINS = readOriginAllowlist(process.env.POST_ALLOWED_ORIGINS);
 
+// 9.10 treatment 需求的 15 个处理单元（3 组 × 5 篇），空串表示未参与干预
+// （练习轮或旧客户端）。与 src/experiment/treatments.ts 保持一致。
+const TREATMENT_IDS = [
+  "C1", "C2", "C3", "C4", "C5",
+  "P1", "P2", "P3", "P4", "P5",
+  "N1", "N2", "N3", "N4", "N5"
+];
+
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
 const db = new Database(DB_PATH);
@@ -45,6 +53,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   comprehension_answer TEXT NOT NULL,
   post_rule_attitude TEXT NOT NULL,
   post_rule_attitude_text TEXT NOT NULL,
+  treatment TEXT NOT NULL DEFAULT '',
+  intervention_ms INTEGER NOT NULL DEFAULT 0,
   elapsed_sec REAL NOT NULL,
   money REAL NOT NULL,
   violations INTEGER NOT NULL,
@@ -85,6 +95,18 @@ CREATE INDEX IF NOT EXISTS idx_events_session_id ON events(session_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at_iso);
 `);
 
+// 既有数据库（CREATE TABLE IF NOT EXISTS 不会变更旧表）按列迁移，
+// 与 9.10 treatment 需求新增的列保持兼容；旧行取默认值。
+const sessionColumnNames = new Set(
+  db.prepare("PRAGMA table_info(sessions)").all().map((column) => column.name)
+);
+if (!sessionColumnNames.has("treatment")) {
+  db.exec("ALTER TABLE sessions ADD COLUMN treatment TEXT NOT NULL DEFAULT ''");
+}
+if (!sessionColumnNames.has("intervention_ms")) {
+  db.exec("ALTER TABLE sessions ADD COLUMN intervention_ms INTEGER NOT NULL DEFAULT 0");
+}
+
 const insertSessionStmt = db.prepare(`
 INSERT INTO sessions (
   client_session_id,
@@ -96,6 +118,8 @@ INSERT INTO sessions (
   comprehension_answer,
   post_rule_attitude,
   post_rule_attitude_text,
+  treatment,
+  intervention_ms,
   elapsed_sec,
   money,
   violations,
@@ -119,6 +143,8 @@ VALUES (
   @comprehensionAnswer,
   @postRuleAttitude,
   @postRuleAttitudeText,
+  @treatment,
+  @interventionMs,
   @elapsedSec,
   @money,
   @violations,
@@ -239,7 +265,7 @@ if (CORS_ORIGIN.trim()) {
           callback(null, true);
           return;
         }
-        callback(new Error("CORS origin not allowed"));
+        callback(null, false);
       }
     })
   );
@@ -385,8 +411,17 @@ function parseSubmission(body) {
   const revealMode = readEnum(body.revealMode, ["full", "sequential"]);
   if (!revealMode.ok) return revealMode;
 
-  const comprehensionAnswer = readEnum(body.comprehensionAnswer ?? "", ["", "yes", "no"]);
+  const comprehensionAnswer = readComprehensionAnswer(body.comprehensionAnswer ?? "");
   if (!comprehensionAnswer.ok) return comprehensionAnswer;
+
+  const treatment = readEnum(body.treatment ?? "", ["", ...TREATMENT_IDS]);
+  if (!treatment.ok) return treatment;
+
+  const interventionMs = readInteger(body.interventionMs ?? 0, {
+    min: 0,
+    max: 24 * 60 * 60 * 1000
+  });
+  if (!interventionMs.ok) return interventionMs;
 
   const postRuleAttitude = readEnum(body.postRuleAttitude ?? "", ["", "A", "B", "C", "D"]);
   if (!postRuleAttitude.ok) return postRuleAttitude;
@@ -487,6 +522,8 @@ function parseSubmission(body) {
       comprehensionAnswer: comprehensionAnswer.value,
       postRuleAttitude: postRuleAttitude.value,
       postRuleAttitudeText: postRuleAttitudeText.value,
+      treatment: treatment.value,
+      interventionMs: interventionMs.value,
       summary: {
         elapsedSec: elapsedSec.value,
         money: money.value,
@@ -542,6 +579,17 @@ function readEnum(value, allowed) {
   if (typeof value !== "string") return fail("must be a string enum value");
   if (!allowed.includes(value)) return fail(`must be one of: ${allowed.join(", ")}`);
   return success(value);
+}
+
+// 理解测试答案：旧版单题 "yes"/"no"，或多题格式（如 "q1=less;q2=wait"）。
+// 校验模式与客户端 src/experiment/logger.ts 一致——此前服务端只认 yes/no，
+// 客户端修复答案结转后若仍拒绝该格式，正式提交会被 400 挡在库外。
+function readComprehensionAnswer(value) {
+  if (typeof value !== "string") return fail("must be a string");
+  if (value.length > 200) return fail("must be <= 200 chars");
+  if (value === "" || value === "yes" || value === "no") return success(value);
+  if (/^q\d+=[a-z_]+(;q\d+=[a-z_]+)*$/.test(value)) return success(value);
+  return fail("must be one of: , yes, no, or q-pattern");
 }
 
 function readNullableEnum(value, allowed) {

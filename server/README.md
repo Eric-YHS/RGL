@@ -24,7 +24,9 @@ npm --prefix server run dev
 - `submittedAtIso`
 - `runKind`
 - `revealMode`
-- `comprehensionAnswer`
+- `treatment`（干预材料编号：`C1`–`C5` / `P1`–`P5` / `N1`–`N5`，空串表示未参与干预）
+- `interventionMs`（干预材料阅读时长，毫秒整数）
+- `comprehensionAnswer`（支持 `yes`/`no` 或多题格式，如 `q1=less;q2=wait`）
 - `postRuleAttitude`
 - `postRuleAttitudeText`
 - `summary`（`elapsedSec` / `money` / `violations`）

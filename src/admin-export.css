@@ -33,11 +33,6 @@ body {
 
 .page-header h1 {
   font-size: 22px;
-  margin: 0 0 4px;
-}
-
-.page-sub {
-  color: var(--muted);
   margin: 0 0 20px;
 }
 
@@ -98,6 +93,17 @@ button.primary {
 button.primary:hover:not(:disabled) {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
+  color: #fff;
+}
+
+button.danger {
+  border-color: #c62828;
+  color: #c62828;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #c62828;
+  border-color: #c62828;
   color: #fff;
 }
 
@@ -217,20 +223,6 @@ button.quick {
 .col-check {
   width: 36px;
   text-align: center;
-}
-
-.checkbox-group {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-label.checkbox {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  user-select: none;
 }
 
 .page-info {

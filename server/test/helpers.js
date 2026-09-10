@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   comprehension_answer TEXT NOT NULL,
   post_rule_attitude TEXT NOT NULL,
   post_rule_attitude_text TEXT NOT NULL,
+  treatment TEXT NOT NULL DEFAULT '',
+  intervention_ms INTEGER NOT NULL DEFAULT 0,
   elapsed_sec REAL NOT NULL,
   money REAL NOT NULL,
   violations INTEGER NOT NULL,
@@ -59,11 +61,15 @@ CREATE INDEX IF NOT EXISTS idx_events_session_id ON events(session_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at_iso);
 `;
 
-export function createTestDb() {
+export function createTestDb({ wal = true, foreignKeys = true } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "honglvdeng-test-"));
   const dbPath = path.join(dir, "test.db");
   const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
+  if (wal) db.pragma("journal_mode = WAL");
+  // 与生产连接（server/index.js）保持一致：ON DELETE CASCADE 依赖外键开启。
+  // better-sqlite3 默认开启外键，因此关闭方向也要显式设置。
+  if (foreignKeys) db.pragma("foreign_keys = ON");
+  else db.pragma("foreign_keys = OFF");
   db.exec(SCHEMA);
   seed(db);
   return { db, dir };
@@ -82,22 +88,22 @@ function seed(db) {
     INSERT INTO sessions (
       id, client_session_id, participant_id, started_at_iso, submitted_at_iso,
       run_kind, reveal_mode, comprehension_answer, post_rule_attitude,
-      post_rule_attitude_text, elapsed_sec, money, violations,
+      post_rule_attitude_text, treatment, intervention_ms, elapsed_sec, money, violations,
       user_agent, language, platform, screen_width, screen_height,
-      viewport_width, viewport_height, time_zone, ip_address
+      viewport_width, viewport_height, time_zone, ip_address, created_at
     ) VALUES (
       @id, @clientSessionId, @participantId, @startedAtIso, @submittedAtIso,
       @runKind, @revealMode, @comprehensionAnswer, @postRuleAttitude,
-      @postRuleAttitudeText, @elapsedSec, @money, @violations,
+      @postRuleAttitudeText, @treatment, @interventionMs, @elapsedSec, @money, @violations,
       @userAgent, @language, @platform, @screenWidth, @screenHeight,
-      @viewportWidth, @viewportHeight, @timeZone, @ipAddress
+      @viewportWidth, @viewportHeight, @timeZone, @ipAddress, @createdAt
     )
   `);
   const insertEvent = db.prepare(`
     INSERT INTO events (
       session_id, seq, t_ms, t_sec, event, phase, light_index, light_color,
-      money, route_pos_01, route_pos_10, note
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      money, route_pos_01, route_pos_10, note, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const session = (id, overrides = {}) =>
@@ -112,6 +118,8 @@ function seed(db) {
       comprehensionAnswer: "yes",
       postRuleAttitude: "A",
       postRuleAttitudeText: "",
+      treatment: "",
+      interventionMs: 0,
       elapsedSec: 300,
       money: 83.1,
       violations: 0,
@@ -124,6 +132,8 @@ function seed(db) {
       viewportHeight: 700,
       timeZone: "Asia/Shanghai",
       ipAddress: "1.2.3.4",
+      // 固定入库时间，保证 CLI 语义基线 fixture 可复现。
+      createdAt: "2026-08-07 12:00:00",
       ...overrides
     });
 
@@ -140,7 +150,8 @@ function seed(db) {
       overrides.money ?? 83.1,
       overrides.routePos01 ?? null,
       overrides.routePos10 ?? null,
-      overrides.note ?? null
+      overrides.note ?? null,
+      overrides.createdAt ?? "2026-08-07 12:00:00"
     );
 
   // 基础数据（与线上结构一致的示例）。
@@ -159,7 +170,14 @@ function seed(db) {
     [49, "S008", "2026-08-07T07:15:03.700Z", "2026-08-07T07:21:47.100Z", "formal", "full", 2],
     [50, "S009", "2026-08-07T08:00:00.000Z", "2026-08-07T08:08:01.000Z", "formal", "full", 0]
   ];
+  // 干预材料字段覆盖（9.10 treatment）：供导出基线验证新列。
+  const treatmentById = new Map([
+    [42, ["N1", 15234]],
+    [44, ["P3", 42100]],
+    [45, ["C2", 30000]]
+  ]);
   for (const [id, pid, started, submitted, runKind, revealMode, violations] of aug7) {
+    const [treatment, interventionMs] = treatmentById.get(id) ?? ["", 0];
     session(id, {
       participantId: pid,
       startedAtIso: started,
@@ -167,6 +185,8 @@ function seed(db) {
       runKind,
       revealMode,
       violations,
+      treatment,
+      interventionMs,
       elapsedSec: 300 + id,
       money: 80 + id * 0.5
     });

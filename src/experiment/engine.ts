@@ -50,7 +50,7 @@ export class ExperimentEngine {
       phase: this.state.phase,
       lightIndex: null,
       lightColor: null,
-      money: this.state.money
+      money: this.getRecordedMoney()
     });
   }
 
@@ -80,7 +80,7 @@ export class ExperimentEngine {
       phase: this.state.phase,
       lightIndex: this.state.lightIndex,
       lightColor: null,
-      money: this.state.money
+      money: this.getRecordedMoney()
     });
   }
 
@@ -97,7 +97,7 @@ export class ExperimentEngine {
       phase: this.state.phase,
       lightIndex: this.state.phase === "idle" ? null : this.state.lightIndex,
       lightColor: this.state.phase === "waiting_red" ? this.state.currentLightColor : null,
-      money: this.state.money,
+      money: this.getRecordedMoney(),
       routePos01,
       routePos10: Number(routePos10.toFixed(3))
     });
@@ -151,7 +151,7 @@ export class ExperimentEngine {
           phase: this.state.phase,
           lightIndex: this.state.lightIndex,
           lightColor: "green",
-          money: this.state.money
+          money: this.getRecordedMoney()
         });
       }
       // The circle stays at the light until the participant clicks "移动".
@@ -201,6 +201,10 @@ export class ExperimentEngine {
     return null;
   }
 
+  getRecordedMoney(): number {
+    return this.getRecordedMoneyAtElapsed(this.state.elapsedSec);
+  }
+
   pause(nowMs: number): void {
     if (this.state.phase === "idle" || this.state.phase === "finished") return;
     if (this.pausedAtMs !== null) return;
@@ -233,7 +237,7 @@ export class ExperimentEngine {
       phase: this.state.phase,
       lightIndex: this.state.lightIndex,
       lightColor: "red",
-      money: this.state.money
+      money: this.getRecordedMoney()
     });
   }
 
@@ -251,7 +255,7 @@ export class ExperimentEngine {
       phase: this.state.phase,
       lightIndex: this.state.lightIndex,
       lightColor: "red",
-      money: this.state.money,
+      money: this.getRecordedMoney(),
       routePos01,
       routePos10: Number(routePos10.toFixed(3)),
       note: "run_red"
@@ -264,7 +268,7 @@ export class ExperimentEngine {
       phase: this.state.phase,
       lightIndex: this.state.lightIndex,
       lightColor: "red",
-      money: this.state.money,
+      money: this.getRecordedMoney(),
       routePos01,
       routePos10: Number(routePos10.toFixed(3)),
       note: "run_red"
@@ -284,7 +288,7 @@ export class ExperimentEngine {
       phase: this.state.phase,
       lightIndex: this.state.lightIndex,
       lightColor: "green",
-      money: this.state.money,
+      money: this.getRecordedMoney(),
       routePos01,
       routePos10: Number(routePos10.toFixed(3)),
       note: "green"
@@ -305,7 +309,7 @@ export class ExperimentEngine {
       phase: this.state.phase,
       lightIndex: this.state.lightIndex,
       lightColor: null,
-      money: this.state.money,
+      money: this.getRecordedMoney(),
       note: reason
     });
   }
@@ -320,7 +324,7 @@ export class ExperimentEngine {
       phase: this.state.phase,
       lightIndex: this.state.lightIndex,
       lightColor: null,
-      money: this.state.money
+      money: this.getRecordedMoney()
     });
   }
 
@@ -330,6 +334,11 @@ export class ExperimentEngine {
   }
 
   private getMoneyAtElapsed(elapsedSec: number): number {
+    const chargedSeconds = Math.floor(Math.max(0, elapsedSec));
+    return Math.max(0, this.config.startMoney - this.config.moneyLossPerSec * chargedSeconds);
+  }
+
+  private getRecordedMoneyAtElapsed(elapsedSec: number): number {
     const chargedSeconds = Math.max(0, elapsedSec);
     return Math.max(0, this.config.startMoney - this.config.moneyLossPerSec * chargedSeconds);
   }

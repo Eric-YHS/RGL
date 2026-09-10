@@ -6,7 +6,7 @@
     "dev": "node index.js",
     "start": "node index.js",
     "export:xlsx": "node export-xlsx.js",
-    "test": "node --test test/"
+    "test": "node test-runner.js"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",

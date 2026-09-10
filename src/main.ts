@@ -5,13 +5,12 @@ import { ExperimentEngine } from "./experiment/engine";
 import type { ClientDeviceInfo, SessionSubmission } from "./experiment/logger";
 import { ExperimentLogger } from "./experiment/logger";
 import { formatMoney, formatSeconds } from "./experiment/utils";
+import { findTreatment, resolveTreatmentId } from "./experiment/treatments";
 import { World2D } from "./scene/world2d";
 
 type SubmitOutcome = "sent" | "queued";
 type DesktopInputProof = {
   keyboard: boolean;
-  mouseMove: boolean;
-  mouseClick: boolean;
 };
 
 const params = new URLSearchParams(window.location.search);
@@ -19,6 +18,7 @@ const participantId = (params.get("pid") ?? "").trim();
 const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 const surveyUrl = (import.meta.env.VITE_SURVEY_URL ?? "").trim();
 const PENDING_SUBMISSIONS_KEY = "honglvdeng_pending_submissions_v1";
+const CONTINUE_SURVEY_EVENT = "honglvdeng:continue-survey";
 const EXPERIMENT_UI_FONT = '"Experiment Sans"';
 const EXPERIMENT_MONEY_FONT = '"Experiment Mono"';
 const isCredamoEmbedded =
@@ -52,8 +52,8 @@ function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig
   return {
     revealMode,
     numLights,
-    segmentDurationSec: 2,
-    redWaitSec: 12,
+    segmentDurationSec: 4,
+    redWaitSec: 15,
     startMoney: 100,
     moneyLossPerSec: 2.0
   };
@@ -62,12 +62,42 @@ function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig
 const formalConfig: ExperimentConfig = makeConfig("full", 1);
 const practiceConfig: ExperimentConfig = makeConfig("full", 1);
 
+// 干预材料分配：URL treatment 参数（见数随机化后与操纵检验联动）> pid 哈希 >
+// 本地持久化随机；同一被试退出再进仍进入同一处理组（需求批注第 1 条）。
+const treatmentId = resolveTreatmentId(window.location.search, participantId);
+const treatmentMaterial = findTreatment(treatmentId)!;
+// 批注第 2 条：强制最低阅读时间，确保 treatment 生效。
+const INTERVENTION_MIN_READ_SEC = 15;
+let interventionShown = false;
+let interventionStartedAtMs = 0;
+let interventionDurationMs = 0;
+let interventionTimer: number | null = null;
+// 理解测试答案在练习/正式 logger 切换时会丢失（enterPracticeMode/enterFormalMode
+// 均新建 logger），这里留存原始事件，正式 logger 创建时以原始时间戳补记。
+let lastComprehensionEvent: { nowMs: number; note: string } | null = null;
+
 function createLogger(config: ExperimentConfig, runKind: "formal" | "practice"): ExperimentLogger {
-  return new ExperimentLogger(config, {
+  const next = new ExperimentLogger(config, {
     participantId,
     startedAtIso: new Date().toISOString(),
-    runKind
+    runKind,
+    treatment: treatmentId
   });
+  // 正式轮的提交由最新 logger 生成；把理解测试答案以原始时间戳补进新 logger，
+  // 避免切换练习/正式 logger 时丢失（8 月内测数据该字段为空即此原因）。
+  if (runKind === "formal" && lastComprehensionEvent) {
+    next.log({
+      nowMs: lastComprehensionEvent.nowMs,
+      tSec: 0,
+      event: "comprehension_answer",
+      phase: "idle",
+      lightIndex: null,
+      lightColor: null,
+      money: config.startMoney,
+      note: lastComprehensionEvent.note
+    });
+  }
+  return next;
 }
 
 type SubmissionApiResponse = {
@@ -298,9 +328,7 @@ let formalClientSessionId = createClientSessionId();
 let formalSubmission: SessionSubmission | null = null;
 let isPracticeMode = false;
 const desktopInputProof: DesktopInputProof = {
-  keyboard: false,
-  mouseMove: false,
-  mouseClick: false
+  keyboard: false
 };
 let desktopGateReady = false;
 let desktopGateVisible = false;
@@ -308,12 +336,22 @@ let pausedByDesktopGate = false;
 let desktopGateIntroductionAcknowledged = false;
 let practiceCompletedOnce = false;
 let resumeDeviceCornerCheck: (() => void) | null = null;
+type ModalScreen = "instructions" | "comprehension" | "practice_ready" | "intervention" | "manipulation_check";
+let currentModalScreen: ModalScreen | null = null;
+type AttentionResumeTarget =
+  | { kind: "task_restart" }
+  | { kind: "modal"; screen: ModalScreen }
+  | { kind: "task_idle" };
+let attentionResumeTarget: AttentionResumeTarget | null = null;
 
-type DisplayCheckMode = "enter_practice" | "enter_formal" | "restart" | "before_start" | "enter_comprehension";
+type DisplayCheckMode = "initial" | "recheck" | "before_start";
 const DISPLAY_CHECK_MAX_DURATION_MS = 6000;
 let displayCheckMode: DisplayCheckMode | null = null;
 let displayCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。请连续完成，不要滚动页面。";
 let displayCheckCertified = false;
+let cornerCheckCompleted = false;
+let lastDeviceCheckPassedMs = 0;
+const DEVICE_CHECK_COOLDOWN_MS = 2000;
 type AttentionIssue =
   | "document_hidden"
   | "window_blurred"
@@ -337,13 +375,11 @@ function renderCornerCheckStatusItems(): string {
   const pointerReady = hasDesktopPointer();
   const hoverReady = hasDesktopHover();
   const keyboardReady = desktopInputProof.keyboard;
-  const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
 
   const items = [
     { ready: pointerReady, label: pointerReady ? "检测到精细指针设备" : "请进行精细指针设备检测" },
     { ready: hoverReady, label: hoverReady ? "检测到悬停能力" : "请进行悬停能力检测" },
-    { ready: keyboardReady, label: keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键" },
-    { ready: mouseReady, label: mouseReady ? "已检测到鼠标移动和点击" : "请移动鼠标并点击一次" }
+    { ready: keyboardReady, label: keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键" }
   ];
 
   return items
@@ -367,6 +403,65 @@ function startDisplayCornerCheck(
   renderDisplayCornerCheck();
 }
 
+function startDisplayDeviceCheck(mode: DisplayCheckMode): void {
+  closeModal();  // 关闭可能处于打开状态的 modal，防止旧按钮残留焦点（Space/Enter keyup 误触发 click）
+  displayCheckMode = mode;
+  displayCheckCertified = false;
+  cornerCheckCompleted = false;
+  resetDesktopInputProof();
+  resumeDeviceCornerCheck = null;
+  renderDeviceCheck();
+}
+
+function areAllDeviceChecksReady(): boolean {
+  const pointerReady = hasDesktopPointer();
+  const hoverReady = hasDesktopHover();
+  const keyboardReady = desktopInputProof.keyboard;
+  return pointerReady && hoverReady && keyboardReady;
+}
+
+function renderDeviceCheck(): void {
+  const mode = displayCheckMode;
+  if (!mode) return;
+
+  els.desktopGate.classList.add("display-corner-check-active");
+  els.desktopGate.innerHTML = `
+    <section class="display-corner-check display-device-check" id="displayCornerCheck" aria-label="输入设备检查">
+      <div class="display-corner-check-instructions">
+        <h1>输入设备检查</h1>
+        <p id="displayCornerCheckHint">${displayCheckNotice}</p>
+        <div class="display-corner-check-status" id="displayCornerCheckStatus">
+          ${renderCornerCheckStatusItems()}
+        </div>
+        <p class="hint">请按一次键盘按键。完成后将自动进入显示区域检查。</p>
+      </div>
+    </section>
+  `;
+  els.desktopGate.style.display = "grid";
+  desktopGateVisible = true;
+
+  // 记录当前视口签名，避免因 overflow 变化（滚动条显隐）
+  // 导致的 resize 事件误触发 invalidateDisplayCheckForEnvironmentChange。
+  lastViewportSignature = getViewportSignature();
+
+  // 键盘检测由持久化监听器统一处理（见 installDesktopKeyboardDetector 附近），
+  // 此处设置回调以便键盘检测后自动进入角落检查阶段。
+  resumeDeviceCornerCheck = () => {
+    if (!displayCheckMode) return;
+    if (cornerCheckCompleted) return;
+    if (areAllDeviceChecksReady()) {
+      startDisplayCornerCheck(
+        displayCheckMode,
+        "设备检查已完成。请按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。"
+      );
+    }
+  };
+
+  if (areAllDeviceChecksReady()) {
+    startDisplayCornerCheck(mode, "设备检查已完成。请按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。");
+  }
+}
+
 function renderDisplayCornerCheck(): void {
   const mode = displayCheckMode;
   if (!mode) return;
@@ -387,12 +482,16 @@ function renderDisplayCornerCheck(): void {
         <div class="display-corner-check-status" id="displayCornerCheckStatus">
           ${renderCornerCheckStatusItems()}
         </div>
-        <p class="hint">如需调整浏览器缩放，请按住 Ctrl（Mac 为 ⌘）并滚动鼠标滚轮；调整后请重新从左上角开始。普通滚轮不能使用。</p>
+        <p class="hint">如需调整浏览器缩放，请按 Ctrl（Mac 为 ⌘）+ 减号，或按住 Ctrl（⌘）滚动鼠标滚轮/触摸板；调整完成后请重新从左上角开始。</p>
       </div>
     </section>
   `;
   els.desktopGate.style.display = "grid";
   desktopGateVisible = true;
+
+  // 记录当前视口签名，避免因 overflow 变化（滚动条显隐）
+  // 导致的 resize 事件误触发 invalidateDisplayCheckForEnvironmentChange。
+  lastViewportSignature = getViewportSignature();
 
   const surface = els.desktopGate.querySelector<HTMLElement>("#displayCornerCheck");
   const line = els.desktopGate.querySelector<SVGPolylineElement>("#displayCornerCheckLine polyline");
@@ -430,56 +529,62 @@ function renderDisplayCornerCheck(): void {
     displayCheckNotice = notice;
     renderDisplayCornerCheck();
   };
-  let cornerCheckCompleted = false;
+
   resumeDeviceCornerCheck = () => {
+    if (!displayCheckMode) return;
+
+    // We are currently in the device-check phase; wait until all device checks
+    // pass, then automatically switch to the corner check for the same mode.
+    if (!cornerCheckCompleted) {
+      if (areAllDeviceChecksReady()) {
+        startDisplayCornerCheck(displayCheckMode, "设备检查已完成。请按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。");
+      }
+      return;
+    }
+
     const pointerReady = hasDesktopPointer();
     const hoverReady = hasDesktopHover();
     const keyboardReady = desktopInputProof.keyboard;
-    const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
-    if (!cornerCheckCompleted || !pointerReady || !hoverReady || !keyboardReady || !mouseReady) {
+    if (!pointerReady || !hoverReady || !keyboardReady) {
+      // If the corner check is already done but some device check is still
+      // pending, reset corner state so the participant can complete it again
+      // after satisfying all device checks.  Without the reset, the
+      // re-rendered corner check would never fire completion because
+      // cornerCheckCompleted stays true and completeCornerCheck returns early.
+      displayCheckNotice = "连线已完成，请继续完成设备检查：按一次键盘按键。";
+      cornerCheckCompleted = false;
+      renderDisplayCornerCheck();
       return;
     }
 
     displayCheckCertified = true;
     displayCheckMode = null;
+    lastDeviceCheckPassedMs = performance.now();
     els.desktopGate.classList.remove("display-corner-check-active");
     els.desktopGate.style.display = "none";
     desktopGateVisible = false;
-    lastViewportSignature = getViewportSignature();
 
-    if (mode === "enter_comprehension") {
+    const finishedMode = mode;
+    if (finishedMode === "initial") {
       desktopGateReady = true;
-      showComprehensionTest();
+      lastViewportSignature = getViewportSignature();
+      showInstructions();
       return;
     }
-    if (mode === "enter_practice") {
-      enterPracticeMode();
-      closeModal();
+    if (finishedMode === "recheck") {
+      desktopGateReady = true;
+      lastViewportSignature = getViewportSignature();
+      resumeAfterAttentionRecheck();
       return;
     }
-    if (mode === "enter_formal") {
-      enterFormalMode();
-      closeModal();
-      return;
-    }
-    if (mode === "restart") {
-      restartCurrentTask();
-      return;
-    }
-    if (mode === "before_start") {
+    if (finishedMode === "before_start") {
+      desktopGateReady = true;
+      lastViewportSignature = getViewportSignature();
       updateHud();
     }
   };
   const completeCornerCheck = (): void => {
-    const pointerReady = hasDesktopPointer();
-    const hoverReady = hasDesktopHover();
-    const keyboardReady = desktopInputProof.keyboard;
-    const mouseReady = desktopInputProof.mouseMove && desktopInputProof.mouseClick;
-    if (!pointerReady || !hoverReady || !keyboardReady || !mouseReady) {
-      displayCheckNotice = "连线已完成，请继续完成全部设备检查：按一次键盘按键，并移动、点击鼠标。";
-      renderDisplayCornerCheck();
-      return;
-    }
+    if (cornerCheckCompleted) return;
     cornerCheckCompleted = true;
     resumeDeviceCornerCheck?.();
   };
@@ -543,8 +648,8 @@ function renderDisplayCornerCheck(): void {
 }
 
 function invalidateDisplayCheckForEnvironmentChange(notice: string): boolean {
-  displayCheckCertified = false;
   if (!displayCheckMode) return false;
+  displayCheckCertified = false;
   displayCheckNotice = notice;
   renderDisplayCornerCheck();
   return true;
@@ -552,7 +657,9 @@ function invalidateDisplayCheckForEnvironmentChange(notice: string): boolean {
 
 function renderDesktopPreflightGate(): void {
   if (displayCheckMode) {
-    renderDisplayCornerCheck();
+    // 设备/角落检查已在进行中，由检查渲染函数自行管理 UI。
+    // resize/visibilitychange 处理器会单独调用 invalidateDisplayCheckForEnvironmentChange
+    // 在需要时重新渲染角落检查，因此此处无需重复调用 renderDisplayCornerCheck。
     return;
   }
   if (desktopGateIntroductionAcknowledged) {
@@ -568,9 +675,15 @@ function renderDesktopPreflightGate(): void {
 
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card desktop-entry-card">
+      <div class="desktop-entry-zoom-hints">
+        <p>若显示不全</p>
+        <p>按 <strong>Ctrl + 减号</strong>（⌘ + 减号）。</p>
+      </div>
       <h1>欢迎参加学术调查</h1>
-      <p>感谢您参与本次学术研究。初始酬金为 <strong>100 元人民币</strong>，最终酬金取决于任务中的决策，介乎 <strong>0 元–92 元人民币</strong>。</p>
-      <p>任务包括练习与正式任务，预计 <strong>15–20 分钟</strong>。参与完全自愿，可随时退出；退出无法获得酬金。作答匿名，数据仅用于学术研究。</p>
+      <p>感谢您参与本次学术研究。我们是中山大学学术研究团队。本研究的初始酬金为 <strong>100 元人民币</strong>，但实际酬金将完全取决于您在任务中的决策，介乎 <strong>0 元–84 元人民币</strong>。</p>
+      <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。完成整个调查需 <strong>15-20 分钟</strong>。</p>
+      <p>本次参与完全自愿，您可以随时退出，但退出无法获得酬金。作答完全匿名，数据仅用于学术研究，请放心作答。</p>
+      <p>为了确保您能顺利开展实验，请先完成设备与环境检测。</p>
       <p class="hint">请使用台式机或笔记本电脑。开始后请保持页面可见，不要缩放或离开网页。</p>
       <div class="desktop-preflight-actions">
         <button class="btn primary" id="btnDesktopGateCheck">阅读任务指导</button>
@@ -589,7 +702,7 @@ function renderDesktopPreflightGate(): void {
         engine.resume(performance.now());
         pausedByDesktopGate = false;
       }
-      showInstructions();
+      startDisplayDeviceCheck("initial");
     });
 }
 
@@ -608,24 +721,64 @@ function isTaskInProgress(): boolean {
   return engine.state.phase !== "idle" && engine.state.phase !== "finished";
 }
 
+function captureAttentionResumeTarget(): AttentionResumeTarget {
+  if (isTaskInProgress()) {
+    return { kind: "task_restart" };
+  }
+  if (currentModalScreen) {
+    return { kind: "modal", screen: currentModalScreen };
+  }
+  return { kind: "task_idle" };
+}
+
+function resumeAfterAttentionRecheck(): void {
+  const target = attentionResumeTarget ?? { kind: "task_idle" };
+  attentionResumeTarget = null;
+
+  if (target.kind === "task_restart") {
+    restartCurrentTask();
+    return;
+  }
+
+  if (target.kind === "modal") {
+    if (target.screen === "instructions") {
+      showInstructions();
+    } else if (target.screen === "comprehension") {
+      showComprehensionTest();
+    } else if (target.screen === "intervention") {
+      showIntervention();
+    } else if (target.screen === "manipulation_check") {
+      showManipulationCheckScreen();
+    } else {
+      showPracticeReady();
+    }
+    return;
+  }
+
+  updateHud();
+}
+
 function isTaskMonitoringArmed(): boolean {
   return (
     desktopGateReady &&
     displayCheckCertified &&
+    !displayCheckMode &&
     !desktopGateVisible &&
+    !attentionWarningVisible &&
     engine.state.phase !== "finished"
   );
 }
 
 function isExperimentRegionFullyVisible(): boolean {
   const targets = [els.stage, els.canvas, els.btnAction];
-  const viewport = window.visualViewport;
-  const left = viewport?.offsetLeft ?? 0;
-  const top = viewport?.offsetTop ?? 0;
-  const right = left + (viewport?.width ?? window.innerWidth);
-  const bottom = top + (viewport?.height ?? window.innerHeight);
-  // A one-CSS-pixel tolerance avoids false alarms from fractional layout pixels.
-  const tolerance = 1;
+  // 使用 window.innerWidth/Height 而非 visualViewport，以保证在不同浏览器
+  // （尤其是 visualViewport API 行为不一致的桌面浏览器）上的兼容性。
+  const left = 0;
+  const top = 0;
+  const right = window.innerWidth;
+  const bottom = window.innerHeight;
+  // 增加容差以适配不同操作系统/DPI 缩放下的亚像素渲染差异。
+  const tolerance = 5;
 
   // The decision task must never require horizontal scrolling. This also
   // catches a canvas whose drawing area overflows while its parent still fits.
@@ -658,7 +811,7 @@ function logAttentionEvent(event: "attention_lost" | "attention_restored", issue
     phase: engine.state.phase,
     lightIndex: engine.state.lightIndex,
     lightColor: engine.getCurrentLightColor(),
-    money: engine.state.money,
+    money: engine.getRecordedMoney(),
     note: issue
   });
 }
@@ -679,11 +832,16 @@ function attentionIssueMessage(issue: AttentionIssue): string {
 function renderAttentionWarning(): void {
   if (!currentAttentionIssue) return;
 
+  const target = attentionResumeTarget ?? captureAttentionResumeTarget();
+  const recoveryMessage = target.kind === "task_restart"
+    ? "本轮任务将作废。请重新完成实验显示区域检查；检查通过后将从当前页面起始状态重新开始。"
+    : "请重新完成实验显示区域检查；检查通过后将回到刚刚的页面继续。";
+
   els.attentionWarning.innerHTML = `
     <section class="attention-warning-card" aria-labelledby="attentionWarningTitle">
       <h1 id="attentionWarningTitle">实验已暂停</h1>
       <p>${attentionIssueMessage(currentAttentionIssue)}</p>
-      <p>本轮任务将作废。请重新完成实验显示区域检查；检查通过后将从本轮起点重新开始。</p>
+      <p>${recoveryMessage}</p>
       <div class="attention-warning-actions">
         <button class="btn primary" id="btnResumeAfterAttentionWarning">重新检查显示区域</button>
       </div>
@@ -699,7 +857,8 @@ function renderAttentionWarning(): void {
       attentionWarningVisible = false;
       currentAttentionIssue = null;
       els.attentionWarning.style.display = "none";
-      startDisplayCornerCheck("restart");
+      attentionResumeTarget = attentionResumeTarget ?? target;
+      startDisplayDeviceCheck("recheck");
     });
 }
 
@@ -707,7 +866,13 @@ function pauseForAttentionIssue(issue: AttentionIssue, force = false): void {
   if ((!force && !isTaskMonitoringArmed()) || attentionWarningVisible) return;
 
   const nowMs = performance.now();
+
+  // 设备检测刚通过不久（冷却期内），忽略非强制触发，防止检测-通过-暂停-重启循环。
+  if (!force && lastDeviceCheckPassedMs > 0 && nowMs - lastDeviceCheckPassedMs < DEVICE_CHECK_COOLDOWN_MS) return;
+
+  attentionResumeTarget = captureAttentionResumeTarget();
   if (isTaskInProgress()) engine.pause(nowMs);
+  displayCheckCertified = false;
 
   attentionWarningVisible = true;
   currentAttentionIssue = issue;
@@ -775,6 +940,7 @@ function openModal(html: string): void {
 
 function closeModal(): void {
   els.modal.style.display = "none";
+  currentModalScreen = null;
 }
 
 function escapeHtmlAttr(value: string): string {
@@ -791,27 +957,42 @@ function buildFormalSubmission(): SessionSubmission {
     submittedAtIso: new Date().toISOString(),
     summary: {
       elapsedSec: engine.state.elapsedSec,
-      money: engine.state.money,
+      money: engine.getRecordedMoney(),
       violations: engine.state.violations
     },
-    device: collectDeviceInfo()
+    device: collectDeviceInfo(),
+    interventionMs: Math.round(interventionDurationMs)
   });
 }
 
+function continueSurveyAfterCompletion(): void {
+  if (!formalSubmission) {
+    formalSubmission = buildFormalSubmission();
+  }
+  window.dispatchEvent(new CustomEvent(CONTINUE_SURVEY_EVENT, { detail: formalSubmission }));
+}
+
 function showInstructions(): void {
+  currentModalScreen = "instructions";
   openModal(`
-    <h1>任务指导</h1>
-    <h2>操作说明</h2>
+    <h1>指导语</h1>
     <p>在本次任务中，您将控制一个<strong>圆点</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
     <ul>
       <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，圆点会靠近一个红绿信号灯并停下等待。</li>
-      <li>按钮会变为<strong>【移动】</strong>。再次点击即可让圆点继续移动并通过红绿灯。</li>
-      <li>您可以在任意时刻点击【移动】按钮。</li>
+      <li>此时按钮会由<strong>【开始】</strong>变为<strong>【移动】</strong>。要让圆点再次移动并通过红绿灯，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
     </ul>
+    <h2>示例短片</h2>
+    <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
+    <div class="instruction-video">
+      <video controls preload="metadata" playsinline poster="./demo-poster.svg">
+        <source src="./demo.mp4" type="video/mp4" />
+        当前浏览器无法直接播放示例短片。
+      </video>
+    </div>
     <h2>任务规则</h2>
-    <p>任务规则：在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
-    <p>点击<strong>【开始】</strong>后开始计时。从起点到红绿灯、以及从红绿灯到终点线，各需 <strong>${engine.config.segmentDurationSec} 秒</strong>。</p>
-    <h2>酬金</h2>
+    <p>在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
+    <h2>酬金计算</h2>
+    <p>任务酬金取决于您将圆点移至终点线所花费的时间。注意：计时从点击<strong>【开始】</strong>按钮起计时。其中，从起点到红绿灯处，耗时 <strong>${engine.config.segmentDurationSec} 秒</strong>，从红绿灯处抵达终点线，耗时 <strong>${engine.config.segmentDurationSec} 秒</strong>。</p>
     <p>初始报酬为 <strong>100 元人民币整</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${engine.config.moneyLossPerSec}</strong>；红灯等待 <strong>${engine.config.redWaitSec} 秒</strong>后变为绿灯。</p>
     <div class="actions">
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
@@ -824,6 +1005,7 @@ function showInstructions(): void {
 }
 
 function showComprehensionTest(): void {
+  currentModalScreen = "comprehension";
   openModal(`
     <h1>理解测试</h1>
     <p>请回答以下问题，以确认您已理解任务规则。两题均需回答正确才能继续。</p>
@@ -863,9 +1045,14 @@ function showComprehensionTest(): void {
     </div>
     <div class="hint" id="compHint"></div>
     <div class="actions">
+      <button class="btn" id="btnBackToInstructions">上一步</button>
       <button class="btn primary" id="btnBeginExperiment">我已作答，下一步</button>
     </div>
   `);
+
+  document.querySelector<HTMLButtonElement>("#btnBackToInstructions")?.addEventListener("click", () => {
+    showInstructions();
+  });
 
   document.querySelector<HTMLButtonElement>("#btnBeginExperiment")?.addEventListener("click", () => {
     const nowMs = performance.now();
@@ -877,10 +1064,12 @@ function showComprehensionTest(): void {
       return;
     }
     if (choice1 !== "less" || choice2 !== "wait") {
-      if (hint) hint.textContent = "回答不正确，请重新选择答案。";
+      if (hint) hint.textContent = "回答错误，请重新阅读指导语后再继续。";
       return;
     }
 
+    const comprehensionNote = `q1=${choice1};q2=${choice2}`;
+    lastComprehensionEvent = { nowMs, note: comprehensionNote };
     logger.log({
       nowMs,
       tSec: 0,
@@ -889,7 +1078,7 @@ function showComprehensionTest(): void {
       lightIndex: null,
       lightColor: null,
       money: engine.state.money,
-      note: `q1=${choice1};q2=${choice2}`
+      note: comprehensionNote
     });
 
     showPracticeReady();
@@ -897,13 +1086,12 @@ function showComprehensionTest(): void {
 }
 
 function showPracticeReady(): void {
+  currentModalScreen = "practice_ready";
   if (!practiceCompletedOnce) {
     // 第一次：只显示进入练习按钮
     openModal(`
-      <h1>准备开始练习</h1>
+      <h1>任务准备</h1>
       <p>回答正确！请点击下方按钮进入练习界面。</p>
-      <p>进入练习界面后，底部按钮会先显示为<strong>【开始】</strong>；点击<strong>【开始】</strong>后，练习开始计时，圆点开始移动，按钮会切换为<strong>【移动】</strong>。</p>
-      <p class="hint">规则提醒：你可以在任意时刻点击<strong>【移动】</strong>，但实验规则要求你在红绿灯处等待，直到红灯变为绿色后再通行。</p>
       <div class="actions">
         <button class="btn" id="btnBackToCompTest">上一步</button>
         <button class="btn primary" id="btnEnterPractice">进入练习</button>
@@ -915,17 +1103,18 @@ function showPracticeReady(): void {
     });
 
     document.querySelector<HTMLButtonElement>("#btnEnterPractice")?.addEventListener("click", () => {
-      startDisplayCornerCheck("enter_practice");
+      enterPracticeMode();
+      closeModal();
     });
   } else {
     // 练习完成后：显示返回导语、继续练习、进入正式决策任务
     openModal(`
-      <h1>准备开始正式实验</h1>
-      <p>您已完成练习轮次。您可以选择返回导语重新阅读说明、继续练习，或进入正式决策任务。</p>
+      <h1>任务准备</h1>
+      <p>您已完成练习轮次。您可以选择返回导语重新阅读说明、继续练习，或进入决策任务。</p>
       <div class="actions">
         <button class="btn" id="btnBackToInstructions">返回导语</button>
         <button class="btn" id="btnContinuePractice">继续练习</button>
-        <button class="btn primary" id="btnEnterFormal">进入正式决策任务</button>
+        <button class="btn primary" id="btnEnterFormal">进入决策任务</button>
       </div>
     `);
 
@@ -939,9 +1128,78 @@ function showPracticeReady(): void {
     });
 
     document.querySelector<HTMLButtonElement>("#btnEnterFormal")?.addEventListener("click", () => {
-      startDisplayCornerCheck("enter_formal");
+      enterFormalMode();
+      closeModal();
     });
   }
+}
+
+function clearInterventionTimer(): void {
+  if (interventionTimer !== null) {
+    window.clearInterval(interventionTimer);
+    interventionTimer = null;
+  }
+}
+
+// 文本干预页：练习结束后、正式任务前展示分配到的一篇材料（15 选 1）。
+// 批注要求：强制最低阅读时间；本页不设返回（返回入口在随后的任务准备页）。
+function showIntervention(): void {
+  currentModalScreen = "intervention";
+  interventionStartedAtMs = performance.now();
+  openModal(`
+    <h1>干预材料</h1>
+    <p>${treatmentMaterial.prompt}</p>
+    <div class="intervention-material">
+      ${treatmentMaterial.paragraphs.map((paragraph) => `<p>${paragraph}</p>`).join("")}
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btnFinishIntervention" disabled></button>
+    </div>
+  `);
+
+  const btn = document.querySelector<HTMLButtonElement>("#btnFinishIntervention");
+  const refreshButton = (): void => {
+    if (!btn) return;
+    const remainingSec = Math.ceil(
+      INTERVENTION_MIN_READ_SEC - (performance.now() - interventionStartedAtMs) / 1000
+    );
+    if (remainingSec > 0) {
+      btn.disabled = true;
+      btn.textContent = `请认真阅读（${remainingSec} 秒后可继续）`;
+    } else {
+      btn.disabled = false;
+      btn.textContent = "我已完成阅读，下一步";
+    }
+  };
+  clearInterventionTimer();
+  refreshButton();
+  interventionTimer = window.setInterval(refreshButton, 250);
+
+  btn?.addEventListener("click", () => {
+    interventionDurationMs += Math.max(0, performance.now() - interventionStartedAtMs);
+    interventionShown = true;
+    clearInterventionTimer();
+    showPracticeReady();
+  });
+}
+
+// 操纵检验跳转页：正式数据保存完成后展示。批注要求：本页不允许返回，
+// 只保留前往见数问卷的入口；操纵检验题目在见数问卷中呈现。
+function showManipulationCheckScreen(): void {
+  currentModalScreen = "manipulation_check";
+  const action = surveyUrl
+    ? `<a class="btn primary" href="${escapeHtmlAttr(surveyUrl)}">继续答题</a>`
+    : `<button class="btn primary" id="btnGotoSurvey">继续答题</button>`;
+  openModal(`
+    <h1>操纵检验</h1>
+    <p>点击下方按钮后继续完成见数问卷。</p>
+    <div class="actions">
+      ${action}
+    </div>
+  `);
+  document
+    .querySelector<HTMLButtonElement>("#btnGotoSurvey")
+    ?.addEventListener("click", continueSurveyAfterCompletion);
 }
 
 function enterPracticeMode(): void {
@@ -1009,20 +1267,17 @@ async function submitFormalResultsSilently(): Promise<SubmitOutcome> {
 
 function showCompletionScreen(state: CompletionScreenState): void {
   const elapsed = engine.state.elapsedSec;
-  const waitSec = Math.max(0, elapsed - engine.config.segmentDurationSec * 2);
+  const baseTravelSec = engine.config.segmentDurationSec * 2;
+  const waitSec = Math.floor(Math.max(0, elapsed - baseTravelSec));
   const taskMoney = engine.state.money;
-  const fixedFee = 0; // fixed participation fee; set to 0 if not applicable
-  const totalMoney = fixedFee + taskMoney;
   const surveyAction =
     state === "saving"
       ? ""
-      : surveyUrl
-        ? `
+      : `
           <div class="completion-actions">
-            <a class="btn primary" href="${escapeHtmlAttr(surveyUrl)}">跳转见数</a>
+            <button class="btn primary" id="btnToManipulationCheck">继续答题</button>
           </div>
-        `
-        : "";
+        `;
 
   const statusBlock =
     state === "saving"
@@ -1032,18 +1287,21 @@ function showCompletionScreen(state: CompletionScreenState): void {
         : `<div class="completion-status queued">网络暂时不稳定，数据已保存并会继续尝试提交。</div>`;
 
   openModal(`
-    <h1>决策任务完成</h1>
+    <h1>任务完成</h1>
     <div class="completion-card-body">
-      <h2>感谢您的参与</h2>
-      <p>您获得的固定参与费用为 <strong>${formatMoney(fixedFee)}</strong>；</p>
-      <p>在决策任务中，初始酬金 <strong>${formatMoney(engine.config.startMoney)}</strong>，您在红绿灯处等待了 <strong>${formatSeconds(waitSec, 1)}</strong>，按照任务规则，每等待 1 秒扣除酬金 <strong>${formatMoney(engine.config.moneyLossPerSec)}</strong>。</p>
-      <p>因此，您总计获得酬金 <strong>${formatMoney(totalMoney)}</strong>。</p>
-      <p>感谢您参与我们的研究。</p>
       ${statusBlock}
-      <p class="completion-close-note">后续填写完简短问卷后，您将在见数平台领取自己的收益。</p>
+      <p>在决策任务中，初始酬金 <strong>${formatMoney(engine.config.startMoney)}</strong>，您从起点到终点耗时 <strong>${baseTravelSec} 秒</strong>，在红绿灯处等待了 <strong>${waitSec} 秒</strong>，按照任务规则，每等待 1 秒扣除酬金 <strong>${formatMoney(engine.config.moneyLossPerSec)}</strong>。因此，您在该部分总计获得酬金 <strong>${formatMoney(taskMoney)}</strong>；</p>
+      <p class="completion-close-note">后续填写完成简短问卷后，除固定参与费用外，您将在见数平台通过额外奖励渠道领取此部分收益。</p>
+      <p>感谢您的参与。</p>
       ${surveyAction}
     </div>
   `);
+
+  if (state !== "saving") {
+    document
+      .querySelector<HTMLButtonElement>("#btnToManipulationCheck")
+      ?.addEventListener("click", showManipulationCheckScreen);
+  }
 }
 
 function showTaskSubmitScreen(): void {
@@ -1058,7 +1316,13 @@ function showTaskSubmitScreen(): void {
   document.querySelector<HTMLButtonElement>("#btnTaskSubmit")?.addEventListener("click", () => {
     if (isPracticeMode) {
       practiceCompletedOnce = true;
-      showPracticeReady();
+      // 9.10 需求顺序：练习任务 → 文本干预 → 正式任务。首次完成练习后先进入
+      // 干预材料页；再次练习（任务准备页点“继续练习”）后直接进入任务准备。
+      if (!interventionShown) {
+        showIntervention();
+      } else {
+        showPracticeReady();
+      }
     } else {
       showCompletionScreen("saving");
       void submitFormalResultsSilently().then((outcome) => {
@@ -1069,12 +1333,17 @@ function showTaskSubmitScreen(): void {
 }
 
 els.btnAction.addEventListener("click", () => {
-  if (!world || engine.state.phase === "finished" || attentionWarningVisible || displayCheckMode) return;
+  if (
+    !world ||
+    engine.state.phase === "finished" ||
+    attentionWarningVisible ||
+    displayCheckMode
+  ) return;
 
   const nowMs = performance.now();
   if (engine.state.phase === "idle") {
-    if (!displayCheckCertified || !isExperimentRegionFullyVisible()) {
-      startDisplayCornerCheck("before_start");
+    if (!displayCheckCertified) {
+      startDisplayDeviceCheck("before_start");
       return;
     }
     closeModal();
@@ -1099,11 +1368,27 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
+// 持久化键盘检测监听器 — 在设备检查/角落检查阶段全程生效。
+// 采用单一持久化监听器而非动态添加/移除，从根源上消除监听器生命周期
+// 管理带来的竞态问题（如：按住按键时通过检测，松开后状态异常回退）。
+window.addEventListener("keydown", (e) => {
+  if (desktopInputProof.keyboard) return;                         // 已检测到键盘
+  if (e.metaKey || e.ctrlKey || e.altKey) return;                // 修饰键忽略
+  if (["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab"].includes(e.key)) return; // 特殊键忽略
+  if (!displayCheckMode) return;                                  // 非设备检查阶段
+
+  e.preventDefault();                                              // 阻止 Space/Enter 在 keyup 时触发聚焦按钮的 click
+  desktopInputProof.keyboard = true;
+  updateCornerCheckStatus();
+  resumeDeviceCornerCheck?.();
+});
+
 let lastPhase: typeof engine.state.phase = engine.state.phase;
 let finishGate = false;
 
 const hudCache = {
   btnActionDisabled: null as boolean | null,
+  btnActionSelected: null as boolean | null,
   btnActionText: "",
   posText: "",
   timeText: "",
@@ -1154,35 +1439,9 @@ window.addEventListener("resize", () => {
   scheduleExperimentVisibilityCheck();
 });
 
-window.addEventListener("keydown", (e) => {
-  if (
-    !desktopInputProof.keyboard &&
-    !e.metaKey &&
-    !e.ctrlKey &&
-    !e.altKey &&
-    !["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab"].includes(e.key)
-  ) {
-    desktopInputProof.keyboard = true;
-    updateCornerCheckStatus();
-    resumeDeviceCornerCheck?.();
-  }
-});
-
-window.addEventListener("mousemove", () => {
-  if (!desktopInputProof.mouseMove) {
-    desktopInputProof.mouseMove = true;
-    updateCornerCheckStatus();
-    resumeDeviceCornerCheck?.();
-  }
-});
-
-window.addEventListener("mousedown", () => {
-  if (!desktopInputProof.mouseClick) {
-    desktopInputProof.mouseClick = true;
-    updateCornerCheckStatus();
-    resumeDeviceCornerCheck?.();
-  }
-});
+function resetDesktopInputProof(): void {
+  desktopInputProof.keyboard = false;
+}
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
@@ -1204,10 +1463,16 @@ window.addEventListener("blur", () => {
 function updateHud(): void {
   const s = engine.state;
   const nextActionDisabled = s.phase === "finished";
+  const nextActionSelected = s.phase === "moving_to_finish";
   const nextActionText = s.phase === "idle" ? "开始" : "移动";
   if (hudCache.btnActionDisabled !== nextActionDisabled) {
     els.btnAction.disabled = nextActionDisabled;
     hudCache.btnActionDisabled = nextActionDisabled;
+  }
+  if (hudCache.btnActionSelected !== nextActionSelected) {
+    els.btnAction.classList.toggle("action-selected", nextActionSelected);
+    els.btnAction.setAttribute("aria-pressed", nextActionSelected ? "true" : "false");
+    hudCache.btnActionSelected = nextActionSelected;
   }
   if (hudCache.btnActionText !== nextActionText) {
     els.btnAction.textContent = nextActionText;
@@ -1217,7 +1482,7 @@ function updateHud(): void {
   els.btnAction.classList.toggle("action-move", s.phase !== "idle" && s.phase !== "finished");
 
   let posText = "—";
-  let timeText = formatSeconds(0, 1);
+  let timeText = formatSeconds(0, 0);
   let moneyText = formatMoney(engine.config.startMoney);
   let lightText = "—";
   let moneyUrgent = false;
@@ -1234,7 +1499,7 @@ function updateHud(): void {
     } else if (s.phase === "moving_to_finish") {
       posText = "冲向终点线";
     }
-    timeText = formatSeconds(s.elapsedSec, 1);
+    timeText = formatSeconds(s.elapsedSec, 0);
     moneyText = formatMoney(s.money);
     const pulseRate = 2.4;
     moneyUrgent = s.phase !== "finished" && Math.floor(s.elapsedSec * pulseRate) % 2 === 0;
