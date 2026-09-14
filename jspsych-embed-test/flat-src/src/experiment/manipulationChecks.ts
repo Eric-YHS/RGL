@@ -69,3 +69,32 @@ export function getManipulationQuestions(id: string): ManipulationQuestion[] {
     }
   ];
 }
+
+const questionCache = new Map<string, ManipulationQuestion[]>();
+
+// 保存实际选项文本的排列，不依赖随机算法在不同版本中的实现细节。
+export function getPersistentManipulationQuestions(id: string, participantId: string): ManipulationQuestion[] {
+  const identity = participantId ? `pid:${encodeURIComponent(participantId)}` : "anonymous";
+  const key = `honglvdeng_manipulation_order_v1:${identity}:${id}`;
+  const cached = questionCache.get(key);
+  if (cached) return cached.map(q => ({ ...q, options: [...q.options] }));
+  const questions = getManipulationQuestions(id);
+  try {
+    const raw = window.localStorage.getItem(key);
+    let saved: unknown = null;
+    try { saved = raw ? JSON.parse(raw) : null; } catch { /* Replace corrupt storage below. */ }
+    if (Array.isArray(saved) && saved.length === questions.length && saved.every((options, i) =>
+      Array.isArray(options) && options.length === questions[i].options.length &&
+      new Set(options).size === options.length &&
+      options.every(option => typeof option === "string" && questions[i].options.includes(option))
+    )) {
+      questions.forEach((q, i) => { q.options = [...saved[i]]; });
+    } else {
+      window.localStorage.setItem(key, JSON.stringify(questions.map(q => q.options)));
+    }
+  } catch {
+    // 禁用存储时至少保持本次打开页面内的顺序一致。
+  }
+  questionCache.set(key, questions);
+  return questions.map(q => ({ ...q, options: [...q.options] }));
+}

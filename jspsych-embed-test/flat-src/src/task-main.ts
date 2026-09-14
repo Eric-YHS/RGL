@@ -7,11 +7,11 @@ import { ExperimentLogger } from "./experiment/logger";
 import { formatMoney, formatSeconds } from "./experiment/utils";
 import { findTreatment, resolveTreatmentId } from "./experiment/treatments";
 import { World2D } from "./scene/world2d";
-import { getManipulationQuestions } from "./experiment/manipulationChecks";
+import { getPersistentManipulationQuestions } from "./experiment/manipulationChecks";
 
 type SubmitOutcome = "sent" | "queued";
 const params = new URLSearchParams(window.location.search);
-const participantId = (params.get("pid") ?? "").trim();
+const participantId = (params.get("pid") ?? params.get("participant_id") ?? "").trim();
 const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 const surveyUrl = (import.meta.env.VITE_SURVEY_URL ?? "").trim();
 const PENDING_SUBMISSIONS_KEY = "honglvdeng_pending_submissions_v1";
@@ -59,10 +59,11 @@ function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig
 const formalConfig: ExperimentConfig = makeConfig("full", 1);
 const practiceConfig: ExperimentConfig = makeConfig("full", 1);
 
-// 干预材料分配：URL treatment 参数（见数随机化后与操纵检验联动）> pid 哈希 >
-// 本地持久化随机；同一被试退出再进仍进入同一处理组（需求批注第 1 条）。
+// 优先沿用被试在本浏览器的首次分配，重新进入不受新 treatment 参数影响。
 const treatmentId = resolveTreatmentId(window.location.search, participantId);
 const treatmentMaterial = findTreatment(treatmentId)!;
+// 首次打开即保存题目排列，避免退出后或重复进入检验页重新洗牌。
+const manipulationQuestions = getPersistentManipulationQuestions(treatmentId, participantId);
 // 批注第 2 条：强制最低阅读时间，确保 treatment 生效。
 const INTERVENTION_MIN_READ_SEC = 15;
 let interventionShown = false;
@@ -596,7 +597,7 @@ function showIntervention(): void {
 // 操纵检验跳转页：正式数据保存完成后展示。批注要求：本页不允许返回，
 // 只保留前往见数问卷的入口；操纵检验题目在见数问卷中呈现。
 function showManipulationCheckScreen(): void {
-  const questions = getManipulationQuestions(treatmentId);
+  const questions = manipulationQuestions;
   openModal(`
     <h1>操纵检验</h1>
     <p>请根据您刚才阅读的材料作答。每道题请选择一个答案。</p>

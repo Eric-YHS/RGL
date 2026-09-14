@@ -1,7 +1,6 @@
 // 干预材料（treatment）：3 个组别 × 5 篇，共 15 个处理单元。
 // 文本来自《treatment+红绿灯实验问卷9.10》需求文档，逐字收录。
-// 分配优先级：URL 参数 treatment（见数平台随机化后传入，与操纵检验联动）
-// > pid 哈希（同一被试退出再进仍进入同一组）> localStorage 持久化随机。
+// 首次分配后按被试保存，后续入口参数不能覆盖已分配材料。
 
 export type TreatmentGroup = "control" | "positive" | "negative";
 
@@ -202,21 +201,19 @@ function randomTreatmentId(): string {
 export function resolveTreatmentId(search: string, participantId: string): string {
   const params = new URLSearchParams(search);
   const fromParam = normalizeTreatmentId(params.get("treatment"));
-  if (fromParam) return fromParam;
-
-  // 同一被试（同一 pid）必须始终进入同一处理组，即使退出再进。
-  if (participantId) {
-    return TREATMENT_IDS[hashString(participantId) % TREATMENT_IDS.length];
-  }
-
-  // 无 pid 时退化为本地持久化随机：刷新/重进保持同一分组。
+  const key = participantId
+    ? `${TREATMENT_STORAGE_KEY}:pid:${encodeURIComponent(participantId)}`
+    : TREATMENT_STORAGE_KEY;
+  const assign = (): string => fromParam ?? (participantId
+    ? TREATMENT_IDS[hashString(participantId) % TREATMENT_IDS.length]
+    : randomTreatmentId());
   try {
-    const saved = normalizeTreatmentId(window.localStorage.getItem(TREATMENT_STORAGE_KEY));
+    const saved = normalizeTreatmentId(window.localStorage.getItem(key));
     if (saved) return saved;
-    const assigned = randomTreatmentId();
-    window.localStorage.setItem(TREATMENT_STORAGE_KEY, assigned);
+    const assigned = assign();
+    window.localStorage.setItem(key, assigned);
     return assigned;
   } catch {
-    return randomTreatmentId();
+    return assign();
   }
 }
