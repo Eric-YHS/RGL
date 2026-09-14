@@ -194,18 +194,6 @@ canvas.webgl {
   color: #111111;
 }
 
-.center-controls .btn.action-selected {
-  background: var(--button);
-  border-color: var(--button-border);
-  color: var(--text);
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-
-.center-controls .btn.action-selected:active {
-  transform: none;
-}
-
 .btn:disabled {
   opacity: 0.48;
   cursor: not-allowed;
