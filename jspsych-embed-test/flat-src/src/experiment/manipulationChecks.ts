@@ -1,24 +1,71 @@
-export type ManipulationQuestion = { id: string; prompt: string; options: string[]; answer: string };
-
-const sets: Record<string, ManipulationQuestion[]> = {
-  C1: [{id:"main",prompt:"根据您刚才阅读的材料，下列哪项最准确地描述了材料的主旨？",options:["地球大气分层结构与物理稳定性","疫情期间孕产妇的就医过程","资源节约集约与绿色低碳全民活动"],answer:"地球大气分层结构与物理稳定性"},{id:"key",prompt:"根据您刚才阅读的材料，下列哪项是材料中提到的关键信息？",options:["臭氧吸收紫外线","救治绿色通道","单位GDP用水量下降"],answer:"臭氧吸收紫外线"}],
-  C2: [{id:"main",prompt:"根据您刚才阅读的材料，下列哪项最准确地描述了材料的主旨？",options:["板块构造理论与山脉的抬升机制","封控区儿童急危重症的救治","资源节约集约与绿色低碳全民活动"],answer:"板块构造理论与山脉的抬升机制"},{id:"key",prompt:"根据您刚才阅读的材料，下列哪项是材料中提到的关键信息？",options:["喜马拉雅山脉的形成","先救人后补程序","单位GDP用水量下降"],answer:"喜马拉雅山脉的形成"}],
-  C3: [{id:"main",prompt:"根据您刚才阅读的材料，下列哪项最准确地描述了材料的主旨？",options:["海洋环流机制与全球热量分配","急救中心的急性高危病例应对","资源节约集约与绿色低碳全民活动"],answer:"海洋环流机制与全球热量分配"},{id:"key",prompt:"根据您刚才阅读的材料，下列哪项是材料中提到的关键信息？",options:["温盐梯度调节","高危胸痛即刻出车","单位GDP用水量下降"],answer:"温盐梯度调节"}],
-  C4: [{id:"main",prompt:"根据您刚才阅读的材料，下列哪项最准确地描述了材料的主旨？",options:["光合作用中的光能捕获与能量转化","医院消杀期间的接诊状况","资源节约集约与绿色低碳全民活动"],answer:"光合作用中的光能捕获与能量转化"},{id:"key",prompt:"根据您刚才阅读的材料，下列哪项是材料中提到的关键信息？",options:["类囊体薄膜吸收光子","缓冲区应急预案","单位GDP用水量下降"],answer:"类囊体薄膜吸收光子"}],
-  C5: [{id:"main",prompt:"根据您刚才阅读的材料，下列哪项最准确地描述了材料的主旨？",options:["天体引力作用与潮汐周期的形成","疫情期间涉疫人员的车辆转运任务","资源节约集约与绿色低碳全民活动"],answer:"天体引力作用与潮汐周期的形成"},{id:"key",prompt:"根据您刚才阅读的材料，下列哪项是材料中提到的关键信息？",options:["引力平方反比定律","双司机轮换保障","单位GDP用水量下降"],answer:"引力平方反比定律"}]
+export type ManipulationQuestion = {
+  id: string;
+  prompt: string;
+  options: string[];
+  answer: string;
 };
-export function getManipulationQuestions(id:string): ManipulationQuestion[] {
-  const idx = Number(id.slice(1)) || 1;
-  const base = sets[`C${idx}`] ?? sets.C1;
-  const group = id[0];
-  const topics = ["孕产妇的就医过程","封控区儿童急危重症的救治","急救中心的急性高危病例应对","医院消杀期间的接诊状况","疫情期间涉疫人员的车辆转运任务"];
-  const positive = ["救治绿色通道","先救人后补程序","高危胸痛即刻出车","缓冲区应急预案","双司机轮换保障"];
-  const negative = ["核酸过期4小时","先审批再转运","凌晨4时25分出车","患者突发哮喘","凌晨2点40分发生事故"];
-  return base.map((q, qi) => {
-    const options = [...q.options];
-    if (qi === 0 && group !== "C") options[1] = topics[idx - 1];
-    if (qi === 1 && group === "P") options[1] = positive[idx - 1];
-    if (qi === 1 && group === "N") options[1] = negative[idx - 1];
-    return {...q, options: options.sort(()=>Math.random()-.5)};
-  });
+
+// 每套题的选项对 C/P/N 三组完全一致，只有正确答案随材料组别变化。
+const sets = [
+  {
+    topics: ["地球大气分层结构与物理稳定性", "疫情期间孕产妇的就医过程"],
+    keys: ["臭氧吸收紫外线", "救治绿色通道", "核酸过期4小时"]
+  },
+  {
+    topics: ["板块构造理论与山脉的抬升机制", "封控区儿童急危重症的救治"],
+    keys: ["喜马拉雅山脉的形成", "先救人后补程序", "先审批再转运"]
+  },
+  {
+    topics: ["海洋环流机制与全球热量分配", "急救中心的急性高危病例应对"],
+    keys: ["温盐梯度调节", "高危胸痛即刻出车", "凌晨4时25分出车"]
+  },
+  {
+    topics: ["光合作用中的光能捕获与能量转化", "医院消杀期间的接诊状况"],
+    keys: ["类囊体薄膜吸收光子", "缓冲区应急预案", "患者突发哮喘"]
+  },
+  {
+    topics: ["天体引力作用与潮汐周期的形成", "疫情期间涉疫人员的车辆转运任务"],
+    keys: ["引力平方反比定律", "双司机轮换保障", "凌晨2点40分发生事故"]
+  }
+] as const;
+
+function randomIndex(bound: number): number {
+  // 拒绝不能均分到 bound 个桶的尾部值，避免取模偏差。
+  const range = 0x100000000;
+  const limit = range - (range % bound);
+  const value = new Uint32Array(1);
+  do {
+    globalThis.crypto.getRandomValues(value);
+  } while (value[0] >= limit);
+  return value[0] % bound;
+}
+
+function shuffle<T>(values: readonly T[]): T[] {
+  const result = [...values];
+  // Fisher–Yates：每步从尚未排定的元素中等概率选一个。
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = randomIndex(i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+export function getManipulationQuestions(id: string): ManipulationQuestion[] {
+  if (!/^[CPN][1-5]$/.test(id)) throw new Error(`Invalid treatment ID: ${id}`);
+  const set = sets[Number(id[1]) - 1];
+  const groupIndex = { C: 0, P: 1, N: 2 }[id[0] as "C" | "P" | "N"];
+  return [
+    {
+      id: "main",
+      prompt: "根据您刚才阅读的材料，下列哪项最准确地描述了材料的主旨？",
+      options: shuffle([...set.topics, "资源节约集约与绿色低碳全民活动"]),
+      answer: set.topics[groupIndex === 0 ? 0 : 1]
+    },
+    {
+      id: "key",
+      prompt: "根据您刚才阅读的材料，下列哪项是材料中提到的关键信息？",
+      options: shuffle([...set.keys, "单位GDP用水量下降"]),
+      answer: set.keys[groupIndex]
+    }
+  ];
 }
