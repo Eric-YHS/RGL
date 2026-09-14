@@ -328,7 +328,7 @@ let manipulationAnswers: string | null = null;
 let isPracticeMode = false;
 let desktopGateIntroductionAcknowledged = false;
 
-type View = "welcome" | "modal" | "formal_submit" | "task" | "intervention" | "completion" | "manipulation";
+type View = "welcome" | "modal" | "practice_complete" | "formal_submit" | "task" | "intervention" | "completion" | "manipulation";
 type Frame = { view: View; nodes: Node[]; engine: ExperimentEngine; logger: ExperimentLogger; practice: boolean };
 let view: View = "welcome";
 let navigationVersion = 0;
@@ -361,6 +361,11 @@ function leaveView(): void {
   }
 }
 
+function canGoBack(): boolean {
+  return !navigationLocked && backStack.length > 0 &&
+    view !== "formal_submit" && view !== "practice_complete" && view !== "completion";
+}
+
 function navigate(next: View): void {
   if (!restoring) {
     if (view !== "manipulation") {
@@ -370,11 +375,11 @@ function navigate(next: View): void {
   }
   view = next;
   navigationVersion++;
-  backButton.hidden = navigationLocked || view === "formal_submit" || backStack.length === 0;
+  backButton.hidden = !canGoBack();
 }
 
 function goBack(): void {
-  if (navigationLocked || view === "formal_submit") return;
+  if (!canGoBack()) return;
   const frame = backStack.pop();
   if (!frame) return;
   leaveView();
@@ -395,7 +400,7 @@ function goBack(): void {
   if (view === "intervention") showIntervention();
   if (view === "completion") showCompletionScreen(completionState);
   restoring = false;
-  backButton.hidden = view === "formal_submit" || backStack.length === 0;
+  backButton.hidden = !canGoBack();
   updateHud();
 }
 backButton.addEventListener("click", goBack);
@@ -754,7 +759,7 @@ function showCompletionScreen(state: CompletionScreenState): void {
 }
 
 function showTaskSubmitScreen(): void {
-  navigate(isPracticeMode ? "modal" : "formal_submit");
+  navigate(isPracticeMode ? "practice_complete" : "formal_submit");
   openModal(`
     <h1>${isPracticeMode ? "练习完成" : "决策任务"}</h1>
     <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
