@@ -486,6 +486,16 @@ html.credamo-embedded .display-corner-check-status {
   padding-top: 0;
 }
 
+.card:has(> .practice-ready-actions) {
+  width: fit-content;
+  max-width: calc(100vw - 28px);
+}
+
+.card .practice-ready-actions {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .modal {
   position: absolute;
   inset: 0;

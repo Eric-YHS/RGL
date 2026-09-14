@@ -328,7 +328,7 @@ let isPracticeMode = false;
 let desktopGateIntroductionAcknowledged = false;
 let practiceCompletedOnce = false;
 
-type View = "welcome" | "modal" | "task" | "intervention" | "completion" | "manipulation";
+type View = "welcome" | "modal" | "practice_ready" | "task" | "intervention" | "completion" | "manipulation";
 type Frame = { view: View; nodes: Node[]; engine: ExperimentEngine; logger: ExperimentLogger; practice: boolean };
 let view: View = "welcome";
 let navigationVersion = 0;
@@ -368,7 +368,7 @@ function navigate(next: View): void {
   }
   view = next;
   navigationVersion++;
-  backButton.hidden = navigationLocked || backStack.length === 0;
+  backButton.hidden = navigationLocked || view === "practice_ready" || backStack.length === 0;
 }
 
 function goBack(): void {
@@ -393,7 +393,7 @@ function goBack(): void {
   if (view === "intervention") showIntervention();
   if (view === "completion") showCompletionScreen(completionState);
   restoring = false;
-  backButton.hidden = backStack.length === 0;
+  backButton.hidden = view === "practice_ready" || backStack.length === 0;
   updateHud();
 }
 backButton.addEventListener("click", goBack);
@@ -577,12 +577,10 @@ function showPracticeReady(): void {
     enterPracticeMode();
     closeModal();
   } else {
-    navigate("modal");
+    navigate("practice_ready");
     // 练习完成后：显示返回导语、继续练习、进入正式决策任务
     openModal(`
-      <h1>任务准备</h1>
-      <p>您已完成练习轮次。您可以选择返回导语重新阅读说明、继续练习，或进入决策任务。</p>
-      <div class="actions">
+      <div class="actions practice-ready-actions" aria-label="任务选择">
         <button class="btn" id="btnBackToInstructions">返回导语</button>
         <button class="btn" id="btnContinuePractice">继续练习</button>
         <button class="btn primary" id="btnEnterFormal">进入决策任务</button>
