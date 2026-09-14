@@ -549,10 +549,11 @@ function showComprehensionTest(): void {
       return;
     }
     if (choice1 !== "less" || choice2 !== "wait") {
-      if (hint) hint.textContent = "回答错误，请重新阅读指导语后再继续。";
+      if (hint) hint.textContent = "回答错误，请重新阅读指导语后再继续";
       return;
     }
 
+    if (hint) hint.textContent = "";
     const comprehensionNote = `q1=${choice1};q2=${choice2}`;
     lastComprehensionEvent = { nowMs, note: comprehensionNote };
     logger.log({
@@ -571,22 +572,12 @@ function showComprehensionTest(): void {
 }
 
 function showPracticeReady(): void {
-  navigate("modal");
   if (!practiceCompletedOnce) {
-    // 第一次：只显示进入练习按钮
-    openModal(`
-      <h1>任务准备</h1>
-      <p>回答正确！请点击下方按钮进入练习界面。</p>
-      <div class="actions">
-        <button class="btn primary" id="btnEnterPractice">进入练习</button>
-      </div>
-    `);
-
-    document.querySelector<HTMLButtonElement>("#btnEnterPractice")?.addEventListener("click", () => {
-      enterPracticeMode();
-      closeModal();
-    });
+    // 理解测试通过后直接进入练习，返回时仍回到原来的理解测试。
+    enterPracticeMode();
+    closeModal();
   } else {
+    navigate("modal");
     // 练习完成后：显示返回导语、继续练习、进入正式决策任务
     openModal(`
       <h1>任务准备</h1>
