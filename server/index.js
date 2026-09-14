@@ -107,6 +107,9 @@ if (!sessionColumnNames.has("treatment")) {
 if (!sessionColumnNames.has("intervention_ms")) {
   db.exec("ALTER TABLE sessions ADD COLUMN intervention_ms INTEGER NOT NULL DEFAULT 0");
 }
+if (!sessionColumnNames.has("manipulation_answers")) {
+  db.exec("ALTER TABLE sessions ADD COLUMN manipulation_answers TEXT NOT NULL DEFAULT ''");
+}
 
 const insertSessionStmt = db.prepare(`
 INSERT INTO sessions (
@@ -121,6 +124,7 @@ INSERT INTO sessions (
   post_rule_attitude_text,
   treatment,
   intervention_ms,
+  manipulation_answers,
   elapsed_sec,
   money,
   violations,
@@ -146,6 +150,7 @@ VALUES (
   @postRuleAttitudeText,
   @treatment,
   @interventionMs,
+  @manipulationAnswers,
   @elapsedSec,
   @money,
   @violations,
@@ -430,6 +435,16 @@ function parseSubmission(body) {
     max: 24 * 60 * 60 * 1000
   });
   if (!interventionMs.ok) return interventionMs;
+  const manipulationAnswers = readString(body.manipulationAnswers ?? "", { max: 4000, required: false });
+  if (!manipulationAnswers.ok) return manipulationAnswers;
+  if (manipulationAnswers.value) {
+    try {
+      const answers = JSON.parse(manipulationAnswers.value);
+      if (!Array.isArray(answers) || answers.length !== 2 || !answers.every(answer => typeof answer === "string" && answer.trim())) {
+        return fail("manipulationAnswers must contain two non-empty answers");
+      }
+    } catch { return fail("manipulationAnswers must be valid JSON"); }
+  }
 
   const postRuleAttitude = readEnum(body.postRuleAttitude ?? "", ["", "A", "B", "C", "D"]);
   if (!postRuleAttitude.ok) return postRuleAttitude;
@@ -532,6 +547,7 @@ function parseSubmission(body) {
       postRuleAttitudeText: postRuleAttitudeText.value,
       treatment: treatment.value,
       interventionMs: interventionMs.value,
+      manipulationAnswers: manipulationAnswers.value,
       summary: {
         elapsedSec: elapsedSec.value,
         money: money.value,

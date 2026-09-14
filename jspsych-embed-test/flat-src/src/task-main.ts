@@ -324,6 +324,7 @@ let engine: ExperimentEngine = new ExperimentEngine(currentConfig, logger);
 let world: World2D | null = null;
 let formalClientSessionId = createClientSessionId();
 let formalSubmission: SessionSubmission | null = null;
+let manipulationAnswers: string | null = null;
 let isPracticeMode = false;
 let desktopGateIntroductionAcknowledged = false;
 let practiceCompletedOnce = false;
@@ -363,7 +364,9 @@ function leaveView(): void {
 
 function navigate(next: View): void {
   if (!restoring) {
-    backStack.push({ view, nodes: Array.from(els.modalCard.childNodes), engine, logger, practice: isPracticeMode });
+    if (view !== "manipulation") {
+      backStack.push({ view, nodes: Array.from(els.modalCard.childNodes), engine, logger, practice: isPracticeMode });
+    }
     leaveView();
   }
   view = next;
@@ -444,7 +447,7 @@ function escapeHtmlAttr(value: string): string {
 }
 
 function buildFormalSubmission(): SessionSubmission {
-  return logger.buildSubmission({
+  const payload = logger.buildSubmission({
     clientSessionId: formalClientSessionId,
     submittedAtIso: new Date().toISOString(),
     summary: {
@@ -455,6 +458,8 @@ function buildFormalSubmission(): SessionSubmission {
     device: collectDeviceInfo(),
     interventionMs: Math.round(interventionDurationMs)
   });
+  if (manipulationAnswers) payload.manipulationAnswers = manipulationAnswers;
+  return payload;
 }
 
 function showInstructions(): void {
@@ -598,6 +603,7 @@ function showPracticeReady(): void {
 
     document.querySelector<HTMLButtonElement>("#btnEnterFormal")?.addEventListener("click", () => {
       if (!interventionShown) { showIntervention(); return; }
+      if (!manipulationAnswers) { showManipulationCheckScreen(); return; }
       enterFormalMode();
       closeModal();
     });
@@ -648,7 +654,7 @@ function showIntervention(): void {
   btn?.addEventListener("click", () => {
     interventionShown = true;
     clearInterventionTimer();
-    showPracticeReady();
+    showManipulationCheckScreen();
   });
 }
 
@@ -672,9 +678,9 @@ function showManipulationCheckScreen(): void {
     const answers = questions.map(q => document.querySelector<HTMLInputElement>(`input[name="manip-${q.id}"]:checked`)?.value);
     const hint = document.querySelector<HTMLDivElement>("#manipHint");
     if (answers.some(a => !a)) { if (hint) hint.textContent = "请回答全部题目后再继续。"; return; }
-    const payload = formalSubmission ?? buildFormalSubmission();
-    payload.manipulationAnswers = JSON.stringify(answers);
-    if (surveyUrl) window.location.assign(surveyUrl); else window.dispatchEvent(new CustomEvent(CONTINUE_SURVEY_EVENT, {detail: payload}));
+    manipulationAnswers = JSON.stringify(answers);
+    navigationLocked = false;
+    showPracticeReady();
   });
 }
 
@@ -747,7 +753,7 @@ function showCompletionScreen(state: CompletionScreenState): void {
       ? ""
       : `
           <div class="completion-actions">
-            <button class="btn primary" id="btnToManipulationCheck">继续答题</button>
+            <button class="btn primary" id="btnContinueSurvey">继续答题</button>
           </div>
         `;
 
@@ -771,8 +777,12 @@ function showCompletionScreen(state: CompletionScreenState): void {
 
   if (state !== "saving") {
     document
-      .querySelector<HTMLButtonElement>("#btnToManipulationCheck")
-      ?.addEventListener("click", showManipulationCheckScreen);
+      .querySelector<HTMLButtonElement>("#btnContinueSurvey")
+      ?.addEventListener("click", () => {
+        const payload = formalSubmission ?? buildFormalSubmission();
+        if (surveyUrl) window.location.assign(surveyUrl);
+        else window.dispatchEvent(new CustomEvent(CONTINUE_SURVEY_EVENT, { detail: payload }));
+      });
   }
 }
 
@@ -789,7 +799,7 @@ function showTaskSubmitScreen(): void {
   document.querySelector<HTMLButtonElement>("#btnTaskSubmit")?.addEventListener("click", () => {
     if (isPracticeMode) {
       practiceCompletedOnce = true;
-      // 9.10 需求顺序：练习任务 → 文本干预 → 正式任务。首次完成练习后先进入
+      // 顺序：练习任务 → 文本干预 → 操纵检验 → 正式任务。首次完成练习后先进入
       // 干预材料页；再次练习（任务准备页点“继续练习”）后直接进入任务准备。
       if (!interventionShown) {
         showIntervention();
