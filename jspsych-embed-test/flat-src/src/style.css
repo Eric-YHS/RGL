@@ -728,3 +728,12 @@ html.credamo-embedded .display-corner-check-status {
     font-size: 18px;
   }
 }
+.navigation-back {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 10000;
+}
+.navigation-back[hidden] { display: none; }
+.navigation-review { position: fixed; right: 18px; bottom: 18px; z-index: 10000; }
+.navigation-review[hidden] { display: none; }

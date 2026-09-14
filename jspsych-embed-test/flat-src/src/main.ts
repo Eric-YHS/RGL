@@ -328,6 +328,76 @@ let isPracticeMode = false;
 let desktopGateIntroductionAcknowledged = false;
 let practiceCompletedOnce = false;
 
+type View = "welcome" | "modal" | "task" | "intervention" | "completion" | "manipulation";
+type Frame = { view: View; nodes: Node[]; engine: ExperimentEngine; logger: ExperimentLogger; practice: boolean };
+let view: View = "welcome";
+let navigationVersion = 0;
+let restoring = false;
+let navigationLocked = false;
+const backStack: Frame[] = [];
+let formalRun: { engine: ExperimentEngine; logger: ExperimentLogger } | null = null;
+let practiceRun: { engine: ExperimentEngine; logger: ExperimentLogger } | null = null;
+let completionState: CompletionScreenState = "saving";
+const backButton = document.createElement("button");
+backButton.className = "btn navigation-back";
+backButton.id = "btnPageBack";
+backButton.textContent = "返回";
+backButton.hidden = true;
+document.body.append(backButton);
+const reviewButton = document.createElement("button");
+reviewButton.className = "btn navigation-review";
+reviewButton.textContent = "查看完成结果";
+reviewButton.hidden = true;
+document.body.append(reviewButton);
+reviewButton.addEventListener("click", showTaskSubmitScreen);
+const comprehensionChoices: Record<string, string> = {};
+
+function leaveView(): void {
+  els.modalCard.querySelectorAll("video").forEach(video => video.pause());
+  engine.pause(performance.now());
+  if (view === "intervention") {
+    interventionDurationMs += Math.max(0, performance.now() - interventionStartedAtMs);
+    clearInterventionTimer();
+  }
+}
+
+function navigate(next: View): void {
+  if (!restoring) {
+    backStack.push({ view, nodes: Array.from(els.modalCard.childNodes), engine, logger, practice: isPracticeMode });
+    leaveView();
+  }
+  view = next;
+  navigationVersion++;
+  backButton.hidden = navigationLocked || backStack.length === 0;
+}
+
+function goBack(): void {
+  if (navigationLocked) return;
+  const frame = backStack.pop();
+  if (!frame) return;
+  leaveView();
+  view = frame.view;
+  navigationVersion++;
+  engine = frame.engine;
+  logger = frame.logger;
+  isPracticeMode = frame.practice;
+  world?.dispose();
+  world = new World2D(els.canvas, engine.config);
+  lastPhase = engine.state.phase;
+  finishGate = engine.state.phase === "finished";
+  els.desktopGate.style.display = view === "welcome" ? "grid" : "none";
+  els.modalCard.replaceChildren(...frame.nodes);
+  els.modal.style.display = view === "welcome" || view === "task" ? "none" : "grid";
+  if (view === "task") engine.resume(performance.now());
+  restoring = true;
+  if (view === "intervention") showIntervention();
+  if (view === "completion") showCompletionScreen(completionState);
+  restoring = false;
+  backButton.hidden = backStack.length === 0;
+  updateHud();
+}
+backButton.addEventListener("click", goBack);
+
 function renderDesktopPreflightGate(): void {
   if (desktopGateIntroductionAcknowledged) {
     // Keep the welcome page from replacing an active task.
@@ -388,6 +458,7 @@ function buildFormalSubmission(): SessionSubmission {
 }
 
 function showInstructions(): void {
+  navigate("modal");
   openModal(`
     <h1>指导语</h1>
     <p>在本次任务中，您将控制一个<strong>圆点</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
@@ -419,6 +490,7 @@ function showInstructions(): void {
 }
 
 function showComprehensionTest(): void {
+  navigate("modal");
   openModal(`
     <h1>理解测试</h1>
     <p>请回答以下问题，以确认您已理解任务规则。两题均需回答正确才能继续。</p>
@@ -458,13 +530,13 @@ function showComprehensionTest(): void {
     </div>
     <div class="hint" id="compHint"></div>
     <div class="actions">
-      <button class="btn" id="btnBackToInstructions">上一步</button>
       <button class="btn primary" id="btnBeginExperiment">我已作答，下一步</button>
     </div>
   `);
 
-  document.querySelector<HTMLButtonElement>("#btnBackToInstructions")?.addEventListener("click", () => {
-    showInstructions();
+  els.modalCard.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(input => {
+    input.checked = comprehensionChoices[input.name] === input.value;
+    input.addEventListener("change", () => { comprehensionChoices[input.name] = input.value; });
   });
 
   document.querySelector<HTMLButtonElement>("#btnBeginExperiment")?.addEventListener("click", () => {
@@ -499,20 +571,16 @@ function showComprehensionTest(): void {
 }
 
 function showPracticeReady(): void {
+  navigate("modal");
   if (!practiceCompletedOnce) {
     // 第一次：只显示进入练习按钮
     openModal(`
       <h1>任务准备</h1>
       <p>回答正确！请点击下方按钮进入练习界面。</p>
       <div class="actions">
-        <button class="btn" id="btnBackToCompTest">上一步</button>
         <button class="btn primary" id="btnEnterPractice">进入练习</button>
       </div>
     `);
-
-    document.querySelector<HTMLButtonElement>("#btnBackToCompTest")?.addEventListener("click", () => {
-      showComprehensionTest();
-    });
 
     document.querySelector<HTMLButtonElement>("#btnEnterPractice")?.addEventListener("click", () => {
       enterPracticeMode();
@@ -540,6 +608,7 @@ function showPracticeReady(): void {
     });
 
     document.querySelector<HTMLButtonElement>("#btnEnterFormal")?.addEventListener("click", () => {
+      if (!interventionShown) { showIntervention(); return; }
       enterFormalMode();
       closeModal();
     });
@@ -554,8 +623,9 @@ function clearInterventionTimer(): void {
 }
 
 // 文本干预页：练习结束后、正式任务前展示分配到的一篇材料（15 选 1）。
-// 批注要求：强制最低阅读时间；本页不设返回（返回入口在随后的任务准备页）。
+// 阅读时间累计仅计算材料实际显示的时间；返回后继续累计。
 function showIntervention(): void {
+  navigate("intervention");
   interventionStartedAtMs = performance.now();
   openModal(`
     <h1>干预材料</h1>
@@ -572,7 +642,7 @@ function showIntervention(): void {
   const refreshButton = (): void => {
     if (!btn) return;
     const remainingSec = Math.ceil(
-      INTERVENTION_MIN_READ_SEC - (performance.now() - interventionStartedAtMs) / 1000
+      INTERVENTION_MIN_READ_SEC - (interventionDurationMs + performance.now() - interventionStartedAtMs) / 1000
     );
     if (remainingSec > 0) {
       btn.disabled = true;
@@ -587,16 +657,18 @@ function showIntervention(): void {
   interventionTimer = window.setInterval(refreshButton, 250);
 
   btn?.addEventListener("click", () => {
-    interventionDurationMs += Math.max(0, performance.now() - interventionStartedAtMs);
     interventionShown = true;
     clearInterventionTimer();
     showPracticeReady();
   });
 }
 
-// 操纵检验跳转页：正式数据保存完成后展示。批注要求：本页不允许返回，
-// 只保留前往见数问卷的入口；操纵检验题目在见数问卷中呈现。
+// 操纵检验在程序内作答；进入后清空返回路径，不能回看材料。
 function showManipulationCheckScreen(): void {
+  navigate("manipulation");
+  navigationLocked = true;
+  backStack.length = 0;
+  backButton.hidden = true;
   const questions = manipulationQuestions;
   openModal(`
     <h1>操纵检验</h1>
@@ -618,11 +690,14 @@ function showManipulationCheckScreen(): void {
 }
 
 function enterPracticeMode(): void {
+  navigate("task");
   isPracticeMode = true;
-  const practiceLogger = createLogger(practiceConfig, "practice");
-  const practiceEngine = new ExperimentEngine(practiceConfig, practiceLogger);
-  logger = practiceLogger;
-  engine = practiceEngine;
+  if (!practiceRun || practiceRun.engine.state.phase === "finished") {
+    const practiceLogger = createLogger(practiceConfig, "practice");
+    practiceRun = { logger: practiceLogger, engine: new ExperimentEngine(practiceConfig, practiceLogger) };
+  }
+  ({ logger, engine } = practiceRun);
+  engine.resume(performance.now());
   if (world) {
     world.dispose();
     world = new World2D(els.canvas, practiceConfig);
@@ -633,11 +708,14 @@ function enterPracticeMode(): void {
 }
 
 function enterFormalMode(): void {
+  navigate("task");
   isPracticeMode = false;
-  const newLogger = createLogger(formalConfig, "formal");
-  const newEngine = new ExperimentEngine(formalConfig, newLogger);
-  logger = newLogger;
-  engine = newEngine;
+  if (!formalRun) {
+    const newLogger = createLogger(formalConfig, "formal");
+    formalRun = { logger: newLogger, engine: new ExperimentEngine(formalConfig, newLogger) };
+  }
+  ({ logger, engine } = formalRun);
+  engine.resume(performance.now());
   if (world) {
     world.dispose();
     world = new World2D(els.canvas, formalConfig);
@@ -648,8 +726,15 @@ function enterFormalMode(): void {
 }
 
 type CompletionScreenState = "saving" | SubmitOutcome;
+let formalSavePromise: Promise<SubmitOutcome> | null = null;
 
-async function submitFormalResultsSilently(): Promise<SubmitOutcome> {
+function submitFormalResultsSilently(): Promise<SubmitOutcome> {
+  if (formalSavePromise) return formalSavePromise;
+  formalSavePromise = saveFormalResults();
+  return formalSavePromise;
+}
+
+async function saveFormalResults(): Promise<SubmitOutcome> {
   if (!formalSubmission) {
     formalSubmission = buildFormalSubmission();
   }
@@ -662,6 +747,8 @@ async function submitFormalResultsSilently(): Promise<SubmitOutcome> {
 }
 
 function showCompletionScreen(state: CompletionScreenState): void {
+  navigate("completion");
+  completionState = state;
   const elapsed = engine.state.elapsedSec;
   const baseTravelSec = engine.config.segmentDurationSec * 2;
   const waitSec = Math.floor(Math.max(0, elapsed - baseTravelSec));
@@ -701,11 +788,12 @@ function showCompletionScreen(state: CompletionScreenState): void {
 }
 
 function showTaskSubmitScreen(): void {
+  navigate("modal");
   openModal(`
     <h1>${isPracticeMode ? "练习完成" : "决策任务"}</h1>
-    <p>圆点已越过终点线。请点击下方按钮${isPracticeMode ? "返回导语" : "进入下一屏幕"}。</p>
+    <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
     <div class="actions">
-      <button class="btn primary" id="btnTaskSubmit">${isPracticeMode ? "返回" : "提交并保存数据"}</button>
+      <button class="btn primary" id="btnTaskSubmit">${isPracticeMode ? "下一步" : "提交并保存数据"}</button>
     </div>
   `);
 
@@ -721,8 +809,14 @@ function showTaskSubmitScreen(): void {
       }
     } else {
       showCompletionScreen("saving");
+      const version = navigationVersion;
       void submitFormalResultsSilently().then((outcome) => {
-        showCompletionScreen(outcome);
+        completionState = outcome;
+        if (view === "completion" && navigationVersion === version) {
+          restoring = true;
+          showCompletionScreen(outcome);
+          restoring = false;
+        }
       });
     }
   });
@@ -730,7 +824,7 @@ function showTaskSubmitScreen(): void {
 
 els.btnAction.addEventListener("click", () => {
   if (
-    !world ||
+    !world || view !== "task" ||
     engine.state.phase === "finished"
   ) return;
 
@@ -747,7 +841,7 @@ els.btnAction.addEventListener("click", () => {
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     if (
-      engine.state.phase !== "idle" &&
+      view === "task" && engine.state.phase !== "idle" &&
       engine.state.phase !== "finished"
     ) {
       e.preventDefault();
@@ -807,6 +901,7 @@ window.addEventListener("online", () => {
 });
 
 function updateHud(): void {
+  reviewButton.hidden = view !== "task" || engine.state.phase !== "finished";
   const s = engine.state;
   const nextActionDisabled = s.phase === "finished";
   const nextActionText = s.phase === "idle" ? "开始" : "移动";
@@ -898,7 +993,7 @@ function loop(): void {
   world?.render(engine.state, engine.getRouteProgress01(), nowMs);
   updateHud();
 
-  if (!finishGate && lastPhase !== engine.state.phase) {
+  if (view === "task" && !finishGate && (lastPhase !== engine.state.phase || engine.state.phase === "finished")) {
     lastPhase = engine.state.phase;
     if (engine.state.phase === "finished") {
       finishGate = true;
