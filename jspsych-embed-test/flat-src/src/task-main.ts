@@ -10,10 +10,6 @@ import { World2D } from "./scene/world2d";
 import { getManipulationQuestions } from "./experiment/manipulationChecks";
 
 type SubmitOutcome = "sent" | "queued";
-type DesktopInputProof = {
-  keyboard: boolean;
-};
-
 const params = new URLSearchParams(window.location.search);
 const participantId = (params.get("pid") ?? "").trim();
 const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
@@ -301,9 +297,9 @@ app.innerHTML = `
       <div class="card" id="modalCard"></div>
     </div>
 
+    <aside class="desktop-entry-zoom-hints">若显示不全，可按 Ctrl + 减号（Mac：⌘ + 减号）缩小页面。</aside>
     <div class="desktop-preflight" id="desktopGate" style="display:none;"></div>
   </div>
-  <div class="attention-warning" id="attentionWarning" style="display:none;" role="alertdialog" aria-modal="true"></div>
 `;
 
 const els = {
@@ -318,7 +314,6 @@ const els = {
   modal: document.querySelector<HTMLDivElement>("#modal")!,
   modalCard: document.querySelector<HTMLDivElement>("#modalCard")!,
   desktopGate: document.querySelector<HTMLDivElement>("#desktopGate")!,
-  attentionWarning: document.querySelector<HTMLDivElement>("#attentionWarning")!
 };
 
 const currentConfig: ExperimentConfig = formalConfig;
@@ -328,358 +323,17 @@ let world: World2D | null = null;
 let formalClientSessionId = createClientSessionId();
 let formalSubmission: SessionSubmission | null = null;
 let isPracticeMode = false;
-const desktopInputProof: DesktopInputProof = {
-  keyboard: false
-};
-let desktopGateReady = false;
-let desktopGateVisible = false;
-let pausedByDesktopGate = false;
 let desktopGateIntroductionAcknowledged = false;
 let practiceCompletedOnce = false;
-let resumeDeviceCornerCheck: (() => void) | null = null;
-type ModalScreen = "instructions" | "comprehension" | "practice_ready" | "intervention" | "manipulation_check";
-let currentModalScreen: ModalScreen | null = null;
-type AttentionResumeTarget =
-  | { kind: "task_restart" }
-  | { kind: "modal"; screen: ModalScreen }
-  | { kind: "task_idle" };
-let attentionResumeTarget: AttentionResumeTarget | null = null;
-
-type DisplayCheckMode = "initial" | "recheck" | "before_start";
-const DISPLAY_CHECK_MAX_DURATION_MS = 6000;
-let displayCheckMode: DisplayCheckMode | null = null;
-let displayCheckNotice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。请连续完成，不要滚动页面。";
-let displayCheckCertified = false;
-let cornerCheckCompleted = false;
-let lastDeviceCheckPassedMs = 0;
-const DEVICE_CHECK_COOLDOWN_MS = 2000;
-type AttentionIssue =
-  | "document_hidden"
-  | "window_blurred"
-  | "viewport_changed"
-  | "experiment_region_not_fully_visible";
-
-let attentionWarningVisible = false;
-let currentAttentionIssue: AttentionIssue | null = null;
-let visibilityCheckQueued = false;
-let lastViewportSignature = getViewportSignature();
-
-function hasDesktopPointer(): boolean {
-  return window.matchMedia("(pointer: fine)").matches;
-}
-
-function hasDesktopHover(): boolean {
-  return window.matchMedia("(hover: hover)").matches;
-}
-
-function renderCornerCheckStatusItems(): string {
-  const pointerReady = hasDesktopPointer();
-  const hoverReady = hasDesktopHover();
-  const keyboardReady = desktopInputProof.keyboard;
-
-  const items = [
-    { ready: pointerReady, label: pointerReady ? "检测到精细指针设备" : "请进行精细指针设备检测" },
-    { ready: hoverReady, label: hoverReady ? "检测到悬停能力" : "请进行悬停能力检测" },
-    { ready: keyboardReady, label: keyboardReady ? "已检测到实体键盘输入" : "请按一次实体键盘按键" }
-  ];
-
-  return items
-    .map((item) => `<div class="${item.ready ? "ready" : ""}">${item.ready ? "✓" : "•"} ${item.label}</div>`)
-    .join("");
-}
-
-function updateCornerCheckStatus(): void {
-  const container = els.desktopGate.querySelector<HTMLElement>("#displayCornerCheckStatus");
-  if (!container) return;
-  container.innerHTML = renderCornerCheckStatusItems();
-}
-
-function startDisplayCornerCheck(
-  mode: DisplayCheckMode,
-  notice = "按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。请连续完成，不要滚动页面。"
-): void {
-  displayCheckMode = mode;
-  displayCheckCertified = false;
-  displayCheckNotice = notice;
-  renderDisplayCornerCheck();
-}
-
-function startDisplayDeviceCheck(mode: DisplayCheckMode): void {
-  closeModal();  // 关闭可能处于打开状态的 modal，防止旧按钮残留焦点（Space/Enter keyup 误触发 click）
-  displayCheckMode = mode;
-  displayCheckCertified = false;
-  cornerCheckCompleted = false;
-  resetDesktopInputProof();
-  resumeDeviceCornerCheck = null;
-  renderDeviceCheck();
-}
-
-function areAllDeviceChecksReady(): boolean {
-  const pointerReady = hasDesktopPointer();
-  const hoverReady = hasDesktopHover();
-  const keyboardReady = desktopInputProof.keyboard;
-  return pointerReady && hoverReady && keyboardReady;
-}
-
-function renderDeviceCheck(): void {
-  const mode = displayCheckMode;
-  if (!mode) return;
-
-  els.desktopGate.classList.add("display-corner-check-active");
-  els.desktopGate.innerHTML = `
-    <section class="display-corner-check display-device-check" id="displayCornerCheck" aria-label="输入设备检查">
-      <div class="display-corner-check-instructions">
-        <h1>输入设备检查</h1>
-        <p id="displayCornerCheckHint">${displayCheckNotice}</p>
-        <div class="display-corner-check-status" id="displayCornerCheckStatus">
-          ${renderCornerCheckStatusItems()}
-        </div>
-        <p class="hint">请按一次键盘按键。完成后将自动进入显示区域检查。</p>
-      </div>
-    </section>
-  `;
-  els.desktopGate.style.display = "grid";
-  desktopGateVisible = true;
-
-  // 记录当前视口签名，避免因 overflow 变化（滚动条显隐）
-  // 导致的 resize 事件误触发 invalidateDisplayCheckForEnvironmentChange。
-  lastViewportSignature = getViewportSignature();
-
-  // 键盘检测由持久化监听器统一处理（见 installDesktopKeyboardDetector 附近），
-  // 此处设置回调以便键盘检测后自动进入角落检查阶段。
-  resumeDeviceCornerCheck = () => {
-    if (!displayCheckMode) return;
-    if (cornerCheckCompleted) return;
-    if (areAllDeviceChecksReady()) {
-      startDisplayCornerCheck(
-        displayCheckMode,
-        "设备检查已完成。请按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。"
-      );
-    }
-  };
-
-  if (areAllDeviceChecksReady()) {
-    startDisplayCornerCheck(mode, "设备检查已完成。请按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。");
-  }
-}
-
-function renderDisplayCornerCheck(): void {
-  const mode = displayCheckMode;
-  if (!mode) return;
-
-  els.desktopGate.classList.add("display-corner-check-active");
-  els.desktopGate.innerHTML = `
-    <section class="display-corner-check" id="displayCornerCheck" aria-label="实验显示区域检查">
-      <svg class="display-corner-check-line" id="displayCornerCheckLine" aria-hidden="true">
-        <polyline fill="none" stroke="#17689a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-      <button type="button" class="display-corner-target top-left" data-corner="0" aria-label="左上角"></button>
-      <button type="button" class="display-corner-target top-right" data-corner="1" aria-label="右上角"></button>
-      <button type="button" class="display-corner-target bottom-right" data-corner="2" aria-label="右下角"></button>
-      <button type="button" class="display-corner-target bottom-left" data-corner="3" aria-label="左下角"></button>
-      <div class="display-corner-check-instructions">
-        <h1>实验显示区域检查</h1>
-        <p id="displayCornerCheckHint">${displayCheckNotice}</p>
-        <div class="display-corner-check-status" id="displayCornerCheckStatus">
-          ${renderCornerCheckStatusItems()}
-        </div>
-        <p class="hint">如需调整浏览器缩放，请按 Ctrl（Mac 为 ⌘）+ 减号，或按住 Ctrl（⌘）滚动鼠标滚轮/触摸板；调整完成后请重新从左上角开始。</p>
-      </div>
-    </section>
-  `;
-  els.desktopGate.style.display = "grid";
-  desktopGateVisible = true;
-
-  // 记录当前视口签名，避免因 overflow 变化（滚动条显隐）
-  // 导致的 resize 事件误触发 invalidateDisplayCheckForEnvironmentChange。
-  lastViewportSignature = getViewportSignature();
-
-  const surface = els.desktopGate.querySelector<HTMLElement>("#displayCornerCheck");
-  const line = els.desktopGate.querySelector<SVGPolylineElement>("#displayCornerCheckLine polyline");
-  const targets = Array.from(els.desktopGate.querySelectorAll<HTMLElement>("[data-corner]"));
-  if (!surface || !line || targets.length !== 4) return;
-
-  let nextCorner = 0;
-  let pointerId: number | null = null;
-  let startedAtMs = 0;
-  const connectedCorners: Array<{ x: number; y: number }> = [];
-  let previewPoint: { x: number; y: number } | null = null;
-
-  const pointFromEvent = (event: PointerEvent): { x: number; y: number } => {
-    const rect = surface.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  };
-  const centerOfTarget = (index: number): { x: number; y: number } => {
-    const surfaceRect = surface.getBoundingClientRect();
-    const targetRect = targets[index].getBoundingClientRect();
-    return {
-      x: targetRect.left - surfaceRect.left + targetRect.width / 2,
-      y: targetRect.top - surfaceRect.top + targetRect.height / 2
-    };
-  };
-  const isOnTarget = (point: { x: number; y: number }, index: number): boolean => {
-    const targetRect = targets[index].getBoundingClientRect();
-    const center = centerOfTarget(index);
-    return Math.hypot(point.x - center.x, point.y - center.y) <= Math.max(targetRect.width, targetRect.height) * 1.2;
-  };
-  const redraw = (): void => {
-    const points = previewPoint ? [...connectedCorners, previewPoint] : connectedCorners;
-    line.setAttribute("points", points.map((point) => `${point.x},${point.y}`).join(" "));
-  };
-  const reset = (notice: string): void => {
-    displayCheckNotice = notice;
-    renderDisplayCornerCheck();
-  };
-
-  resumeDeviceCornerCheck = () => {
-    if (!displayCheckMode) return;
-
-    // We are currently in the device-check phase; wait until all device checks
-    // pass, then automatically switch to the corner check for the same mode.
-    if (!cornerCheckCompleted) {
-      if (areAllDeviceChecksReady()) {
-        startDisplayCornerCheck(displayCheckMode, "设备检查已完成。请按住鼠标左键，依次经过左上、右上、右下、左下四个圆点。");
-      }
-      return;
-    }
-
-    const pointerReady = hasDesktopPointer();
-    const hoverReady = hasDesktopHover();
-    const keyboardReady = desktopInputProof.keyboard;
-    if (!pointerReady || !hoverReady || !keyboardReady) {
-      // If the corner check is already done but some device check is still
-      // pending, reset corner state so the participant can complete it again
-      // after satisfying all device checks.  Without the reset, the
-      // re-rendered corner check would never fire completion because
-      // cornerCheckCompleted stays true and completeCornerCheck returns early.
-      displayCheckNotice = "连线已完成，请继续完成设备检查：按一次键盘按键。";
-      cornerCheckCompleted = false;
-      renderDisplayCornerCheck();
-      return;
-    }
-
-    displayCheckCertified = true;
-    displayCheckMode = null;
-    lastDeviceCheckPassedMs = performance.now();
-    els.desktopGate.classList.remove("display-corner-check-active");
-    els.desktopGate.style.display = "none";
-    desktopGateVisible = false;
-
-    const finishedMode = mode;
-    if (finishedMode === "initial") {
-      desktopGateReady = true;
-      lastViewportSignature = getViewportSignature();
-      showInstructions();
-      return;
-    }
-    if (finishedMode === "recheck") {
-      desktopGateReady = true;
-      lastViewportSignature = getViewportSignature();
-      resumeAfterAttentionRecheck();
-      return;
-    }
-    if (finishedMode === "before_start") {
-      desktopGateReady = true;
-      lastViewportSignature = getViewportSignature();
-      updateHud();
-    }
-  };
-  const completeCornerCheck = (): void => {
-    if (cornerCheckCompleted) return;
-    cornerCheckCompleted = true;
-    resumeDeviceCornerCheck?.();
-  };
-
-  surface.addEventListener(
-    "wheel",
-    (event) => {
-      if (event.ctrlKey || event.metaKey) {
-        reset("正在调整浏览器缩放。调整完成并确认四角同时可见后，请从左上角重新开始。");
-        return;
-      }
-      event.preventDefault();
-      reset("检测到滚轮操作。请停止滚动，确认实验区完整显示后重新从左上角开始。");
-    },
-    { passive: false }
-  );
-  surface.addEventListener("contextmenu", (event) => event.preventDefault());
-
-  surface.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return;
-    const point = pointFromEvent(event);
-    if (!isOnTarget(point, 0)) {
-      reset("请从左上角圆点开始，按住鼠标左键后连续经过四个角。");
-      return;
-    }
-    pointerId = event.pointerId;
-    startedAtMs = performance.now();
-    nextCorner = 1;
-    connectedCorners.length = 0;
-    connectedCorners.push(centerOfTarget(0));
-    previewPoint = point;
-    redraw();
-    surface.setPointerCapture(event.pointerId);
-  });
-
-  surface.addEventListener("pointermove", (event) => {
-    if (pointerId !== event.pointerId || nextCorner >= targets.length) return;
-    if (performance.now() - startedAtMs > DISPLAY_CHECK_MAX_DURATION_MS) {
-      reset("连续连线超时。请确认四角同时可见后，从左上角重新开始。");
-      return;
-    }
-
-    const point = pointFromEvent(event);
-    previewPoint = point;
-    redraw();
-    if (!isOnTarget(point, nextCorner)) return;
-
-    connectedCorners.push(centerOfTarget(nextCorner));
-    nextCorner += 1;
-    redraw();
-    if (nextCorner === targets.length) completeCornerCheck();
-  });
-
-  surface.addEventListener("pointerup", (event) => {
-    if (pointerId !== event.pointerId || nextCorner === targets.length) return;
-    reset("连线未经过全部四个角。请从左上角重新开始并保持按住鼠标左键。");
-  });
-  surface.addEventListener("pointercancel", () => {
-    reset("检测中断。请确认实验区完整显示后，从左上角重新开始。");
-  });
-}
-
-function invalidateDisplayCheckForEnvironmentChange(notice: string): boolean {
-  if (!displayCheckMode) return false;
-  displayCheckCertified = false;
-  displayCheckNotice = notice;
-  renderDisplayCornerCheck();
-  return true;
-}
 
 function renderDesktopPreflightGate(): void {
-  if (displayCheckMode) {
-    // 设备/角落检查已在进行中，由检查渲染函数自行管理 UI。
-    // resize/visibilitychange 处理器会单独调用 invalidateDisplayCheckForEnvironmentChange
-    // 在需要时重新渲染角落检查，因此此处无需重复调用 renderDisplayCornerCheck。
-    return;
-  }
   if (desktopGateIntroductionAcknowledged) {
-    // The participant has already passed the welcome gate and is either in the
-    // combined device + corner check or reading the instructions. Nothing to render.
+    // Keep the welcome page from replacing an active task.
     return;
-  }
-
-  if (!pausedByDesktopGate && engine.state.phase !== "idle" && engine.state.phase !== "finished") {
-    engine.pause(performance.now());
-    pausedByDesktopGate = true;
   }
 
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card desktop-entry-card">
-      <div class="desktop-entry-zoom-hints">
-        <p>若显示不全</p>
-        <p>按 <strong>Ctrl + 减号</strong>（⌘ + 减号）。</p>
-      </div>
       <h1>欢迎参加学术调查</h1>
       <p>感谢您参与本次学术研究。我们是中山大学学术研究团队。本研究的初始酬金为 <strong>100 元人民币</strong>，但实际酬金将完全取决于您在任务中的决策，介乎 <strong>0 元–84 元人民币</strong>。</p>
       <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。完成整个调查需 <strong>15-20 分钟</strong>。</p>
@@ -692,244 +346,13 @@ function renderDesktopPreflightGate(): void {
     </section>
   `;
   els.desktopGate.style.display = "grid";
-  desktopGateVisible = true;
   els.desktopGate
     .querySelector<HTMLButtonElement>("#btnDesktopGateCheck")
     ?.addEventListener("click", () => {
       desktopGateIntroductionAcknowledged = true;
       els.desktopGate.style.display = "none";
-      desktopGateVisible = false;
-      if (pausedByDesktopGate) {
-        engine.resume(performance.now());
-        pausedByDesktopGate = false;
-      }
-      desktopGateReady = true;
-      displayCheckCertified = true;
       showInstructions();
     });
-}
-
-function getViewportSignature(): string {
-  const viewport = window.visualViewport;
-  return [
-    window.innerWidth,
-    window.innerHeight,
-    Math.round(viewport?.width ?? window.innerWidth),
-    Math.round(viewport?.height ?? window.innerHeight),
-    Math.round((window.devicePixelRatio || 1) * 100)
-  ].join("x");
-}
-
-function isTaskInProgress(): boolean {
-  return engine.state.phase !== "idle" && engine.state.phase !== "finished";
-}
-
-function captureAttentionResumeTarget(): AttentionResumeTarget {
-  if (isTaskInProgress()) {
-    return { kind: "task_restart" };
-  }
-  if (currentModalScreen) {
-    return { kind: "modal", screen: currentModalScreen };
-  }
-  return { kind: "task_idle" };
-}
-
-function resumeAfterAttentionRecheck(): void {
-  const target = attentionResumeTarget ?? { kind: "task_idle" };
-  attentionResumeTarget = null;
-
-  if (target.kind === "task_restart") {
-    restartCurrentTask();
-    return;
-  }
-
-  if (target.kind === "modal") {
-    if (target.screen === "instructions") {
-      showInstructions();
-    } else if (target.screen === "comprehension") {
-      showComprehensionTest();
-    } else if (target.screen === "intervention") {
-      showIntervention();
-    } else if (target.screen === "manipulation_check") {
-      showManipulationCheckScreen();
-    } else {
-      showPracticeReady();
-    }
-    return;
-  }
-
-  updateHud();
-}
-
-function isTaskMonitoringArmed(): boolean {
-  void desktopGateReady;
-  void desktopGateVisible;
-  void displayCheckCertified;
-  return false;
-}
-
-function isExperimentRegionFullyVisible(): boolean {
-  const targets = [els.stage, els.canvas, els.btnAction];
-  // 使用 window.innerWidth/Height 而非 visualViewport，以保证在不同浏览器
-  // （尤其是 visualViewport API 行为不一致的桌面浏览器）上的兼容性。
-  const left = 0;
-  const top = 0;
-  const right = window.innerWidth;
-  const bottom = window.innerHeight;
-  // 增加容差以适配不同操作系统/DPI 缩放下的亚像素渲染差异。
-  const tolerance = 5;
-
-  // The decision task must never require horizontal scrolling. This also
-  // catches a canvas whose drawing area overflows while its parent still fits.
-  if (document.documentElement.scrollWidth > document.documentElement.clientWidth + tolerance) {
-    return false;
-  }
-
-  return targets.every((target) => {
-    const rect = target.getBoundingClientRect();
-    return (
-      rect.width > 0 &&
-      rect.height > 0 &&
-      rect.left >= left - tolerance &&
-      rect.top >= top - tolerance &&
-      rect.right <= right + tolerance &&
-      rect.bottom <= bottom + tolerance
-    );
-  });
-}
-
-function logAttentionEvent(event: "attention_lost" | "attention_restored", issue: AttentionIssue, nowMs: number): void {
-  // Practice data is never submitted, so keep the persisted audit trail limited
-  // to the formal decision task.
-  if (isPracticeMode) return;
-
-  logger.log({
-    nowMs,
-    tSec: engine.state.elapsedSec,
-    event,
-    phase: engine.state.phase,
-    lightIndex: engine.state.lightIndex,
-    lightColor: engine.getCurrentLightColor(),
-    money: engine.getRecordedMoney(),
-    note: issue
-  });
-}
-
-function attentionIssueMessage(issue: AttentionIssue): string {
-  switch (issue) {
-    case "document_hidden":
-      return "检测到实验页面被切换到后台、最小化或暂时不可见。";
-    case "window_blurred":
-      return "检测到浏览器窗口已失去焦点，可能切换到了其他窗口。";
-    case "viewport_changed":
-      return "检测到浏览器窗口大小或页面缩放发生了变化。";
-    case "experiment_region_not_fully_visible":
-      return "检测到红绿灯实验区没有完整显示在当前浏览器视口内。";
-  }
-}
-
-function renderAttentionWarning(): void {
-  if (!currentAttentionIssue) return;
-
-  const target = attentionResumeTarget ?? captureAttentionResumeTarget();
-  const recoveryMessage = target.kind === "task_restart"
-    ? "本轮任务将作废。请重新完成实验显示区域检查；检查通过后将从当前页面起始状态重新开始。"
-    : "请重新完成实验显示区域检查；检查通过后将回到刚刚的页面继续。";
-
-  els.attentionWarning.innerHTML = `
-    <section class="attention-warning-card" aria-labelledby="attentionWarningTitle">
-      <h1 id="attentionWarningTitle">实验已暂停</h1>
-      <p>${attentionIssueMessage(currentAttentionIssue)}</p>
-      <p>${recoveryMessage}</p>
-      <div class="attention-warning-actions">
-        <button class="btn primary" id="btnResumeAfterAttentionWarning">重新检查显示区域</button>
-      </div>
-      <p class="hint" id="attentionWarningHint"></p>
-    </section>
-  `;
-  els.attentionWarning.style.display = "grid";
-
-  els.attentionWarning
-    .querySelector<HTMLButtonElement>("#btnResumeAfterAttentionWarning")
-    ?.addEventListener("click", () => {
-      if (!currentAttentionIssue) return;
-      attentionWarningVisible = false;
-      currentAttentionIssue = null;
-      els.attentionWarning.style.display = "none";
-      attentionResumeTarget = attentionResumeTarget ?? target;
-      startDisplayDeviceCheck("recheck");
-    });
-}
-
-function pauseForAttentionIssue(issue: AttentionIssue, force = false): void {
-  if ((!force && !isTaskMonitoringArmed()) || attentionWarningVisible) return;
-
-  const nowMs = performance.now();
-
-  // 设备检测刚通过不久（冷却期内），忽略非强制触发，防止检测-通过-暂停-重启循环。
-  if (!force && lastDeviceCheckPassedMs > 0 && nowMs - lastDeviceCheckPassedMs < DEVICE_CHECK_COOLDOWN_MS) return;
-
-  attentionResumeTarget = captureAttentionResumeTarget();
-  if (isTaskInProgress()) engine.pause(nowMs);
-  displayCheckCertified = false;
-
-  attentionWarningVisible = true;
-  currentAttentionIssue = issue;
-  logAttentionEvent("attention_lost", issue, nowMs);
-  renderAttentionWarning();
-}
-
-function scheduleExperimentVisibilityCheck(): void {
-  if (!isTaskMonitoringArmed() || attentionWarningVisible || visibilityCheckQueued) return;
-  visibilityCheckQueued = true;
-  requestAnimationFrame(() => {
-    visibilityCheckQueued = false;
-    if (!isTaskMonitoringArmed() || attentionWarningVisible || document.hidden) return;
-    if (!isExperimentRegionFullyVisible()) {
-      pauseForAttentionIssue("experiment_region_not_fully_visible");
-    }
-  });
-}
-
-function installExperimentVisibilityMonitor(): void {
-  const observer = new IntersectionObserver(
-    () => {
-      scheduleExperimentVisibilityCheck();
-    },
-    { threshold: [0, 1] }
-  );
-  observer.observe(els.stage);
-  observer.observe(els.canvas);
-  observer.observe(els.btnAction);
-
-  if (typeof ResizeObserver !== "undefined") {
-    const resizeObserver = new ResizeObserver(() => {
-      scheduleExperimentVisibilityCheck();
-    });
-    resizeObserver.observe(els.stage);
-    resizeObserver.observe(els.canvas);
-    resizeObserver.observe(els.btnAction);
-  }
-
-  document.addEventListener("scroll", scheduleExperimentVisibilityCheck, true);
-  window.visualViewport?.addEventListener("scroll", scheduleExperimentVisibilityCheck);
-  window.visualViewport?.addEventListener("resize", () => {
-    const nextSignature = getViewportSignature();
-    if (nextSignature !== lastViewportSignature) {
-      const wasMonitoring = isTaskMonitoringArmed();
-      lastViewportSignature = nextSignature;
-      if (
-        invalidateDisplayCheckForEnvironmentChange(
-          "检测到窗口大小或页面缩放变化。请确认四角同时可见后，从左上角重新开始。"
-        )
-      ) {
-        return;
-      }
-      pauseForAttentionIssue("viewport_changed", wasMonitoring);
-      return;
-    }
-    scheduleExperimentVisibilityCheck();
-  });
 }
 
 function openModal(html: string): void {
@@ -939,7 +362,6 @@ function openModal(html: string): void {
 
 function closeModal(): void {
   els.modal.style.display = "none";
-  currentModalScreen = null;
 }
 
 function escapeHtmlAttr(value: string): string {
@@ -965,7 +387,6 @@ function buildFormalSubmission(): SessionSubmission {
 }
 
 function showInstructions(): void {
-  currentModalScreen = "instructions";
   openModal(`
     <h1>指导语</h1>
     <p>在本次任务中，您将控制一个<strong>圆点</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
@@ -997,7 +418,6 @@ function showInstructions(): void {
 }
 
 function showComprehensionTest(): void {
-  currentModalScreen = "comprehension";
   openModal(`
     <h1>理解测试</h1>
     <p>请回答以下问题，以确认您已理解任务规则。两题均需回答正确才能继续。</p>
@@ -1078,7 +498,6 @@ function showComprehensionTest(): void {
 }
 
 function showPracticeReady(): void {
-  currentModalScreen = "practice_ready";
   if (!practiceCompletedOnce) {
     // 第一次：只显示进入练习按钮
     openModal(`
@@ -1136,7 +555,6 @@ function clearInterventionTimer(): void {
 // 文本干预页：练习结束后、正式任务前展示分配到的一篇材料（15 选 1）。
 // 批注要求：强制最低阅读时间；本页不设返回（返回入口在随后的任务准备页）。
 function showIntervention(): void {
-  currentModalScreen = "intervention";
   interventionStartedAtMs = performance.now();
   openModal(`
     <h1>干预材料</h1>
@@ -1178,7 +596,6 @@ function showIntervention(): void {
 // 操纵检验跳转页：正式数据保存完成后展示。批注要求：本页不允许返回，
 // 只保留前往见数问卷的入口；操纵检验题目在见数问卷中呈现。
 function showManipulationCheckScreen(): void {
-  currentModalScreen = "manipulation_check";
   const questions = getManipulationQuestions(treatmentId);
   openModal(`
     <h1>操纵检验</h1>
@@ -1224,25 +641,6 @@ function enterFormalMode(): void {
     world.dispose();
     world = new World2D(els.canvas, formalConfig);
   }
-  lastPhase = engine.state.phase;
-  finishGate = false;
-  updateHud();
-}
-
-function restartCurrentTask(): void {
-  const config = isPracticeMode ? practiceConfig : formalConfig;
-  const runKind: "practice" | "formal" = isPracticeMode ? "practice" : "formal";
-
-  // Do not resume the interrupted state. A new engine/logger makes this round
-  // start at the initial position with a fresh timer and compensation amount.
-  if (!isPracticeMode) {
-    formalClientSessionId = createClientSessionId();
-    formalSubmission = null;
-  }
-  logger = createLogger(config, runKind);
-  engine = new ExperimentEngine(config, logger);
-  world?.dispose();
-  world = new World2D(els.canvas, config);
   lastPhase = engine.state.phase;
   finishGate = false;
   updateHud();
@@ -1332,9 +730,7 @@ function showTaskSubmitScreen(): void {
 els.btnAction.addEventListener("click", () => {
   if (
     !world ||
-    engine.state.phase === "finished" ||
-    attentionWarningVisible ||
-    displayCheckMode
+    engine.state.phase === "finished"
   ) return;
 
   const nowMs = performance.now();
@@ -1350,8 +746,6 @@ els.btnAction.addEventListener("click", () => {
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
     if (
-      !attentionWarningVisible &&
-      !displayCheckMode &&
       engine.state.phase !== "idle" &&
       engine.state.phase !== "finished"
     ) {
@@ -1359,21 +753,6 @@ window.addEventListener("keydown", (e) => {
       engine.pressWalk(performance.now());
     }
   }
-});
-
-// 持久化键盘检测监听器 — 在设备检查/角落检查阶段全程生效。
-// 采用单一持久化监听器而非动态添加/移除，从根源上消除监听器生命周期
-// 管理带来的竞态问题（如：按住按键时通过检测，松开后状态异常回退）。
-window.addEventListener("keydown", (e) => {
-  if (desktopInputProof.keyboard) return;                         // 已检测到键盘
-  if (e.metaKey || e.ctrlKey || e.altKey) return;                // 修饰键忽略
-  if (["Shift", "Control", "Alt", "Meta", "CapsLock", "Tab"].includes(e.key)) return; // 特殊键忽略
-  if (!displayCheckMode) return;                                  // 非设备检查阶段
-
-  e.preventDefault();                                              // 阻止 Space/Enter 在 keyup 时触发聚焦按钮的 click
-  desktopInputProof.keyboard = true;
-  updateCornerCheckStatus();
-  resumeDeviceCornerCheck?.();
 });
 
 let lastPhase: typeof engine.state.phase = engine.state.phase;
@@ -1393,7 +772,6 @@ const hudCache = {
 };
 
 async function bootstrapDesktopApp(): Promise<void> {
-  void installExperimentVisibilityMonitor;
   await waitForExperimentFonts();
   document.body.classList.remove("app-fonts-loading");
   document.body.classList.add("app-fonts-ready");
@@ -1411,46 +789,6 @@ void bootstrapDesktopApp();
 
 window.addEventListener("online", () => {
   void flushPendingSubmissions();
-});
-
-window.addEventListener("resize", () => {
-  renderDesktopPreflightGate();
-  const nextSignature = getViewportSignature();
-  if (nextSignature !== lastViewportSignature) {
-    const wasMonitoring = isTaskMonitoringArmed();
-    lastViewportSignature = nextSignature;
-    if (
-      invalidateDisplayCheckForEnvironmentChange(
-        "检测到窗口大小或页面缩放变化。请确认四角同时可见后，从左上角重新开始。"
-      )
-    ) {
-      return;
-    }
-    pauseForAttentionIssue("viewport_changed", wasMonitoring);
-    return;
-  }
-  scheduleExperimentVisibilityCheck();
-});
-
-function resetDesktopInputProof(): void {
-  desktopInputProof.keyboard = false;
-}
-
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    const wasMonitoring = isTaskMonitoringArmed();
-    invalidateDisplayCheckForEnvironmentChange("检测到您离开了实验页面。返回后请从左上角重新开始检查。");
-    pauseForAttentionIssue("document_hidden", wasMonitoring);
-    return;
-  }
-  renderDesktopPreflightGate();
-  scheduleExperimentVisibilityCheck();
-});
-
-window.addEventListener("blur", () => {
-  const wasMonitoring = isTaskMonitoringArmed();
-  invalidateDisplayCheckForEnvironmentChange("检测到浏览器窗口失去焦点。请返回后从左上角重新开始检查。");
-  pauseForAttentionIssue("window_blurred", wasMonitoring);
 });
 
 function updateHud(): void {
