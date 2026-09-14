@@ -327,9 +327,8 @@ let formalSubmission: SessionSubmission | null = null;
 let manipulationAnswers: string | null = null;
 let isPracticeMode = false;
 let desktopGateIntroductionAcknowledged = false;
-let practiceCompletedOnce = false;
 
-type View = "welcome" | "modal" | "practice_ready" | "task" | "intervention" | "completion" | "manipulation";
+type View = "welcome" | "modal" | "task" | "intervention" | "completion" | "manipulation";
 type Frame = { view: View; nodes: Node[]; engine: ExperimentEngine; logger: ExperimentLogger; practice: boolean };
 let view: View = "welcome";
 let navigationVersion = 0;
@@ -371,7 +370,7 @@ function navigate(next: View): void {
   }
   view = next;
   navigationVersion++;
-  backButton.hidden = navigationLocked || view === "practice_ready" || backStack.length === 0;
+  backButton.hidden = navigationLocked || backStack.length === 0;
 }
 
 function goBack(): void {
@@ -396,7 +395,7 @@ function goBack(): void {
   if (view === "intervention") showIntervention();
   if (view === "completion") showCompletionScreen(completionState);
   restoring = false;
-  backButton.hidden = view === "practice_ready" || backStack.length === 0;
+  backButton.hidden = backStack.length === 0;
   updateHud();
 }
 backButton.addEventListener("click", goBack);
@@ -572,42 +571,9 @@ function showComprehensionTest(): void {
       note: comprehensionNote
     });
 
-    showPracticeReady();
-  });
-}
-
-function showPracticeReady(): void {
-  if (!practiceCompletedOnce) {
-    // 理解测试通过后直接进入练习，返回时仍回到原来的理解测试。
     enterPracticeMode();
     closeModal();
-  } else {
-    navigate("practice_ready");
-    // 练习完成后：显示返回导语、继续练习、进入正式决策任务
-    openModal(`
-      <div class="actions practice-ready-actions" aria-label="任务选择">
-        <button class="btn" id="btnBackToInstructions">返回导语</button>
-        <button class="btn" id="btnContinuePractice">继续练习</button>
-        <button class="btn primary" id="btnEnterFormal">进入决策任务</button>
-      </div>
-    `);
-
-    document.querySelector<HTMLButtonElement>("#btnBackToInstructions")?.addEventListener("click", () => {
-      showInstructions();
-    });
-
-    document.querySelector<HTMLButtonElement>("#btnContinuePractice")?.addEventListener("click", () => {
-      enterPracticeMode();
-      closeModal();
-    });
-
-    document.querySelector<HTMLButtonElement>("#btnEnterFormal")?.addEventListener("click", () => {
-      if (!interventionShown) { showIntervention(); return; }
-      if (!manipulationAnswers) { showManipulationCheckScreen(); return; }
-      enterFormalMode();
-      closeModal();
-    });
-  }
+  });
 }
 
 function clearInterventionTimer(): void {
@@ -680,7 +646,8 @@ function showManipulationCheckScreen(): void {
     if (answers.some(a => !a)) { if (hint) hint.textContent = "请回答全部题目后再继续。"; return; }
     manipulationAnswers = JSON.stringify(answers);
     navigationLocked = false;
-    showPracticeReady();
+    enterFormalMode();
+    closeModal();
   });
 }
 
@@ -792,19 +759,22 @@ function showTaskSubmitScreen(): void {
     <h1>${isPracticeMode ? "练习完成" : "决策任务"}</h1>
     <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
     <div class="actions">
+      ${isPracticeMode ? '<button class="btn" id="btnRepeatPractice">重新练习</button>' : ''}
       <button class="btn primary" id="btnTaskSubmit">${isPracticeMode ? "下一步" : "提交并保存数据"}</button>
     </div>
   `);
 
+  document.querySelector<HTMLButtonElement>("#btnRepeatPractice")?.addEventListener("click", () => {
+    enterPracticeMode();
+    closeModal();
+  });
   document.querySelector<HTMLButtonElement>("#btnTaskSubmit")?.addEventListener("click", () => {
     if (isPracticeMode) {
-      practiceCompletedOnce = true;
-      // 顺序：练习任务 → 文本干预 → 操纵检验 → 正式任务。首次完成练习后先进入
-      // 干预材料页；再次练习（任务准备页点“继续练习”）后直接进入任务准备。
+      // 重练仍留在干预之前；阅读和操纵检验完成后直接进入正式任务。
       if (!interventionShown) {
         showIntervention();
       } else {
-        showPracticeReady();
+        showManipulationCheckScreen();
       }
     } else {
       showCompletionScreen("saving");
