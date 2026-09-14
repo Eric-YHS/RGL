@@ -626,7 +626,8 @@ function showIntervention(): void {
   btn?.addEventListener("click", () => {
     interventionShown = true;
     clearInterventionTimer();
-    showManipulationCheckScreen();
+    enterFormalMode();
+    closeModal();
   });
 }
 
@@ -643,7 +644,7 @@ function showManipulationCheckScreen(): void {
     ${questions.map((q,i)=>`<fieldset class="comp-question"><legend>${i+1}. ${q.prompt}</legend>${q.options.map((o,j)=>`<label style="display:flex;gap:10px;margin:8px 0"><input type="radio" name="manip-${q.id}" value="${escapeHtmlAttr(o)}" />${String.fromCharCode(65+j)}. ${o}</label>`).join("")}</fieldset>`).join("")}
     <div class="hint" id="manipHint"></div>
     <div class="actions">
-      <button class="btn primary" id="btnGotoSurvey">继续答题</button>
+      <button class="btn primary" id="btnGotoSurvey">提交并保存数据</button>
     </div>
   `);
   document.querySelector<HTMLButtonElement>("#btnGotoSurvey")?.addEventListener("click", () => {
@@ -651,9 +652,16 @@ function showManipulationCheckScreen(): void {
     const hint = document.querySelector<HTMLDivElement>("#manipHint");
     if (answers.some(a => !a)) { if (hint) hint.textContent = "请回答全部题目后再继续。"; return; }
     manipulationAnswers = JSON.stringify(answers);
-    navigationLocked = false;
-    enterFormalMode();
-    closeModal();
+    showCompletionScreen("saving");
+    const version = navigationVersion;
+    void submitFormalResultsSilently().then((outcome) => {
+      completionState = outcome;
+      if (view === "completion" && navigationVersion === version) {
+        restoring = true;
+        showCompletionScreen(outcome);
+        restoring = false;
+      }
+    });
   });
 }
 
@@ -766,7 +774,7 @@ function showTaskSubmitScreen(): void {
     <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
     <div class="actions">
       ${isPracticeMode ? '<button class="btn" id="btnRepeatPractice">重新练习</button>' : ''}
-      <button class="btn primary" id="btnTaskSubmit">${isPracticeMode ? "下一步" : "提交并保存数据"}</button>
+      <button class="btn primary" id="btnTaskSubmit">下一步</button>
     </div>
   `);
 
@@ -776,23 +784,15 @@ function showTaskSubmitScreen(): void {
   });
   document.querySelector<HTMLButtonElement>("#btnTaskSubmit")?.addEventListener("click", () => {
     if (isPracticeMode) {
-      // 重练仍留在干预之前；阅读和操纵检验完成后直接进入正式任务。
+      // 顺序：练习（可重练）→ 干预材料 → 正式任务 → 操纵检验 → 保存。
       if (!interventionShown) {
         showIntervention();
       } else {
-        showManipulationCheckScreen();
+        enterFormalMode();
+        closeModal();
       }
     } else {
-      showCompletionScreen("saving");
-      const version = navigationVersion;
-      void submitFormalResultsSilently().then((outcome) => {
-        completionState = outcome;
-        if (view === "completion" && navigationVersion === version) {
-          restoring = true;
-          showCompletionScreen(outcome);
-          restoring = false;
-        }
-      });
+      showManipulationCheckScreen();
     }
   });
 }
