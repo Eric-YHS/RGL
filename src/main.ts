@@ -328,7 +328,7 @@ let manipulationAnswers: string | null = null;
 let isPracticeMode = false;
 let desktopGateIntroductionAcknowledged = false;
 
-type View = "welcome" | "modal" | "practice_complete" | "formal_submit" | "task" | "intervention" | "completion" | "manipulation";
+type View = "welcome" | "modal" | "practice_complete" | "task" | "intervention" | "completion" | "manipulation";
 type Frame = { view: View; nodes: Node[]; engine: ExperimentEngine; logger: ExperimentLogger; practice: boolean };
 let view: View = "welcome";
 let navigationVersion = 0;
@@ -363,7 +363,7 @@ function leaveView(): void {
 
 function canGoBack(): boolean {
   return !navigationLocked && backStack.length > 0 &&
-    view !== "formal_submit" && view !== "practice_complete" && view !== "completion";
+    view !== "practice_complete" && view !== "completion";
 }
 
 function navigate(next: View): void {
@@ -644,7 +644,7 @@ function showManipulationCheckScreen(): void {
     ${questions.map((q,i)=>`<fieldset class="comp-question"><legend>${i+1}. ${q.prompt}</legend>${q.options.map((o,j)=>`<label style="display:flex;gap:10px;margin:8px 0"><input type="radio" name="manip-${q.id}" value="${escapeHtmlAttr(o)}" />${String.fromCharCode(65+j)}. ${o}</label>`).join("")}</fieldset>`).join("")}
     <div class="hint" id="manipHint"></div>
     <div class="actions">
-      <button class="btn primary" id="btnGotoSurvey">提交并保存数据</button>
+      <button class="btn primary" id="btnGotoSurvey">下一步</button>
     </div>
   `);
   document.querySelector<HTMLButtonElement>("#btnGotoSurvey")?.addEventListener("click", () => {
@@ -768,12 +768,16 @@ function showCompletionScreen(state: CompletionScreenState): void {
 }
 
 function showTaskSubmitScreen(): void {
-  navigate(isPracticeMode ? "practice_complete" : "formal_submit");
+  if (!isPracticeMode) {
+    showManipulationCheckScreen();
+    return;
+  }
+  navigate("practice_complete");
   openModal(`
-    <h1>${isPracticeMode ? "练习完成" : "决策任务"}</h1>
+    <h1>练习完成</h1>
     <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
     <div class="actions">
-      ${isPracticeMode ? '<button class="btn" id="btnRepeatPractice">重新练习</button>' : ''}
+      <button class="btn" id="btnRepeatPractice">重新练习</button>
       <button class="btn primary" id="btnTaskSubmit">下一步</button>
     </div>
   `);
@@ -783,16 +787,12 @@ function showTaskSubmitScreen(): void {
     closeModal();
   });
   document.querySelector<HTMLButtonElement>("#btnTaskSubmit")?.addEventListener("click", () => {
-    if (isPracticeMode) {
-      // 顺序：练习（可重练）→ 干预材料 → 正式任务 → 操纵检验 → 保存。
-      if (!interventionShown) {
-        showIntervention();
-      } else {
-        enterFormalMode();
-        closeModal();
-      }
+    // 顺序：练习（可重练）→ 干预材料 → 正式任务 → 操纵检验 → 保存。
+    if (!interventionShown) {
+      showIntervention();
     } else {
-      showManipulationCheckScreen();
+      enterFormalMode();
+      closeModal();
     }
   });
 }
