@@ -8,6 +8,7 @@ import { formatMoney, formatSeconds } from "./experiment/utils";
 import { findTreatment, resolveTreatmentId } from "./experiment/treatments";
 import { World2D } from "./scene/world2d";
 import { getPersistentManipulationQuestions } from "./experiment/manipulationChecks";
+import { resolveServerAssignment } from "./experiment/assignmentClient";
 
 type SubmitOutcome = "sent" | "queued";
 const params = new URLSearchParams(window.location.search);
@@ -60,10 +61,10 @@ const formalConfig: ExperimentConfig = makeConfig("full", 1);
 const practiceConfig: ExperimentConfig = makeConfig("full", 1);
 
 // 优先沿用被试在本浏览器的首次分配，重新进入不受新 treatment 参数影响。
-const treatmentId = resolveTreatmentId(window.location.search, participantId);
-const treatmentMaterial = findTreatment(treatmentId)!;
+let treatmentId = resolveTreatmentId(window.location.search, participantId);
+let treatmentMaterial = findTreatment(treatmentId)!;
 // 首次打开即保存题目排列，避免退出后或重复进入检验页重新洗牌。
-const manipulationQuestions = getPersistentManipulationQuestions(treatmentId, participantId);
+let manipulationQuestions = getPersistentManipulationQuestions(treatmentId, participantId);
 // 批注第 2 条：强制最低阅读时间，确保 treatment 生效。
 const INTERVENTION_MIN_READ_SEC = 15;
 let interventionShown = false;
@@ -776,6 +777,21 @@ async function bootstrapDesktopApp(): Promise<void> {
   await waitForExperimentFonts();
   document.body.classList.remove("app-fonts-loading");
   document.body.classList.add("app-fonts-ready");
+  openModal('<h1>正在准备实验</h1><p>请稍候…</p>');
+  try {
+    const assignment = await resolveServerAssignment(makeApiUrl('/api/assignments/resolve'), participantId, treatmentId, manipulationQuestions);
+    treatmentId = assignment.treatment;
+    treatmentMaterial = findTreatment(treatmentId)!;
+    manipulationQuestions = assignment.questions;
+    logger = createLogger(currentConfig, "formal");
+    engine = new ExperimentEngine(currentConfig, logger);
+    closeModal();
+  } catch {
+    // 分配未确认前不进入实验，避免网络失败时静默换材料。
+    openModal('<h1>暂时无法连接</h1><p>请检查网络后重试。</p><div class="actions"><button class="btn primary" id="retryAssignment">重试</button></div>');
+    document.querySelector('#retryAssignment')?.addEventListener('click', () => { void bootstrapDesktopApp(); }, { once: true });
+    return;
+  }
   void flushPendingSubmissions();
 
   world = new World2D(els.canvas, engine.config);

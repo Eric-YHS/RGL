@@ -7,6 +7,7 @@ import Database from "better-sqlite3";
 import express from "express";
 import { createAdminExportRouter } from "./admin-export-routes.js";
 import { loadRuntimeEnvironment } from "./runtime-env.js";
+import { createAssignmentStore, parseAssignment } from "./assignments.js";
 
 loadRuntimeEnvironment();
 
@@ -249,6 +250,7 @@ const insertSubmissionTx = db.transaction((payload, ipAddress) => {
 });
 
 const app = express();
+const resolveAssignment = createAssignmentStore(db);
 app.disable("x-powered-by");
 app.set("trust proxy", "loopback");
 app.use(express.json({ limit: "2mb" }));
@@ -276,6 +278,20 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/admin/export", createAdminExportRouter({ db }));
+
+app.post("/api/assignments/resolve", requireAllowedOrigin,
+  createIpRateLimiter({ windowMs: 60000, max: 300 }), (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const input = parseAssignment(req.body);
+    if (!input) return res.status(400).json({ ok: false, error: "Invalid assignment request" });
+    try {
+      const assignment = resolveAssignment(input, { ip: req.ip, userAgent: req.get("user-agent") });
+      res.json({ ok: true, ...assignment });
+    } catch (error) {
+      console.error("[assignment] resolve failed:", error);
+      res.status(503).json({ ok: false, error: "Assignment temporarily unavailable" });
+    }
+  });
 
 app.post(
   "/api/submissions",
@@ -308,16 +324,8 @@ app.listen(PORT, HOST, () => {
 });
 
 function extractClientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.trim()) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  if (Array.isArray(forwarded) && forwarded.length > 0) {
-    const first = String(forwarded[0]).trim();
-    if (first) return first;
-  }
-  return req.socket.remoteAddress ?? "";
+  // Express只信任上方配置的本机反向代理，避免直接采信外部X-Forwarded-For。
+  return req.ip ?? req.socket.remoteAddress ?? "";
 }
 
 function requireAllowedOrigin(req, res, next) {
