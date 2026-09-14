@@ -216,6 +216,10 @@ location /api/ {
 
 ## 示例短片
 
-如需在练习说明页展示示例短片，请将视频文件放到：
+指导页使用项目自己的中文录屏（源文件 `7月2日 (1).mp4`，约 32.47 秒），不使用早期英文参考视频：
 
-- `public/demo.mp4`
+- 视频：`public/demo-own-0702.mp4`
+- 封面：`public/demo-own-0702.png`（录屏第 3 秒）
+- 程序包同步目录：`jspsych-embed-test/flat-src/public/`
+
+更新录屏时同时更新这两个目录和 `src/main.ts` 引用；使用新文件名避免缓存旧视频。视频源 SHA-256：`E531C8DA5BAE6BBD708F29775CE2560F75739735AF586B1DC09CB90714C7253E`。

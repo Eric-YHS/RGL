@@ -479,8 +479,8 @@ function showInstructions(): void {
     <h2>示例短片</h2>
     <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
     <div class="instruction-video">
-      <video controls preload="metadata" playsinline poster="./demo-poster.svg">
-        <source src="./demo.mp4" type="video/mp4" />
+      <video controls preload="metadata" playsinline poster="./demo-own-0702.png">
+        <source src="./demo-own-0702.mp4" type="video/mp4" />
         当前浏览器无法直接播放示例短片。
       </video>
     </div>
