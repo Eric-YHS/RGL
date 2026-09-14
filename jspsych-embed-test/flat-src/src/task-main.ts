@@ -762,6 +762,9 @@ function resumeAfterAttentionRecheck(): void {
 }
 
 function isTaskMonitoringArmed(): boolean {
+  void desktopGateReady;
+  void desktopGateVisible;
+  void displayCheckCertified;
   return false;
 }
 
@@ -1390,6 +1393,7 @@ const hudCache = {
 };
 
 async function bootstrapDesktopApp(): Promise<void> {
+  void installExperimentVisibilityMonitor;
   await waitForExperimentFonts();
   document.body.classList.remove("app-fonts-loading");
   document.body.classList.add("app-fonts-ready");
