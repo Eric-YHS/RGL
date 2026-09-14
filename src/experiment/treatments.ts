@@ -180,33 +180,22 @@ export function normalizeTreatmentId(raw: string | null | undefined): string | n
   return TREATMENT_IDS.includes(normalized) ? normalized : null;
 }
 
-function hashString(text: string): number {
-  // djb2：对被试编号做确定性哈希，保证同一 pid 始终进入同一处理组。
-  let hash = 5381;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = ((hash << 5) + hash + text.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-}
-
 function randomTreatmentId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
-    const buf = new Uint32Array(1);
+  // 等概率抽取；拒绝不能均分为 15 份的尾部值，避免取模偏差。
+  const buf = new Uint32Array(1);
+  const limit = 0x100000000 - (0x100000000 % TREATMENT_IDS.length);
+  do {
     crypto.getRandomValues(buf);
-    return TREATMENT_IDS[buf[0] % TREATMENT_IDS.length];
-  }
-  return TREATMENT_IDS[Date.now() % TREATMENT_IDS.length];
+  } while (buf[0] >= limit);
+  return TREATMENT_IDS[buf[0] % TREATMENT_IDS.length];
 }
 
-export function resolveTreatmentId(search: string, participantId: string): string {
-  const params = new URLSearchParams(search);
-  const fromParam = normalizeTreatmentId(params.get("treatment"));
+export function resolveTreatmentId(_search: string, participantId: string): string {
   const key = participantId
     ? `${TREATMENT_STORAGE_KEY}:pid:${encodeURIComponent(participantId)}`
     : TREATMENT_STORAGE_KEY;
-  const assign = (): string => fromParam ?? (participantId
-    ? TREATMENT_IDS[hashString(participantId) % TREATMENT_IDS.length]
-    : randomTreatmentId());
+  // 编号仅用于恢复首次分配，不参与抽签；链接参数也不指定新被试的材料。
+  const assign = randomTreatmentId;
   try {
     const saved = normalizeTreatmentId(window.localStorage.getItem(key));
     if (saved) return saved;

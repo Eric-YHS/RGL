@@ -10,12 +10,24 @@ function load(name,draw=()=>0,store=storage){
  vm.runInNewContext(js,context);return context.exports;
 }
 const initial=load('treatments');
+// 既有分配保持兼容，不给已进入过实验的人重新抽签。
+values.set('honglvdeng_treatment_v1:pid:alice','P3');
 assert.equal(initial.resolveTreatmentId('?treatment=P3','alice'),'P3');
 assert.equal(load('treatments').resolveTreatmentId('?treatment=N4','alice'),'P3');
 assert.equal(load('treatments').resolveTreatmentId('','alice'),'P3');
-assert.equal(load('treatments').resolveTreatmentId('?treatment=N4','bob'),'N4');
+assert.equal(load('treatments',()=>0).resolveTreatmentId('?treatment=N4','bob'),'C1');
 assert.equal(load('treatments').resolveTreatmentId('?treatment=C1',''),'C1');
 assert.equal(load('treatments').resolveTreatmentId('?treatment=N5',''),'C1');
+// 首次抽签与编号、URL无关；相同编号在独立的首次分配中可以抽到不同材料。
+const emptyStore=()=>{const data=new Map();return {getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)};};
+const ids=initial.TREATMENT_MATERIALS.map(m=>m.id);
+for(let i=0;i<15;i++) {
+ assert.equal(load('treatments',()=>i,emptyStore()).resolveTreatmentId('?treatment=N5','same-pid'),ids[i]);
+ assert.equal(load('treatments',()=>i,emptyStore()).resolveTreatmentId('',''),ids[i]);
+}
+let draws=[0xffffffff,7];
+assert.equal(load('treatments',()=>draws.shift(),emptyStore()).resolveTreatmentId('','new'),ids[7]);
+assert.equal(draws.length,0);
 const get=()=>load('manipulationChecks').getPersistentManipulationQuestions;
 const first=get()('P3','alice');
 const before=JSON.stringify(first);
