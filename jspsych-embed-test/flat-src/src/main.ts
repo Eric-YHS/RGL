@@ -463,6 +463,8 @@ function buildFormalSubmission(): SessionSubmission {
     interventionMs: Math.round(interventionDurationMs)
   });
   if (manipulationAnswers) payload.manipulationAnswers = manipulationAnswers;
+  // 保存实际展示的题目和选项文本顺序，便于独立还原本次作答。
+  payload.manipulationQuestions = JSON.stringify(manipulationQuestions);
   return payload;
 }
 

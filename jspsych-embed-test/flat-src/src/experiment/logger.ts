@@ -56,6 +56,7 @@ export type SessionSubmission = {
   treatment: string;
   interventionMs: number;
   manipulationAnswers?: string;
+  manipulationQuestions?: string;
   comprehensionAnswer: string;
   postRuleAttitude: "A" | "B" | "C" | "D" | "";
   postRuleAttitudeText: string;

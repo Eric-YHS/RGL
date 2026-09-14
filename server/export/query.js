@@ -143,10 +143,13 @@ function readExportRows(db, sessionIds) {
   const json = JSON.stringify(sessionIds);
   const sessionWhere = idListWhere("s", "id", json);
   const eventWhere = idListWhere("e", "session_id", json);
+  const available = new Set(db.prepare('PRAGMA table_info(sessions)').all().map(c => c.name));
+  const manipulationColumns = ['manipulation_answers', 'manipulation_questions']
+    .filter(column => available.has(column)).map(column => `, s.${column}`).join('');
 
   const sessions = db
     .prepare(
-      `SELECT ${SESSION_COLUMNS} FROM sessions s WHERE ${sessionWhere.sql} ORDER BY s.id ASC`
+      `SELECT ${SESSION_COLUMNS}${manipulationColumns} FROM sessions s WHERE ${sessionWhere.sql} ORDER BY s.id ASC`
     )
     .all(...sessionWhere.params);
 

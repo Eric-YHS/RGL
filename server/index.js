@@ -110,6 +110,9 @@ if (!sessionColumnNames.has("intervention_ms")) {
 if (!sessionColumnNames.has("manipulation_answers")) {
   db.exec("ALTER TABLE sessions ADD COLUMN manipulation_answers TEXT NOT NULL DEFAULT ''");
 }
+if (!sessionColumnNames.has("manipulation_questions")) {
+  db.exec("ALTER TABLE sessions ADD COLUMN manipulation_questions TEXT NOT NULL DEFAULT ''");
+}
 
 const insertSessionStmt = db.prepare(`
 INSERT INTO sessions (
@@ -125,6 +128,7 @@ INSERT INTO sessions (
   treatment,
   intervention_ms,
   manipulation_answers,
+  manipulation_questions,
   elapsed_sec,
   money,
   violations,
@@ -151,6 +155,7 @@ VALUES (
   @treatment,
   @interventionMs,
   @manipulationAnswers,
+  @manipulationQuestions,
   @elapsedSec,
   @money,
   @violations,
@@ -437,6 +442,26 @@ function parseSubmission(body) {
   if (!interventionMs.ok) return interventionMs;
   const manipulationAnswers = readString(body.manipulationAnswers ?? "", { max: 4000, required: false });
   if (!manipulationAnswers.ok) return manipulationAnswers;
+  const manipulationQuestions = readString(body.manipulationQuestions ?? "", { max: 16000, required: false });
+  if (!manipulationQuestions.ok) return manipulationQuestions;
+  if (manipulationQuestions.value) {
+    try {
+      const questions = JSON.parse(manipulationQuestions.value);
+      if (!Array.isArray(questions) || questions.length !== 2 || !questions.every((q, i) =>
+        isRecord(q) && q.id === (i === 0 ? 'main' : 'key') &&
+        typeof q.prompt === 'string' && q.prompt.trim() &&
+        Array.isArray(q.options) && q.options.length === i + 3 &&
+        q.options.every(o => typeof o === 'string' && o.trim()) &&
+        new Set(q.options).size === q.options.length && q.options.includes(q.answer)
+      )) return fail('Invalid manipulationQuestions snapshot');
+      if (manipulationAnswers.value) {
+        const answers = JSON.parse(manipulationAnswers.value);
+        if (!Array.isArray(answers) || answers.length !== 2 || !answers.every((a,i)=>questions[i].options.includes(a))) {
+          return fail('Manipulation answers do not match displayed options');
+        }
+      }
+    } catch { return fail('manipulationQuestions must be valid JSON'); }
+  }
   if (manipulationAnswers.value) {
     try {
       const answers = JSON.parse(manipulationAnswers.value);
@@ -548,6 +573,7 @@ function parseSubmission(body) {
       treatment: treatment.value,
       interventionMs: interventionMs.value,
       manipulationAnswers: manipulationAnswers.value,
+      manipulationQuestions: manipulationQuestions.value,
       summary: {
         elapsedSec: elapsedSec.value,
         money: money.value,

@@ -4,6 +4,26 @@
 
 export const CHINA_OFFSET_MS = 8 * 60 * 60 * 1000; // Asia/Shanghai 无夏令时，固定 UTC+8
 
+function manipulationFields(row) {
+  if (row.manipulation_questions === undefined && row.manipulation_answers === undefined) return {};
+  let questions = [], answers = [];
+  try { questions = JSON.parse(row.manipulation_questions || '[]'); } catch { /* Older rows have no snapshot. */ }
+  try { answers = JSON.parse(row.manipulation_answers || '[]'); } catch { /* Preserve unknown values as blank. */ }
+  const result = {};
+  for (let i = 0; i < 2; i++) {
+    const q = Array.isArray(questions) ? questions[i] : null;
+    const options = Array.isArray(q?.options) ? q.options : [];
+    const answer = Array.isArray(answers) ? answers[i] : '';
+    const selectedIndex = options.indexOf(answer);
+    const prefix = `操纵检验${i + 1}`;
+    result[`${prefix}_题干`] = q?.prompt ?? '';
+    for (let j = 0; j < i + 3; j++) result[`${prefix}_选项${String.fromCharCode(65 + j)}`] = options[j] ?? '';
+    result[`${prefix}_所选字母`] = selectedIndex < 0 ? '' : String.fromCharCode(65 + selectedIndex);
+    result[`${prefix}_答案文本`] = answer ?? '';
+  }
+  return result;
+}
+
 const SENSITIVE_COLUMNS = new Set([
   "语言",
   "平台",
@@ -67,6 +87,7 @@ export function transformExportRows(raw, options) {
       "干预组别",
       "干预材料",
       "干预阅读时长_秒",
+      ...Object.keys(manipulationFields(raw.sessions.find(row => row.manipulation_questions !== undefined || row.manipulation_answers !== undefined) ?? {})),
       "理解测验回答",
       "规则看法选项",
       "规则看法补充",
@@ -101,6 +122,7 @@ export function transformExportRows(raw, options) {
       干预组别: formatTreatmentGroup(row.treatment),
       干预材料: row.treatment ?? "",
       干预阅读时长_秒: Math.round((row.intervention_ms ?? 0) / 1000),
+      ...manipulationFields(row),
       理解测验回答: formatComprehensionAnswer(row.comprehension_answer),
       规则看法选项: formatPostRuleAttitude(row.post_rule_attitude),
       规则看法补充: row.post_rule_attitude_text ?? "",
