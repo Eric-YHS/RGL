@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="红绿灯决策任务示例">
+  <rect width="960" height="540" fill="#ffffff"/>
+  <rect x="170" y="72" width="620" height="360" fill="#ffffff" stroke="#0b0b0b" stroke-width="4"/>
+
+  <rect x="326" y="82" width="308" height="38" rx="10" fill="#ffffff" stroke="#0b0b0b" stroke-width="3"/>
+  <text x="480" y="107" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#222222">
+    <tspan>剩余报酬：</tspan><tspan font-weight="700">￥100</tspan>
+  </text>
+
+  <line x1="260" y1="356" x2="708" y2="356" stroke="#777777" stroke-width="3" stroke-dasharray="8 8"/>
+
+  <line x1="480" y1="144" x2="480" y2="408" stroke="#8a8a8a" stroke-width="5"/>
+  <rect x="465" y="116" width="30" height="96" fill="#b6b6b6" stroke="#444444" stroke-width="2"/>
+  <circle cx="480" cy="136" r="13" fill="#f20f16"/>
+  <circle cx="480" cy="165" r="13" fill="#dcc36d"/>
+  <circle cx="480" cy="194" r="13" fill="#b9d4b7"/>
+
+  <line x1="690" y1="146" x2="690" y2="410" stroke="#0b0b0b" stroke-width="5"/>
+
+  <circle cx="238" cy="356" r="24" fill="#2f6fed"/>
+  <ellipse cx="238" cy="386" rx="22" ry="5" fill="rgba(0,0,0,0.16)"/>
+
+  <rect x="425" y="446" width="110" height="48" rx="4" fill="#3d3d3d"/>
+  <text x="480" y="478" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#ffffff">移动</text>
+
+  <g font-family="Microsoft YaHei, Noto Sans CJK SC, Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#111111">
+    <rect x="208" y="123" width="136" height="48" fill="#ff9f05"/>
+    <polygon points="344,123 436,104 344,154" fill="#ff9f05"/>
+    <text x="225" y="154">剩余报酬</text>
+
+    <rect x="348" y="218" width="96" height="48" fill="#ff9f05"/>
+    <polygon points="444,218 498,199 444,252" fill="#ff9f05"/>
+    <text x="364" y="249">红绿灯</text>
+
+    <rect x="160" y="380" width="56" height="48" fill="#ff9f05"/>
+    <polygon points="196,380 238,375 216,400" fill="#ff9f05"/>
+    <text x="177" y="411">您</text>
+
+    <rect x="258" y="358" width="128" height="48" fill="#ff9f05"/>
+    <polygon points="386,406 466,446 350,406" fill="#ff9f05"/>
+    <text x="276" y="389">移动按钮</text>
+
+    <rect x="705" y="380" width="104" height="48" fill="#ff9f05"/>
+    <polygon points="705,380 705,428 648,410" fill="#ff9f05"/>
+    <text x="724" y="411">终点线</text>
+  </g>
+</svg>

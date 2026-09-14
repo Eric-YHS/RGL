@@ -1,0 +1,38 @@
+@import "jspsych/css/jspsych.css";
+
+#jspsych-target {
+  display: none;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+}
+
+body.embed-completed #app {
+  display: none;
+}
+
+body.embed-completed #jspsych-target {
+  display: block;
+}
+
+body.embed-completed .jspsych-display-element,
+body.embed-completed .jspsych-content-wrapper,
+body.embed-completed .jspsych-content {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+}
+
+.embed-complete {
+  box-sizing: border-box;
+  width: min(680px, calc(100vw - 48px));
+  margin: 12vh auto 0;
+  padding: 36px;
+  border: 1px solid #c5c5c5;
+  border-radius: 12px;
+  background: #fff;
+  color: #1c1c1c;
+  text-align: left;
+  line-height: 1.7;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 10%);
+}

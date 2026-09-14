@@ -1,0 +1,63 @@
+{
+  "name": "Kenney City Kit Commercial",
+  "version": "2.1",
+  "license": "CC0-1.0",
+  "source": "https://www.kenney.nl/",
+  "notes": [
+    "GLB models reference the external texture atlas at Textures/colormap.png.",
+    "Keep the relative path Textures/colormap.png next to the .glb files."
+  ],
+  "textureAtlas": "Textures/colormap.png",
+  "models": {
+    "buildings": [
+      "building-a.glb",
+      "building-b.glb",
+      "building-c.glb",
+      "building-d.glb",
+      "building-e.glb",
+      "building-f.glb",
+      "building-g.glb",
+      "building-h.glb",
+      "building-i.glb",
+      "building-j.glb",
+      "building-k.glb",
+      "building-l.glb",
+      "building-m.glb",
+      "building-n.glb"
+    ],
+    "skyscrapers": [
+      "building-skyscraper-a.glb",
+      "building-skyscraper-b.glb",
+      "building-skyscraper-c.glb",
+      "building-skyscraper-d.glb",
+      "building-skyscraper-e.glb"
+    ],
+    "lowDetailBuildings": [
+      "low-detail-building-a.glb",
+      "low-detail-building-b.glb",
+      "low-detail-building-c.glb",
+      "low-detail-building-d.glb",
+      "low-detail-building-e.glb",
+      "low-detail-building-f.glb",
+      "low-detail-building-g.glb",
+      "low-detail-building-h.glb",
+      "low-detail-building-i.glb",
+      "low-detail-building-j.glb",
+      "low-detail-building-k.glb",
+      "low-detail-building-l.glb",
+      "low-detail-building-m.glb",
+      "low-detail-building-n.glb",
+      "low-detail-building-wide-a.glb",
+      "low-detail-building-wide-b.glb"
+    ],
+    "details": [
+      "detail-awning.glb",
+      "detail-awning-wide.glb",
+      "detail-overhang.glb",
+      "detail-overhang-wide.glb",
+      "detail-parasol-a.glb",
+      "detail-parasol-b.glb"
+    ]
+  }
+}
+
