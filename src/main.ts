@@ -684,8 +684,8 @@ function renderDesktopPreflightGate(): void {
       <p>感谢您参与本次学术研究。我们是中山大学学术研究团队。本研究的初始酬金为 <strong>100 元人民币</strong>，但实际酬金将完全取决于您在任务中的决策，介乎 <strong>0 元–84 元人民币</strong>。</p>
       <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。完成整个调查需 <strong>15-20 分钟</strong>。</p>
       <p>本次参与完全自愿，您可以随时退出，但退出无法获得酬金。作答完全匿名，数据仅用于学术研究，请放心作答。</p>
-      <p>为了确保您能顺利开展实验，请先完成设备与环境检测。</p>
-      <p class="hint">请使用台式机或笔记本电脑。开始后请保持页面可见，不要缩放或离开网页。</p>
+      <p>请使用台式机或笔记本电脑完成任务。</p>
+      <p class="hint">实验开始后请保持页面可见。</p>
       <div class="desktop-preflight-actions">
         <button class="btn primary" id="btnDesktopGateCheck">阅读任务指导</button>
       </div>
@@ -703,7 +703,9 @@ function renderDesktopPreflightGate(): void {
         engine.resume(performance.now());
         pausedByDesktopGate = false;
       }
-      startDisplayDeviceCheck("initial");
+      desktopGateReady = true;
+      displayCheckCertified = true;
+      showInstructions();
     });
 }
 
@@ -760,14 +762,7 @@ function resumeAfterAttentionRecheck(): void {
 }
 
 function isTaskMonitoringArmed(): boolean {
-  return (
-    desktopGateReady &&
-    displayCheckCertified &&
-    !displayCheckMode &&
-    !desktopGateVisible &&
-    !attentionWarningVisible &&
-    engine.state.phase !== "finished"
-  );
+  return false;
 }
 
 function isExperimentRegionFullyVisible(): boolean {
@@ -1341,10 +1336,6 @@ els.btnAction.addEventListener("click", () => {
 
   const nowMs = performance.now();
   if (engine.state.phase === "idle") {
-    if (!displayCheckCertified) {
-      startDisplayDeviceCheck("before_start");
-      return;
-    }
     closeModal();
     engine.start(nowMs);
     return;
@@ -1408,7 +1399,6 @@ async function bootstrapDesktopApp(): Promise<void> {
   lastPhase = engine.state.phase;
   finishGate = false;
 
-  installExperimentVisibilityMonitor();
   renderDesktopPreflightGate();
   loop();
 }
