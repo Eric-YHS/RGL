@@ -328,7 +328,7 @@ let manipulationAnswers: string | null = null;
 let isPracticeMode = false;
 let desktopGateIntroductionAcknowledged = false;
 
-type View = "welcome" | "modal" | "task" | "intervention" | "completion" | "manipulation";
+type View = "welcome" | "modal" | "formal_submit" | "task" | "intervention" | "completion" | "manipulation";
 type Frame = { view: View; nodes: Node[]; engine: ExperimentEngine; logger: ExperimentLogger; practice: boolean };
 let view: View = "welcome";
 let navigationVersion = 0;
@@ -370,11 +370,11 @@ function navigate(next: View): void {
   }
   view = next;
   navigationVersion++;
-  backButton.hidden = navigationLocked || backStack.length === 0;
+  backButton.hidden = navigationLocked || view === "formal_submit" || backStack.length === 0;
 }
 
 function goBack(): void {
-  if (navigationLocked) return;
+  if (navigationLocked || view === "formal_submit") return;
   const frame = backStack.pop();
   if (!frame) return;
   leaveView();
@@ -395,7 +395,7 @@ function goBack(): void {
   if (view === "intervention") showIntervention();
   if (view === "completion") showCompletionScreen(completionState);
   restoring = false;
-  backButton.hidden = backStack.length === 0;
+  backButton.hidden = view === "formal_submit" || backStack.length === 0;
   updateHud();
 }
 backButton.addEventListener("click", goBack);
@@ -754,7 +754,7 @@ function showCompletionScreen(state: CompletionScreenState): void {
 }
 
 function showTaskSubmitScreen(): void {
-  navigate("modal");
+  navigate(isPracticeMode ? "modal" : "formal_submit");
   openModal(`
     <h1>${isPracticeMode ? "练习完成" : "决策任务"}</h1>
     <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
