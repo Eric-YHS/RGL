@@ -7,4 +7,18 @@ const sets: Record<string, ManipulationQuestion[]> = {
   C4: [{id:"main",prompt:"根据您刚才阅读的材料，下列哪项最准确地描述了材料的主旨？",options:["光合作用中的光能捕获与能量转化","医院消杀期间的接诊状况","资源节约集约与绿色低碳全民活动"],answer:"光合作用中的光能捕获与能量转化"},{id:"key",prompt:"根据您刚才阅读的材料，下列哪项是材料中提到的关键信息？",options:["类囊体薄膜吸收光子","缓冲区应急预案","单位GDP用水量下降"],answer:"类囊体薄膜吸收光子"}],
   C5: [{id:"main",prompt:"根据您刚才阅读的材料，下列哪项最准确地描述了材料的主旨？",options:["天体引力作用与潮汐周期的形成","疫情期间涉疫人员的车辆转运任务","资源节约集约与绿色低碳全民活动"],answer:"天体引力作用与潮汐周期的形成"},{id:"key",prompt:"根据您刚才阅读的材料，下列哪项是材料中提到的关键信息？",options:["引力平方反比定律","双司机轮换保障","单位GDP用水量下降"],answer:"引力平方反比定律"}]
 };
-export function getManipulationQuestions(id:string): ManipulationQuestion[] { const base=sets[id.slice(0,2)] ?? sets.C1; return base.map(q=>({...q,options:[...q.options].sort(()=>Math.random()-.5)})); }
+export function getManipulationQuestions(id:string): ManipulationQuestion[] {
+  const idx = Number(id.slice(1)) || 1;
+  const base = sets[`C${idx}`] ?? sets.C1;
+  const group = id[0];
+  const topics = ["孕产妇的就医过程","封控区儿童急危重症的救治","急救中心的急性高危病例应对","医院消杀期间的接诊状况","疫情期间涉疫人员的车辆转运任务"];
+  const positive = ["救治绿色通道","先救人后补程序","高危胸痛即刻出车","缓冲区应急预案","双司机轮换保障"];
+  const negative = ["核酸过期4小时","先审批再转运","凌晨4时25分出车","患者突发哮喘","凌晨2点40分发生事故"];
+  return base.map((q, qi) => {
+    const options = [...q.options];
+    if (qi === 0 && group !== "C") options[1] = topics[idx - 1];
+    if (qi === 1 && group === "P") options[1] = positive[idx - 1];
+    if (qi === 1 && group === "N") options[1] = negative[idx - 1];
+    return {...q, options: options.sort(()=>Math.random()-.5)};
+  });
+}
