@@ -639,8 +639,7 @@ function showManipulationCheckScreen(): void {
   backButton.hidden = true;
   const questions = manipulationQuestions;
   openModal(`
-    <h1>操纵检验</h1>
-    <p>请根据您刚才阅读的材料作答。每道题请选择一个答案。</p>
+    <h1>材料问答</h1>
     ${questions.map((q,i)=>`<fieldset class="comp-question"><legend>${i+1}. ${q.prompt}</legend>${q.options.map((o,j)=>`<label style="display:flex;gap:10px;margin:8px 0"><input type="radio" name="manip-${q.id}" value="${escapeHtmlAttr(o)}" />${String.fromCharCode(65+j)}. ${o}</label>`).join("")}</fieldset>`).join("")}
     <div class="hint" id="manipHint"></div>
     <div class="actions">
@@ -751,7 +750,6 @@ function showCompletionScreen(state: CompletionScreenState): void {
       ${statusBlock}
       <p>在决策任务中，初始酬金 <strong>${formatMoney(engine.config.startMoney)}</strong>，您从起点到终点耗时 <strong>${baseTravelSec} 秒</strong>，在红绿灯处等待了 <strong>${waitSec} 秒</strong>，按照任务规则，每等待 1 秒扣除酬金 <strong>${formatMoney(engine.config.moneyLossPerSec)}</strong>。因此，您在该部分总计获得酬金 <strong>${formatMoney(taskMoney)}</strong>；</p>
       <p class="completion-close-note">后续填写完成简短问卷后，除固定参与费用外，您将在见数平台通过额外奖励渠道领取此部分收益。</p>
-      <p>感谢您的参与。</p>
       ${surveyAction}
     </div>
   `);
@@ -965,7 +963,7 @@ function loop(): void {
   const nowMs = performance.now();
   engine.tick(nowMs);
 
-  world?.render(engine.state, engine.getRouteProgress01(), nowMs);
+  world?.render(engine.state, engine.getRouteProgress01(), nowMs, isPracticeMode);
   updateHud();
 
   if (view === "task" && !finishGate && (lastPhase !== engine.state.phase || engine.state.phase === "finished")) {

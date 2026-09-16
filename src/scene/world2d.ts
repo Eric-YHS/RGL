@@ -122,7 +122,7 @@ export class World2D {
     }
   }
 
-  render(state: ExperimentState, _progress01: number, nowMs: number): void {
+  render(state: ExperimentState, _progress01: number, nowMs: number, isPractice = false): void {
     if (this.disposed) return;
     this.syncLayoutToCanvasSize();
 
@@ -131,7 +131,7 @@ export class World2D {
     ctx.scale(this.dpr, this.dpr);
     try {
       this.clear(ctx);
-      this.drawTaskPanel(ctx);
+      this.drawTaskPanel(ctx, isPractice);
       this.drawEndowment(ctx, state.money);
       this.drawTrafficLight(ctx, state, nowMs);
       this.drawFinishLine(ctx);
@@ -146,7 +146,7 @@ export class World2D {
     ctx.fillRect(0, 0, this.w, this.h);
   }
 
-  private drawTaskPanel(ctx: CanvasRenderingContext2D): void {
+  private drawTaskPanel(ctx: CanvasRenderingContext2D, isPractice: boolean): void {
     const titleH = 27;
     const contentY = this.panelY + titleH;
     const contentH = this.panelH - titleH;
@@ -172,7 +172,7 @@ export class World2D {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.font = `700 14px ${UI_FONT_FAMILY}`;
-    ctx.fillText("决策任务", this.panelX + 10, this.panelY + titleH / 2 + 1);
+    ctx.fillText(isPractice ? "练习任务" : "决策任务", this.panelX + 10, this.panelY + titleH / 2 + 1);
 
     ctx.fillStyle = WINDOW_CHROME;
     ctx.fillRect(this.panelX + 1, contentY + 1, this.panelW - 2, 35);
