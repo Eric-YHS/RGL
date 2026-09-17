@@ -28,7 +28,7 @@ var se=Object.defineProperty;var ie=(n,t,e)=>t in n?se(n,t,{enumerable:!0,config
     <p>在本次任务中，您将控制一个<strong>圆点</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
     <ul>
       <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，圆点会靠近一个红绿信号灯并停下等待。</li>
-      <li>此时按钮会由<strong>【开始】</strong>变为<strong>【移动】</strong>。要让圆点再次移动并通过红绿灯，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
+      <li>要让圆点再次移动并通过红绿灯，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
     </ul>
     <h2>示例短片</h2>
     <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
@@ -88,7 +88,7 @@ var se=Object.defineProperty;var ie=(n,t,e)=>t in n?se(n,t,{enumerable:!0,config
       <button class="btn primary" id="btnBeginExperiment">我已作答，下一步</button>
     </div>
   `),p.modalCard.querySelectorAll('input[type="radio"]').forEach(u=>{u.checked=Pt[u.name]===u.value,u.addEventListener("change",()=>{Pt[u.name]=u.value})}),(i=document.querySelector("#btnBeginExperiment"))==null||i.addEventListener("click",()=>{var M,I;const u=performance.now(),f=(M=document.querySelector('input[name="comp1"]:checked'))==null?void 0:M.value,S=(I=document.querySelector('input[name="comp2"]:checked'))==null?void 0:I.value,w=document.querySelector("#compHint");if(!f||!S){w&&(w.textContent="请回答全部两个问题后再继续。");return}if(f!=="less"||S!=="wait"){w&&(w.textContent="回答错误，请重新阅读指导语后再继续");return}w&&(w.textContent="");const b=`q1=${f};q2=${S}`;ot={nowMs:u,note:b},C.log({nowMs:u,tSec:0,event:"comprehension_answer",phase:r.state.phase,lightIndex:null,lightColor:null,money:r.state.money,note:b}),x(),c()})},T=function(){nt!==null&&(window.clearInterval(nt),nt=null)},k=function(){e("intervention"),vt=performance.now(),a(`
-    <h1>干预材料</h1>
+    <h1>材料阅读</h1>
     <p>${ft.prompt}</p>
     <div class="intervention-material">
       ${ft.paragraphs.map(f=>`<p>${f}</p>`).join("")}
@@ -119,7 +119,7 @@ var se=Object.defineProperty;var ie=(n,t,e)=>t in n?se(n,t,{enumerable:!0,config
     <h1>练习完成</h1>
     <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
     <div class="actions">
-      <button class="btn" id="btnRepeatPractice">重新练习</button>
+      <button class="btn" id="btnRepeatPractice">继续练习</button>
       <button class="btn primary" id="btnTaskSubmit">下一步</button>
     </div>
   `),(i=document.querySelector("#btnRepeatPractice"))==null||i.addEventListener("click",()=>{x(),c()}),(u=document.querySelector("#btnTaskSubmit"))==null||u.addEventListener("click",()=>{Ut?(Tt(),c()):k()})},U=function(){N.hidden=v!=="task"||r.state.phase!=="finished";const i=r.state,u=i.phase==="finished",f=i.phase==="idle"?"开始":"移动";y.btnActionDisabled!==u&&(p.btnAction.disabled=u,y.btnActionDisabled=u),y.btnActionText!==f&&(p.btnAction.textContent=f,y.btnActionText=f),p.btnAction.classList.toggle("action-start",i.phase==="idle"),p.btnAction.classList.toggle("action-move",i.phase!=="idle"&&i.phase!=="finished");let S="—",w=Et(0,0),b=L(r.config.startMoney),M="—",I=!1,R=!1,Q=!1;if(i.phase!=="idle")if(i.phase==="finished"?S="已完成":i.phase==="moving"?S="走向红绿灯":i.phase==="waiting_red"?S="红绿灯前等待":i.phase==="moving_to_finish"&&(S="冲向终点线"),w=Et(i.elapsedSec,0),b=L(i.money),I=i.phase!=="finished"&&Math.floor(i.elapsedSec*2.4)%2===0,i.phase==="moving")M="行走中";else if(i.phase==="waiting_red"){const W=i.currentLightColor==="red";M=W?"🔴 红灯":"🟢 绿灯",R=W,Q=!W}else if(i.phase==="moving_to_finish"){const W=i.passedOutcome[i.lightIndex]==="run_red";M=W?"🔴 红灯":"已通过",R=W}else i.phase==="finished"&&(M="✅ 完成");y.posText!==S&&(p.posText.textContent=S,y.posText=S),y.timeText!==w&&(p.timeText.textContent=w,y.timeText=w),y.moneyText!==b&&(p.moneyText.textContent=b,y.moneyText=b),y.lightText!==M&&(p.lightText.textContent=M,y.lightText=M),y.moneyUrgent!==I&&(p.moneyText.classList.toggle("urgent",I),y.moneyUrgent=I),y.lightRed!==R&&(p.lightText.classList.toggle("light-red",R),y.lightRed=R),y.lightGreen!==Q&&(p.lightText.classList.toggle("light-green",Q),y.lightGreen=Q)},It=function(){const i=performance.now();r.tick(i),A==null||A.render(r.state,r.getRouteProgress01(),i,O),U(),v==="task"&&!$&&(E!==r.state.phase||r.state.phase==="finished")?(E=r.state.phase,r.state.phase==="finished"&&($=!0,kt())):E=r.state.phase,requestAnimationFrame(It)};document.body.classList.add("app-fonts-loading"),bt.innerHTML=`

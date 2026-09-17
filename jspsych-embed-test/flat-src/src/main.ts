@@ -474,7 +474,7 @@ function showInstructions(): void {
     <p>在本次任务中，您将控制一个<strong>圆点</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
     <ul>
       <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，圆点会靠近一个红绿信号灯并停下等待。</li>
-      <li>此时按钮会由<strong>【开始】</strong>变为<strong>【移动】</strong>。要让圆点再次移动并通过红绿灯，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
+      <li>要让圆点再次移动并通过红绿灯，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
     </ul>
     <h2>示例短片</h2>
     <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
@@ -595,7 +595,7 @@ function showIntervention(): void {
   navigate("intervention");
   interventionStartedAtMs = performance.now();
   openModal(`
-    <h1>干预材料</h1>
+    <h1>材料阅读</h1>
     <p>${treatmentMaterial.prompt}</p>
     <div class="intervention-material">
       ${treatmentMaterial.paragraphs.map((paragraph) => `<p>${paragraph}</p>`).join("")}
@@ -775,7 +775,7 @@ function showTaskSubmitScreen(): void {
     <h1>练习完成</h1>
     <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
     <div class="actions">
-      <button class="btn" id="btnRepeatPractice">重新练习</button>
+      <button class="btn" id="btnRepeatPractice">继续练习</button>
       <button class="btn primary" id="btnTaskSubmit">下一步</button>
     </div>
   `);
