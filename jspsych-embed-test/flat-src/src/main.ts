@@ -414,9 +414,9 @@ function renderDesktopPreflightGate(): void {
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card desktop-entry-card">
       <h1>欢迎参加学术调查</h1>
-      <p>感谢您参与本次学术研究。我们是中山大学学术研究团队。本研究的初始酬金为 <strong>100 元人民币</strong>，但最终酬金将完全取决于您在任务中的决策，介乎 <strong>0 元–84 元人民币</strong>。</p>
+      <p>感谢您参与本次学术研究。本研究的初始酬金为 100 元人民币，但最终酬金将完全取决于您在任务中的决策，介乎 0 元–84 元人民币。</p>
       <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。</p>
-      <p>实验开始后请保持页面可见，不要缩放或离开网页。</p>
+      <p>实验开始后请保持页面可见，不要离开网页。</p>
       <div class="desktop-preflight-actions">
         <button class="btn primary" id="btnDesktopGateCheck">阅读任务指导</button>
       </div>
@@ -471,15 +471,15 @@ function showInstructions(): void {
   navigate("modal");
   openModal(`
     <h1>指导语</h1>
-    <p>在本次任务中，您将控制一个<strong>圆点</strong>，并在屏幕上将其移动至<strong>终点线</strong>。</p>
+    <p>在本次任务中，您将控制一个圆点，并在屏幕上将其移动至终点线。</p>
     <ul>
-      <li>当您点击屏幕<strong>底部</strong>的<strong>【开始】</strong>按钮后，圆点会靠近一个红绿信号灯并停下等待。</li>
-      <li>要让圆点再次移动并通过红绿灯，请点击<strong>【移动】</strong>按钮，您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
+      <li>当您点击屏幕底部的【开始】按钮后，实验开始，圆点会靠近一个红绿信号灯并自动停下等待。</li>
+      <li>要让圆点再次移动并通过红绿灯，请点击【移动】按钮；您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
     </ul>
     <h2>示例短片</h2>
     <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
     <div class="instruction-video">
-      <video controls preload="metadata" playsinline poster="./demo-own-0702.png">
+      <video controls preload="metadata" playsinline poster="./demo-annotated-current.svg">
         <source src="./demo-own-0702.mp4" type="video/mp4" />
         当前浏览器无法直接播放示例短片。
       </video>
@@ -487,8 +487,8 @@ function showInstructions(): void {
     <h2>任务规则</h2>
     <p>在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
     <h2>酬金计算</h2>
-    <p>任务酬金取决于您将圆点移至终点线所花费的时间。注意：计时从点击<strong>【开始】</strong>按钮起计时。其中，从起点到红绿灯处，耗时 <strong>${engine.config.segmentDurationSec} 秒</strong>，从红绿灯处抵达终点线，耗时 <strong>${engine.config.segmentDurationSec} 秒</strong>。</p>
-    <p>初始报酬为 <strong>100 元人民币整</strong>，每耗时 <strong>1</strong> 秒，资金减少 <strong>￥${engine.config.moneyLossPerSec}</strong>；红灯等待 <strong>${engine.config.redWaitSec} 秒</strong>后变为绿灯。</p>
+    <p>任务酬金取决于您将圆点移至终点线所花费的时间。注意：计时从点击【开始】按钮起计时。其中，从起点到红绿灯处，耗时 ${engine.config.segmentDurationSec} 秒，从红绿灯处抵达终点线，耗时 ${engine.config.segmentDurationSec} 秒。</p>
+    <p>初始报酬为100￥，每耗时1秒，资金减少￥${engine.config.moneyLossPerSec}；红灯等待${engine.config.redWaitSec}秒后自动变为绿灯。</p>
     <div class="actions">
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
     </div>
@@ -505,7 +505,7 @@ function showComprehensionTest(): void {
     <h1>理解测试</h1>
     <p>请回答以下问题，以确认您已理解任务规则。两题均需回答正确才能继续。</p>
     <div class="comp-question">
-      <p><strong>1. 根据上述说明，如果圆点抵达终点线所花费的总时间越长，您最终获得的金钱报酬会如何变化。</strong></p>
+      <p>1. 根据上述说明，如果圆点抵达终点线所花费的总时间越长，您最终获得的金钱报酬会如何变化。</p>
       <div class="choice-stack" style="display:grid; gap:10px;">
         <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
           <input type="radio" name="comp1" value="more" />
@@ -522,7 +522,7 @@ function showComprehensionTest(): void {
       </div>
     </div>
     <div class="comp-question">
-      <p><strong>2. 根据指导语，本次任务的规则是什么？</strong></p>
+      <p>2. 根据指导语，本次任务的规则是什么？</p>
       <div class="choice-stack" style="display:grid; gap:10px;">
         <label style="display:flex; gap:10px; align-items:flex-start; cursor:pointer;">
           <input type="radio" name="comp2" value="fast" />
@@ -773,7 +773,7 @@ function showTaskSubmitScreen(): void {
   navigate("practice_complete");
   openModal(`
     <h1>练习完成</h1>
-    <p>圆点已越过终点线。请点击下方按钮进入下一屏幕。</p>
+    <p>您已完成练习轮次。您可以选择返回导语重新阅读说明、继续练习，或进入下一环节。</p>
     <div class="actions">
       <button class="btn" id="btnRepeatPractice">继续练习</button>
       <button class="btn primary" id="btnTaskSubmit">下一步</button>
