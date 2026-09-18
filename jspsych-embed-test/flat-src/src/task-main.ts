@@ -51,9 +51,9 @@ function makeConfig(revealMode: RevealMode, numLights: number): ExperimentConfig
     revealMode,
     numLights,
     segmentDurationSec: 4,
-    redWaitSec: 15,
-    startMoney: 100,
-    moneyLossPerSec: 2.0
+    redWaitSec: 12,
+    startMoney: 25,
+    moneyLossPerSec: 1.0
   };
 }
 
@@ -414,7 +414,7 @@ function renderDesktopPreflightGate(): void {
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card desktop-entry-card">
       <h1>欢迎参加学术调查</h1>
-      <p>感谢您参与本次学术研究。本研究的初始酬金为 100 元人民币，但最终酬金将完全取决于您在任务中的决策，介乎 0 元–84 元人民币。</p>
+      <p>感谢您参与本次学术研究。本研究的初始酬金为 25 元人民币，但最终酬金将完全取决于您在任务中的决策，介乎 0 元–17 元人民币。</p>
       <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。</p>
       <p>实验开始后请保持页面可见，不要离开网页。</p>
       <div class="desktop-preflight-actions">
@@ -479,8 +479,8 @@ function showInstructions(): void {
     <h2>示例短片</h2>
     <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
     <div class="instruction-video">
-      <video controls preload="metadata" playsinline poster="./demo-annotated-current.svg">
-        <source src="./demo-own-0702.mp4" type="video/mp4" />
+      <video controls preload="metadata" playsinline poster="./demo-annotated-25-12.svg">
+        <source src="./demo-25-12.mp4" type="video/mp4" />
         当前浏览器无法直接播放示例短片。
       </video>
     </div>
@@ -488,7 +488,7 @@ function showInstructions(): void {
     <p>在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
     <h2>酬金计算</h2>
     <p>任务酬金取决于您将圆点移至终点线所花费的时间。注意：计时从点击【开始】按钮起计时。其中，从起点到红绿灯处，耗时 ${engine.config.segmentDurationSec} 秒，从红绿灯处抵达终点线，耗时 ${engine.config.segmentDurationSec} 秒。</p>
-    <p>初始报酬为100￥，每耗时1秒，资金减少￥${engine.config.moneyLossPerSec}；红灯等待${engine.config.redWaitSec}秒后自动变为绿灯。</p>
+    <p>初始报酬为${engine.config.startMoney}￥，每耗时1秒，资金减少￥${engine.config.moneyLossPerSec}；红灯等待${engine.config.redWaitSec}秒后自动变为绿灯。</p>
     <div class="actions">
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
     </div>
@@ -667,7 +667,7 @@ function showManipulationCheckScreen(): void {
 function enterPracticeMode(): void {
   navigate("task");
   isPracticeMode = true;
-  if (!practiceRun || practiceRun.engine.state.phase === "finished") {
+  if (!practiceRun) {
     const practiceLogger = createLogger(practiceConfig, "practice");
     practiceRun = { logger: practiceLogger, engine: new ExperimentEngine(practiceConfig, practiceLogger) };
   }
@@ -773,19 +773,15 @@ function showTaskSubmitScreen(): void {
   navigate("practice_complete");
   openModal(`
     <h1>练习完成</h1>
-    <p>您已完成练习轮次。您可以选择返回导语重新阅读说明、继续练习，或进入下一环节。</p>
+    <p>您已完成练习轮次。请进入下一环节。</p>
     <div class="actions">
-      <button class="btn" id="btnRepeatPractice">继续练习</button>
+
       <button class="btn primary" id="btnTaskSubmit">下一步</button>
     </div>
   `);
 
-  document.querySelector<HTMLButtonElement>("#btnRepeatPractice")?.addEventListener("click", () => {
-    enterPracticeMode();
-    closeModal();
-  });
   document.querySelector<HTMLButtonElement>("#btnTaskSubmit")?.addEventListener("click", () => {
-    // 顺序：练习（可重练）→ 干预材料 → 正式任务 → 操纵检验 → 保存。
+    // 顺序：练习（固定一次）→ 干预材料 → 正式任务 → 操纵检验 → 保存。
     if (!interventionShown) {
       showIntervention();
     } else {
