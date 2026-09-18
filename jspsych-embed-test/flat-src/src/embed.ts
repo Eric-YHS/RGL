@@ -80,27 +80,14 @@ function completeInCredamo(payload: TaskSubmission): void {
   if (completed) return;
   completed = true;
   document.body.classList.add("embed-completed");
-  const endTrial = {
-    type: jsPsychHtmlButtonResponse,
-    stimulus: `
-      <section class="embed-complete">
-        <h1>实验已完成</h1>
-        <p>点击下方按钮后继续完成见数问卷。</p>
-      </section>
-    `,
-    choices: ["继续答题"],
-    data: toEndTrialData(payload),
-    on_finish: () => {
-      const finish = window.onCredamoEndTrialFinish;
-      if (typeof finish === "function") {
-        finish(jsPsych.data.get().csv());
-        return;
-      }
-      // Only used outside Credamo, where the platform bridge does not exist.
-      window.setTimeout(showMissingCredamoBridge, 0);
-    }
-  };
-  void jsPsych.run([endTrial]);
+  jsPsych.data.get().push(toEndTrialData(payload));
+  const finish = window.onCredamoEndTrialFinish;
+  if (typeof finish === "function") {
+    finish(jsPsych.data.get().csv());
+    return;
+  }
+  // Only used outside Credamo, where the platform bridge does not exist.
+  showMissingCredamoBridge();
 }
 
 window.addEventListener(CONTINUE_SURVEY_EVENT, (event) => {
@@ -146,8 +133,31 @@ window.fetch = async (input, init) => {
   return originalFetch(input, init);
 };
 
-void import("./task-main").catch((error: unknown) => {
-  document.body.classList.add("embed-completed");
-  const target = document.querySelector<HTMLElement>("#jspsych-target");
-  if (target) target.textContent = `任务加载失败：${String(error)}`;
-});
+const consentTrial = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <section class="embed-consent">
+      <h1>社会/自然现象与公众行为研究</h1>
+      <h2>知情同意书</h2>
+      <p>欢迎您参与本次学术研究，该研究由中山大学政治与公共事务管理学院相关团队开展。如有疑问，请联系邮箱 zhangyq359@mail2.sysu.edu.cn，为确保研究的准确性与自愿性，下面请您了解：</p>
+      <p><strong>被试要求：</strong>我们希望您年满18周岁，具备基本的中文阅读和理解能力，能够独立阅读材料并在电脑端作答。</p>
+      <p><strong>程序：</strong>请认真阅读材料并根据您的真实想法完成相关题项，预计完成时间10-15分钟。</p>
+      <p><strong>报酬：</strong>完整作答并被采纳后，您将获得相应报酬；如果中途退出、未完整作答或未通过有效性检测，将无法获得报酬；但您有权随时退出。</p>
+      <p><strong>声明：</strong>本研究不采集姓名、身份证号等个人标识信息，作答完全匿名；数据严格保密，仅用于学术研究。</p>
+      <p>作答并提交本调查将被视为您知悉、同意上述内容并自愿参与。如不同意，请退出作答。</p>
+    </section>
+  `,
+  choices: ["同意并开始实验"],
+  data: { phase: "informed_consent", participant_id: participantId },
+  on_finish: () => {
+    document.body.classList.remove("embed-consenting");
+    void import("./task-main").catch((error: unknown) => {
+      document.body.classList.add("embed-completed");
+      const target = document.querySelector<HTMLElement>("#jspsych-target");
+      if (target) target.textContent = `任务加载失败：${String(error)}`;
+    });
+  }
+};
+
+document.body.classList.add("embed-consenting");
+void jsPsych.run([consentTrial]);

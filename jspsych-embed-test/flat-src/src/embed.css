@@ -1,5 +1,30 @@
 @import "jspsych/css/jspsych.css";
 
+body.embed-consenting {
+  margin: 0;
+  background: #e7e7e7;
+}
+
+body.embed-consenting #app { display: none; }
+body.embed-consenting #jspsych-target { display: block; }
+
+.embed-consent {
+  box-sizing: border-box;
+  width: min(850px, calc(100vw - 32px));
+  margin: 24px auto 12px;
+  padding: 24px 32px;
+  background: white;
+  border: 1px solid #aaa;
+  color: #111;
+  text-align: left;
+  font-family: "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+}
+.embed-consent h1 { font-size: 24px; text-align: center; }
+.embed-consent h2 { font-size: 20px; text-align: center; }
+body.embed-consenting .jspsych-btn { margin-bottom: 24px; }
+
 #jspsych-target {
   display: none;
   width: 100%;
