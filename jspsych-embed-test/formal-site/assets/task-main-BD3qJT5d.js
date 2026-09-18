@@ -111,7 +111,7 @@ var st=Object.defineProperty;var it=(n,e,t)=>e in n?st(n,e,{enumerable:!0,config
     <h1>任务完成</h1>
     <div class="completion-card-body">
       ${i==="saving"?'<div class="completion-status saving">数据正在保存，请稍候…</div>':i==="sent"?'<div class="completion-status success">数据已成功保存。</div>':'<div class="completion-status queued">网络暂时不稳定，数据已保存并会继续尝试提交。</div>'}
-      <p>在决策任务中，初始酬金 <strong>${L(r.config.startMoney)}</strong>，您从起点到终点耗时 <strong>${f} 秒</strong>，在红绿灯处等待了 <strong>${S} 秒</strong>，按照任务规则，每等待 1 秒扣除酬金 <strong>${L(r.config.moneyLossPerSec)}</strong>。因此，您在该部分总计获得酬金 <strong>${L(w)}</strong>；</p>
+      <p>在决策任务中，初始酬金 ${L(r.config.startMoney)}，您从起点到终点耗时 ${f} 秒，在红绿灯处等待了 ${S} 秒。按照任务规则，每等待 1 秒扣除酬金 ${L(r.config.moneyLossPerSec)}。因此，您在该部分总计获得酬金 ${L(w)}；</p>
       <p class="completion-close-note">后续填写完成简短问卷后，除固定参与费用外，您将在见数平台通过额外奖励渠道领取此部分收益。</p>
       ${b}
     </div>

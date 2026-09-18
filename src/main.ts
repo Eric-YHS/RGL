@@ -748,7 +748,7 @@ function showCompletionScreen(state: CompletionScreenState): void {
     <h1>任务完成</h1>
     <div class="completion-card-body">
       ${statusBlock}
-      <p>在决策任务中，初始酬金 <strong>${formatMoney(engine.config.startMoney)}</strong>，您从起点到终点耗时 <strong>${baseTravelSec} 秒</strong>，在红绿灯处等待了 <strong>${waitSec} 秒</strong>，按照任务规则，每等待 1 秒扣除酬金 <strong>${formatMoney(engine.config.moneyLossPerSec)}</strong>。因此，您在该部分总计获得酬金 <strong>${formatMoney(taskMoney)}</strong>；</p>
+      <p>在决策任务中，初始酬金 ${formatMoney(engine.config.startMoney)}，您从起点到终点耗时 ${baseTravelSec} 秒，在红绿灯处等待了 ${waitSec} 秒。按照任务规则，每等待 1 秒扣除酬金 ${formatMoney(engine.config.moneyLossPerSec)}。因此，您在该部分总计获得酬金 ${formatMoney(taskMoney)}；</p>
       <p class="completion-close-note">后续填写完成简短问卷后，除固定参与费用外，您将在见数平台通过额外奖励渠道领取此部分收益。</p>
       ${surveyAction}
     </div>
