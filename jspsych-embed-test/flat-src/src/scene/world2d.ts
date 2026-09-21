@@ -172,7 +172,7 @@ export class World2D {
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.font = `700 14px ${UI_FONT_FAMILY}`;
-    ctx.fillText(isPractice ? "练习任务" : "决策任务", this.panelX + 10, this.panelY + titleH / 2 + 1);
+    ctx.fillText(isPractice ? "练习任务" : "正式任务（本轮决定您的具体报酬）", this.panelX + 10, this.panelY + titleH / 2 + 1);
 
     ctx.fillStyle = WINDOW_CHROME;
     ctx.fillRect(this.panelX + 1, contentY + 1, this.panelW - 2, 35);

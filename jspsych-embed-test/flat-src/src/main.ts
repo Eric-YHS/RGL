@@ -414,7 +414,7 @@ function renderDesktopPreflightGate(): void {
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card desktop-entry-card">
       <h1>欢迎参加学术调查</h1>
-      <p>感谢您参与本次学术研究。本研究的初始酬金为 25 元人民币，但最终酬金将完全取决于您在任务中的决策，介乎 0 元–17 元人民币。</p>
+      <p>感谢您参与本次学术研究。最终酬金取决于您在任务中的决策，介乎 0 元–17 元人民币。</p>
       <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。</p>
       <p>实验开始后请保持页面可见，不要离开网页。</p>
       <div class="desktop-preflight-actions">
@@ -480,7 +480,7 @@ function showInstructions(): void {
     <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
     <div class="instruction-video">
       <video controls preload="metadata" playsinline poster="./demo-annotated-25-12.svg">
-        <source src="./demo-25-12.mp4" type="video/mp4" />
+        <source src="./demo-narrated-0921.mp4" type="video/mp4" />
         当前浏览器无法直接播放示例短片。
       </video>
     </div>
