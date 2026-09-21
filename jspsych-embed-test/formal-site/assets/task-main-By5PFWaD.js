@@ -34,7 +34,7 @@ var st=Object.defineProperty;var it=(n,e,t)=>e in n?st(n,e,{enumerable:!0,config
     <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
     <div class="instruction-video">
       <video controls preload="metadata" playsinline poster="./demo-annotated-25-12.svg">
-        <source src="./demo-guided-0921.mp4" type="video/mp4" />
+        <source src="./demo-explainer-0921.mp4" type="video/mp4" />
         当前浏览器无法直接播放示例短片。
       </video>
     </div>
