@@ -16,9 +16,9 @@ var st=Object.defineProperty;var it=(n,e,t)=>e in n?st(n,e,{enumerable:!0,config
   `;else{let n=function(){p.modalCard.querySelectorAll("video").forEach(i=>i.pause()),r.pause(performance.now()),v==="intervention"&&(ye+=Math.max(0,performance.now()-ve),T())},e=function(){return!Ce&&V.length>0&&v!=="practice_complete"&&v!=="completion"},t=function(i){q||(v!=="manipulation"&&V.push({view:v,nodes:Array.from(p.modalCard.childNodes),engine:r,logger:C,practice:O}),n()),v=i,K++,x.hidden=!e()},s=function(){if(!e())return;const i=V.pop();i&&(n(),v=i.view,K++,r=i.engine,C=i.logger,O=i.practice,A==null||A.dispose(),A=new Z(p.canvas,r.config),E=r.state.phase,$=r.state.phase==="finished",p.desktopGate.style.display=v==="welcome"?"grid":"none",p.modalCard.replaceChildren(...i.nodes),p.modal.style.display=v==="welcome"||v==="task"?"none":"grid",v==="task"&&r.resume(performance.now()),q=!0,v==="intervention"&&k(),v==="completion"&&re(de),q=!1,x.hidden=!e(),U())},o=function(){var i;_e||(p.desktopGate.innerHTML=`
     <section class="desktop-preflight-card desktop-entry-card">
       <h1>欢迎参加学术调查</h1>
-      <p>感谢您参与本次学术研究。最终酬金取决于您在任务中的决策，介乎 0 元–17 元人民币。</p>
+      <p>感谢您参与本次学术研究。最终酬金取决于您在任务中的决策，介乎0元-17元人民币。</p>
       <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。</p>
-      <p>实验开始后请保持页面可见，不要离开网页。</p>
+      <p>实验开始后请保持页面可见，不要中途离开网页。</p>
       <div class="desktop-preflight-actions">
         <button class="btn primary" id="btnDesktopGateCheck">阅读任务指导</button>
       </div>
