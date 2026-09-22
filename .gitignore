@@ -14,3 +14,6 @@ pnpm-debug.log*
 .env.*
 
 coverage/
+
+# 本地放置的练习示例短片（代码会在缺失时提示），不入库
+public/demo.mp4

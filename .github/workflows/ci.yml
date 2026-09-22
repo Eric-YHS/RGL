@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Check bundled assets match their manifests
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+
+          missing = []
+          manifest = json.loads(pathlib.Path("public/textures/polyhaven/manifest.json").read_text())
+          for name, tex in manifest["textures"].items():
+              for map_name, rel in tex["maps"].items():
+                  if not pathlib.Path("public/textures/polyhaven", rel).is_file():
+                      missing.append(f"textures/{name}/{map_name} -> {rel}")
+          for rel in ("hdri/daytime.hdr", "hdri/sunset.hdr"):
+              if not pathlib.Path("public", rel).is_file():
+                  missing.append(rel)
+          if missing:
+              sys.exit("缺少清单中声明的资源：\n" + "\n".join(missing))
+          print(f"ok: {len(manifest['textures'])} 套贴图与 2 张 HDRI 齐全")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
