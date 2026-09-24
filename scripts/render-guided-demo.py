@@ -12,20 +12,20 @@ import subprocess
 import sys
 
 SEGMENTS = [
-    (0.4, 5.9, "route", "两段路程", "从起点到红绿灯、红绿灯到终点，各需四秒。"),
-    (6.2, 9.1, "initial", "初始报酬", "初始报酬二十五元。"),
-    (9.4, 13.8, "cost", "计时扣费", "点击开始后，每耗时一秒，扣除一元。"),
-    (14.1, 19.3, "formula", "最终报酬", "最终报酬为二十五元减去全程耗时的秒数。"),
-    (19.6, 25.0, "rule", "任务规则", "绿灯亮起后方可通行。红灯等待十二秒。"),
-    (25.2, 30.5, "minimum", "遵守规则", "等待绿灯时，全程二十秒，最终报酬五元。"),
-    (31.4, 34.8, "start", "点击开始", "准备好后，点击开始。"),
-    (35.2, 39.0, "approach", "自动移动", "圆点自动靠近红绿灯。"),
-    (39.1, 42.0, "stop", "自动停下", "并在红灯前停下等待。"),
-    (42.2, 45.2, "money", "报酬变化", "红灯时，报酬持续扣除。"),
-    (45.3, 48.3, "move", "移动按钮", "等待中，移动按钮仍有效。"),
-    (48.3, 51.0, "early", "提前通行", "点击就会提前通过红灯。"),
-    (51.1, 55.2, "green", "自动通行", "红灯满十二秒变绿，圆点自动前行。"),
-    (55.4, 60.0, "finish", "任务完成", "越过终点线，本轮完成，结算报酬。"),
+    (0.4, 6.9, "route", "两段路程", "从起点到红绿灯、红绿灯到终点，各需四秒。"),
+    (7.1, 10.8, "initial", "初始报酬", "初始报酬二十五元。"),
+    (11.0, 16.8, "cost", "计时扣费", "点击开始后，每耗时一秒扣除一元。"),
+    (17.0, 21.0, "money", "红灯期间", "在红灯期间，报酬每秒持续扣除。"),
+    (21.2, 28.6, "formula", "最终报酬", "您的最终报酬为二十五元减去全程耗时的总秒数。"),
+    (28.8, 34.9, "rule", "任务规则", "规则是：绿灯亮起后，方可通行。"),
+    (35.1, 40.8, "red_wait", "默认等待", "红绿灯默认等待时间为十二秒。"),
+    (41.0, 50.3, "duration", "遵守规则", "若等待绿灯通行，全程固定耗时二十秒，即行进八秒加上等待十二秒。"),
+    (50.5, 53.5, "minimum", "最终报酬", "最终报酬为五元。"),
+    (53.6, 56.3, "start", "点击开始", "准备好后，点击开始。"),
+    (56.4, 61.4, "approach", "自动移动", "圆点自动向红绿灯靠近，并在红灯前停下等待。"),
+    (61.5, 70.9, "move", "移动按钮", "等待中，屏幕下方的移动按钮保持有效。若点击该按钮，圆点将不等待红灯，直接通过路口。"),
+    (72.0, 76.8, "green", "自动通行", "红灯满十二秒后自动变绿，圆点继续前行。"),
+    (76.9, 82.2, "finish", "任务完成", "圆点越过终点线，本轮任务完成，结算最终报酬。"),
 ]
 
 
@@ -79,27 +79,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         event(start, end, "Chapter", rf"{{\pos(470,658)\fad(100,120)}}{chapter}")
         event(start, end, "Caption", rf"{{\pos(470,693)\fad(100,120)}}{text}")
     # Build the two route labels in speech order, away from the actual trajectory.
-    arrow(.6, 5.9, 100, 418, 320)
-    label(.6, 5.9, 265, 289, "起点 → 红绿灯：4秒")
-    arrow(2.5, 5.9, 476, 784, 320)
-    label(2.5, 5.9, 631, 289, "红绿灯 → 终点：4秒")
-    box(6.2, 19.3, 346, 37, 247, 34)
-    label(6.2, 9.1, 660, 235, "初始报酬  ￥25")
-    label(9.4, 13.8, 660, 235, "开始计时后，每秒 −￥1")
-    label(14.1, 19.3, 660, 235, "￥25 − 全程耗时")
-    box(19.6, 25.0, 431, 94, 38, 95)
-    label(19.6, 25.0, 650, 235, "红灯 12秒 → 绿灯通行")
-    label(25.2, 30.5, 640, 290, "行进 8秒 + 等待 12秒 = 20秒 → ￥5")
-    box(31.4, 35.1, 407, 543, 125, 55)
-    label(31.4, 34.8, 655, 573, "准备好后点击")
-    label(35.2, 39.0, 650, 300, "自动靠近红绿灯")
-    label(39.1, 42.0, 640, 330, "红灯前自动停下")
-    box(42.2, 45.1, 346, 37, 247, 34)
-    label(42.2, 45.1, 660, 235, "红灯期间仍在计时扣费")
-    box(45.3, 51.0, 407, 543, 125, 55)
-    label(45.3, 51.0, 680, 573, "红灯期间可按")
-    box(51.1, 55.2, 431, 94, 38, 95)
-    label(51.1, 55.2, 660, 235, "绿灯亮起，自动通行")
+    arrow(.6, 6.9, 100, 418, 320)
+    label(.6, 6.9, 265, 289, "起点 → 红绿灯：4秒")
+    arrow(2.5, 6.9, 476, 784, 320)
+    label(2.5, 6.9, 631, 289, "红绿灯 → 终点：4秒")
+    box(7.1, 28.6, 346, 37, 247, 34)
+    label(7.1, 10.8, 660, 235, "初始报酬  ￥25")
+    label(11.0, 16.8, 660, 235, "开始计时后，每秒 −￥1")
+    label(17.0, 21.0, 660, 235, "红灯期间每秒仍扣费")
+    label(21.2, 28.6, 660, 235, "￥25 − 全程耗时")
+    box(28.8, 40.8, 431, 94, 38, 95)
+    label(28.8, 34.9, 650, 235, "绿灯亮起后，方可通行")
+    label(35.1, 40.8, 650, 235, "红灯默认等待12秒")
+    label(41.0, 53.5, 640, 290, "行进 8秒 + 等待 12秒 = 20秒 → ￥5")
+    box(53.6, 56.3, 407, 543, 125, 55)
+    label(53.6, 56.3, 655, 573, "准备好后点击")
+    label(56.4, 61.4, 650, 300, "自动靠近红绿灯并停下")
+    box(61.5, 70.9, 407, 543, 125, 55)
+    label(61.5, 70.9, 680, 573, "红灯期间可按")
+    box(72.0, 76.8, 431, 94, 38, 95)
+    label(72.0, 76.8, 660, 235, "绿灯亮起，自动通行")
     return "".join(out)
 
 
@@ -109,20 +108,31 @@ async def voices(args):
     import edge_tts
     for start, end, key, _, text in SEGMENTS:
         path = args.work / f"{key}.mp3"
-        fingerprint = hashlib.sha256((text + '|zh-CN-XiaoxiaoNeural|+0%').encode()).hexdigest()
+        # A real pause after 后 prevents TTS from sounding like 后方 ("behind").
+        voice_parts = ["规则是：绿灯亮起后，", "方可通行。"] if key == "rule" else [text]
+        fingerprint = hashlib.sha256(("|".join(voice_parts) + '|zh-CN-XiaoxiaoNeural|+0%|rule-pause-400ms').encode()).hexdigest()
         cache_key = args.work / f"{key}.sha256"
         if not path.exists() or not cache_key.exists() or cache_key.read_text() != fingerprint:
             # Cache completed clips; retry transient service failures with capped waits.
-            delay = 2
-            while True:
-                try:
-                    await edge_tts.Communicate(text, "zh-CN-XiaoxiaoNeural", rate="+0%").save(str(path))
-                    cache_key.write_text(fingerprint)
-                    break
-                except (ConnectionError, TimeoutError) as exc:
-                    print(f"Retry {key}: {exc}", flush=True)
-                    await asyncio.sleep(delay)
-                    delay = min(30, delay * 2)
+            for part_num, part_text in enumerate(voice_parts):
+                part_path = args.work / f"{key}-part{part_num}.mp3" if key == "rule" else path
+                delay = 2
+                while True:
+                    try:
+                        await edge_tts.Communicate(part_text, "zh-CN-XiaoxiaoNeural", rate="+0%").save(str(part_path))
+                        break
+                    except (ConnectionError, TimeoutError) as exc:
+                        print(f"Retry {key}: {exc}", flush=True)
+                        await asyncio.sleep(delay)
+                        delay = min(30, delay * 2)
+            if key == "rule":
+                subprocess.run([
+                    args.ffmpeg, "-y", "-v", "error", "-i", str(args.work / "rule-part0.mp3"),
+                    "-i", str(args.work / "rule-part1.mp3"), "-filter_complex",
+                    "[0:a]apad=pad_dur=0.4[a0];[a0][1:a]concat=n=2:v=0:a=1[a]",
+                    "-map", "[a]", "-q:a", "2", str(path),
+                ], check=True)
+            cache_key.write_text(fingerprint)
         duration = float(subprocess.check_output([args.ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(path)], text=True))
         if duration > end - start:
             raise ValueError(f"{key}: {duration:.3f}s does not fit {end-start:.3f}s; shorten narration")
@@ -146,12 +156,14 @@ def main():
     (args.work / "tutorial.ass").write_text(build_ass(), encoding="utf-8-sig")
     (args.work / "timing.json").write_text(json.dumps(SEGMENTS, ensure_ascii=False, indent=2), encoding="utf-8")
     cmd = [args.ffmpeg, "-y", "-v", "warning", "-i", str(args.source)]
-    filters = ["[0:v]pad=940:720:0:0:color=0xf7f9fb,ass=tutorial.ass[v]"]
+    # Hold the opening frame so the complete spoken explanation has natural pauses.
+    # The actual red-light sequence remains real time: 12 seconds in the recording.
+    filters = ["[0:v]tpad=start_duration=21:start_mode=clone:stop_duration=1:stop_mode=clone,pad=940:720:0:0:color=0xf7f9fb,ass=tutorial.ass[v]"]
     for i, (start, _, key, _, _) in enumerate(SEGMENTS, 1):
         cmd += ["-i", str(args.work / f"{key}.mp3")]
         filters.append(f"[{i}:a]adelay={round(start*1000)}:all=1[a{i}]")
     filters.append("".join(f"[a{i}]" for i in range(1, len(SEGMENTS)+1)) + f"amix=inputs={len(SEGMENTS)}:normalize=0,alimiter=limit=0.95,apad[a]")
-    cmd += ["-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", "60", "-r", "25", "-c:v", "libx264", "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(args.output)]
+    cmd += ["-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", "83", "-r", "25", "-c:v", "libx264", "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(args.output)]
     subprocess.run(cmd, cwd=args.work, check=True)
 
 
