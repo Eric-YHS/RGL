@@ -22,8 +22,10 @@ type TaskSubmission = {
   postRuleAttitudeText?: string;
   summary?: {
     elapsedSec?: number;
+    waitingSec?: number;
     money?: number;
     violations?: number;
+    ruleFollowed?: boolean;
   };
   events?: unknown[];
   manipulationAnswers?: string;
@@ -58,6 +60,8 @@ function toEndTrialData(payload: TaskSubmission): Record<string, unknown> {
     post_rule_attitude: payload.postRuleAttitude ?? "",
     post_rule_attitude_text: payload.postRuleAttitudeText ?? "",
     elapsed_sec: payload.summary?.elapsedSec ?? null,
+    waiting_sec: payload.summary?.waitingSec ?? null,
+    rule_followed: payload.summary?.ruleFollowed ?? null,
     money: payload.summary?.money ?? null,
     violations: payload.summary?.violations ?? null,
     events_json: JSON.stringify(payload.events ?? [])

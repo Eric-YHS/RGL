@@ -29,7 +29,7 @@ npm --prefix server run dev
 - `comprehensionAnswer`（支持 `yes`/`no` 或多题格式，如 `q1=less;q2=wait`）
 - `postRuleAttitude`
 - `postRuleAttitudeText`
-- `summary`（`elapsedSec` / `money` / `violations`）
+- `summary`（`elapsedSec` / `waitingSec` / `money` / `violations` / `ruleFollowed`）。`waitingSec` 最多为 12 秒；不在红灯期间提前通行时，`ruleFollowed` 为 `true`，亮绿灯后圆点自动通行。
 - `device`
 - `events[]`
 

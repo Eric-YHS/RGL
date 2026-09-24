@@ -57,8 +57,10 @@ CREATE TABLE IF NOT EXISTS sessions (
   treatment TEXT NOT NULL DEFAULT '',
   intervention_ms INTEGER NOT NULL DEFAULT 0,
   elapsed_sec REAL NOT NULL,
+  waiting_sec REAL,
   money REAL NOT NULL,
   violations INTEGER NOT NULL,
+  rule_followed INTEGER,
   user_agent TEXT NOT NULL,
   language TEXT NOT NULL,
   platform TEXT NOT NULL,
@@ -113,6 +115,12 @@ if (!sessionColumnNames.has("manipulation_answers")) {
 if (!sessionColumnNames.has("manipulation_questions")) {
   db.exec("ALTER TABLE sessions ADD COLUMN manipulation_questions TEXT NOT NULL DEFAULT ''");
 }
+if (!sessionColumnNames.has("waiting_sec")) {
+  db.exec("ALTER TABLE sessions ADD COLUMN waiting_sec REAL");
+}
+if (!sessionColumnNames.has("rule_followed")) {
+  db.exec("ALTER TABLE sessions ADD COLUMN rule_followed INTEGER");
+}
 
 const insertSessionStmt = db.prepare(`
 INSERT INTO sessions (
@@ -130,8 +138,10 @@ INSERT INTO sessions (
   manipulation_answers,
   manipulation_questions,
   elapsed_sec,
+  waiting_sec,
   money,
   violations,
+  rule_followed,
   user_agent,
   language,
   platform,
@@ -157,8 +167,10 @@ VALUES (
   @manipulationAnswers,
   @manipulationQuestions,
   @elapsedSec,
+  @waitingSec,
   @money,
   @violations,
+  @ruleFollowed,
   @userAgent,
   @language,
   @platform,
@@ -212,8 +224,10 @@ const insertSubmissionTx = db.transaction((payload, ipAddress) => {
     ...payload,
     ipAddress,
     elapsedSec: payload.summary.elapsedSec,
+    waitingSec: payload.summary.waitingSec,
     money: payload.summary.money,
     violations: payload.summary.violations,
+    ruleFollowed: payload.summary.ruleFollowed === null ? null : Number(payload.summary.ruleFollowed),
     userAgent: payload.device.userAgent,
     language: payload.device.language,
     platform: payload.device.platform,
@@ -483,10 +497,17 @@ function parseSubmission(body) {
   if (!isRecord(body.summary)) return fail("summary must be an object");
   const elapsedSec = readNumber(body.summary.elapsedSec, { min: 0, max: 600000 });
   if (!elapsedSec.ok) return elapsedSec;
+  const waitingSec = body.summary.waitingSec === undefined
+    ? success(null)
+    : readNumber(body.summary.waitingSec, { min: 0, max: 12 });
+  if (!waitingSec.ok) return waitingSec;
   const money = readNumber(body.summary.money, { min: -1000000, max: 1000000 });
   if (!money.ok) return money;
   const violations = readInteger(body.summary.violations, { min: 0, max: 100000 });
   if (!violations.ok) return violations;
+  const ruleFollowed = body.summary.ruleFollowed === undefined ? null : body.summary.ruleFollowed;
+  if (ruleFollowed !== null && typeof ruleFollowed !== "boolean") return fail("summary.ruleFollowed must be boolean");
+  if (ruleFollowed !== null && ruleFollowed !== (violations.value === 0)) return fail("summary.ruleFollowed conflicts with violations");
 
   if (!isRecord(body.device)) return fail("device must be an object");
   const userAgent = readString(body.device.userAgent ?? "", { max: 2000, required: false });
@@ -576,8 +597,10 @@ function parseSubmission(body) {
       manipulationQuestions: manipulationQuestions.value,
       summary: {
         elapsedSec: elapsedSec.value,
+        waitingSec: waitingSec.value,
         money: money.value,
-        violations: violations.value
+        violations: violations.value,
+        ruleFollowed
       },
       device: {
         userAgent: userAgent.value,

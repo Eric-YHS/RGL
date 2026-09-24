@@ -1,8 +1,6 @@
 import type { ExperimentConfig, ExperimentState, LightColor } from "./types";
 import type { ExperimentLogger } from "./logger";
 
-const MAX_DT_SEC = 0.1;
-
 export class ExperimentEngine {
   readonly config: ExperimentConfig;
   private readonly logger: ExperimentLogger;
@@ -32,7 +30,7 @@ export class ExperimentEngine {
       waitingSinceSec: null,
       greenAtSec: null,
       autoPassAtSec: null,
-      waitingForWalkSec: null,
+      moveToFinishStartedAtSec: null,
       currentLightColor: "red"
     };
   }
@@ -69,7 +67,7 @@ export class ExperimentEngine {
     this.state.waitingSinceSec = null;
     this.state.greenAtSec = null;
     this.state.autoPassAtSec = null;
-    this.state.waitingForWalkSec = null;
+    this.state.moveToFinishStartedAtSec = null;
     this.state.currentLightColor = "red";
     this.state.violations = 0;
 
@@ -102,14 +100,9 @@ export class ExperimentEngine {
       routePos10: Number(routePos10.toFixed(3))
     });
 
-    // Effective only while waiting at the light. Red -> run the red light
-    // (rule-breaking); green -> proceed normally (rule-following).
-    if (this.state.phase === "waiting_red") {
-      if (this.state.currentLightColor === "red") {
-        this.runRedLight(nowMs, tSec);
-      } else {
-        this.passOnGreen(nowMs, tSec);
-      }
+    // The red-light button is the only decision. Green triggers automatic passage.
+    if (this.state.phase === "waiting_red" && this.state.currentLightColor === "red") {
+      this.runRedLight(nowMs, tSec);
     }
   }
 
@@ -117,8 +110,6 @@ export class ExperimentEngine {
     if (this.state.phase === "idle" || this.state.phase === "finished") return;
     if (this.lastTickMs === null || this.startedAtMs === null || this.pausedAtMs !== null) return;
 
-    const rawDt = (nowMs - this.lastTickMs) / 1000;
-    const dtSec = Math.max(0, Math.min(MAX_DT_SEC, rawDt));
     this.lastTickMs = nowMs;
 
     this.state.elapsedSec = this.getNowTsec(nowMs);
@@ -126,12 +117,11 @@ export class ExperimentEngine {
 
     // Phase: moving toward the traffic light
     if (this.state.phase === "moving") {
-      this.state.segmentProgressSec += dtSec;
+      this.state.segmentProgressSec = Math.min(this.config.segmentDurationSec, this.state.elapsedSec);
       if (this.state.segmentProgressSec >= this.config.segmentDurationSec) {
         this.state.segmentProgressSec = this.config.segmentDurationSec;
         this.arriveAtLight(nowMs);
       }
-      return;
     }
 
     // Phase: waiting at red light
@@ -143,31 +133,32 @@ export class ExperimentEngine {
         this.state.currentLightColor !== "green"
       ) {
         this.state.currentLightColor = "green";
-        this.state.waitingForWalkSec = this.state.elapsedSec;
+        this.state.elapsedSec = greenAtSec;
+        this.state.money = this.getMoneyAtElapsed(greenAtSec);
         this.logger.log({
           nowMs,
-          tSec: this.state.elapsedSec,
+          tSec: greenAtSec,
           event: "light_green",
           phase: this.state.phase,
           lightIndex: this.state.lightIndex,
           lightColor: "green",
           money: this.getRecordedMoney()
         });
+        this.passOnGreen(nowMs, greenAtSec);
       }
-      // The circle stays at the light until the participant clicks "移动".
-      // Clicking during red counts as running the red light (rule-breaking);
-      // clicking after it turns green counts as rule-following.
-      return;
     }
 
     // Phase: moving from traffic light to finish line
     if (this.state.phase === "moving_to_finish") {
-      this.state.segmentProgressSec += dtSec;
+      const moveStartedAt = this.state.moveToFinishStartedAtSec ?? this.state.elapsedSec;
+      this.state.segmentProgressSec = Math.min(this.config.segmentDurationSec, Math.max(0, this.getNowTsec(nowMs) - moveStartedAt));
       if (this.state.segmentProgressSec >= this.config.segmentDurationSec) {
         this.state.segmentProgressSec = this.config.segmentDurationSec;
-        this.finish(nowMs, this.state.elapsedSec);
+        this.finish(nowMs, moveStartedAt + this.config.segmentDurationSec);
+      } else {
+        this.state.elapsedSec = this.getNowTsec(nowMs);
+        this.state.money = this.getMoneyAtElapsed(this.state.elapsedSec);
       }
-      return;
     }
   }
 
@@ -205,6 +196,13 @@ export class ExperimentEngine {
     return this.getRecordedMoneyAtElapsed(this.state.elapsedSec);
   }
 
+  getWaitingSec(): number {
+    const beganAt = this.state.waitingSinceSec;
+    if (beganAt === null) return 0;
+    const endedAt = this.state.moveToFinishStartedAtSec ?? this.state.elapsedSec;
+    return Math.min(this.config.redWaitSec, Math.max(0, endedAt - beganAt));
+  }
+
   pause(nowMs: number): void {
     if (this.state.phase === "idle" || this.state.phase === "finished") return;
     if (this.pausedAtMs !== null) return;
@@ -223,16 +221,15 @@ export class ExperimentEngine {
 
   private arriveAtLight(nowMs: number): void {
     this.state.phase = "waiting_red";
-    this.state.waitingSinceSec = this.state.elapsedSec;
-    this.state.greenAtSec = this.state.elapsedSec + this.config.redWaitSec;
+    this.state.waitingSinceSec = this.config.segmentDurationSec;
+    this.state.greenAtSec = this.config.segmentDurationSec + this.config.redWaitSec;
     this.state.lightGreenAtSecByIndex[this.state.lightIndex] = this.state.greenAtSec;
     this.state.autoPassAtSec = null;
-    this.state.waitingForWalkSec = null;
     this.state.currentLightColor = "red";
 
     this.logger.log({
       nowMs,
-      tSec: this.state.elapsedSec,
+      tSec: this.state.waitingSinceSec,
       event: "arrive_light",
       phase: this.state.phase,
       lightIndex: this.state.lightIndex,
@@ -301,6 +298,8 @@ export class ExperimentEngine {
     this.state.passedOutcome[this.state.lightIndex] = reason;
     this.state.phase = "moving_to_finish";
     this.state.segmentProgressSec = 0;
+    this.state.moveToFinishStartedAtSec = tSec;
+    this.state.autoPassAtSec = reason === "green" ? tSec : null;
 
     this.logger.log({
       nowMs,
@@ -315,6 +314,8 @@ export class ExperimentEngine {
   }
 
   private finish(nowMs: number, tSec: number): void {
+    this.state.elapsedSec = tSec;
+    this.state.money = this.getMoneyAtElapsed(tSec);
     this.state.phase = "finished";
 
     this.logger.log({
@@ -335,12 +336,13 @@ export class ExperimentEngine {
 
   private getMoneyAtElapsed(elapsedSec: number): number {
     const chargedSeconds = Math.floor(Math.max(0, elapsedSec));
-    return Math.max(0, this.config.startMoney - this.config.moneyLossPerSec * chargedSeconds);
+    const minimum = this.config.startMoney - this.config.moneyLossPerSec *
+      (this.config.segmentDurationSec * 2 + this.config.redWaitSec);
+    return Math.max(0, minimum, this.config.startMoney - this.config.moneyLossPerSec * chargedSeconds);
   }
 
   private getRecordedMoneyAtElapsed(elapsedSec: number): number {
-    const chargedSeconds = Math.max(0, elapsedSec);
-    return Math.max(0, this.config.startMoney - this.config.moneyLossPerSec * chargedSeconds);
+    return this.getMoneyAtElapsed(elapsedSec);
   }
 
   private getRoutePosScale10(): number {

@@ -414,7 +414,7 @@ function renderDesktopPreflightGate(): void {
   els.desktopGate.innerHTML = `
     <section class="desktop-preflight-card desktop-entry-card">
       <h1>欢迎参加学术调查</h1>
-      <p>感谢您参与本次学术研究。最终酬金取决于您在任务中的决策，介乎0元-17元人民币。</p>
+      <p>感谢您参与本次学术研究。最终酬金取决于您在任务中的决策，介乎5元-17元人民币。</p>
       <p>本次任务共两轮，其中第一轮为<strong>练习</strong>，帮助参与者熟悉任务。第二轮为<strong>正式任务</strong>，将直接决定薪酬。</p>
       <p>实验开始后请保持页面可见，不要中途离开网页。</p>
       <div class="desktop-preflight-actions">
@@ -455,8 +455,10 @@ function buildFormalSubmission(): SessionSubmission {
     submittedAtIso: new Date().toISOString(),
     summary: {
       elapsedSec: engine.state.elapsedSec,
+      waitingSec: engine.getWaitingSec(),
       money: engine.getRecordedMoney(),
-      violations: engine.state.violations
+      violations: engine.state.violations,
+      ruleFollowed: engine.state.violations === 0
     },
     device: collectDeviceInfo(),
     interventionMs: Math.round(interventionDurationMs)
@@ -474,13 +476,13 @@ function showInstructions(): void {
     <p>在本次任务中，您将控制一个圆点，并在屏幕上将其移动至终点线。</p>
     <ul>
       <li>当您点击屏幕底部的【开始】按钮后，实验开始，圆点会靠近一个红绿信号灯并自动停下等待。</li>
-      <li>要让圆点再次移动并通过红绿灯，请点击【移动】按钮；您可以在任何时刻点击该按钮让圆点通过红绿灯。</li>
+      <li>红灯满 ${engine.config.redWaitSec} 秒后自动变绿，圆点会继续前行；红灯等待期间点击【移动】按钮，圆点会提前通过红绿灯。</li>
     </ul>
     <h2>示例短片</h2>
     <p>请观看下面的示例短片，了解任务画面和操作方式。</p>
     <div class="instruction-video">
       <video controls preload="metadata" playsinline poster="./demo-annotated-25-12.svg">
-        <source src="./demo-explainer-0921.mp4" type="video/mp4" />
+        <source src="./demo-auto-green-0924.mp4" type="video/mp4" />
         当前浏览器无法直接播放示例短片。
       </video>
     </div>
@@ -488,7 +490,7 @@ function showInstructions(): void {
     <p>在红绿灯处等待，直至其变为<strong>绿灯</strong>后通行。</p>
     <h2>酬金计算</h2>
     <p>任务酬金取决于您将圆点移至终点线所花费的时间。注意：计时从点击【开始】按钮起计时。其中，从起点到红绿灯处，耗时 ${engine.config.segmentDurationSec} 秒，从红绿灯处抵达终点线，耗时 ${engine.config.segmentDurationSec} 秒。</p>
-    <p>初始报酬为${engine.config.startMoney}￥，每耗时1秒，资金减少￥${engine.config.moneyLossPerSec}；红灯等待${engine.config.redWaitSec}秒后自动变为绿灯。</p>
+    <p>初始报酬为${engine.config.startMoney}￥，每耗时1秒，资金减少￥${engine.config.moneyLossPerSec}；红灯等待${engine.config.redWaitSec}秒后自动变为绿灯并通行。遵守规则等待绿灯时，全程耗时 ${engine.config.segmentDurationSec * 2 + engine.config.redWaitSec} 秒，最终报酬为 ${formatMoney(engine.config.startMoney - engine.config.moneyLossPerSec * (engine.config.segmentDurationSec * 2 + engine.config.redWaitSec))}。</p>
     <div class="actions">
       <button class="btn primary" id="btnToCompTest">下一步：理解测试</button>
     </div>
@@ -724,9 +726,8 @@ async function saveFormalResults(): Promise<SubmitOutcome> {
 function showCompletionScreen(state: CompletionScreenState): void {
   navigate("completion");
   completionState = state;
-  const elapsed = engine.state.elapsedSec;
   const baseTravelSec = engine.config.segmentDurationSec * 2;
-  const waitSec = Math.floor(Math.max(0, elapsed - baseTravelSec));
+  const waitSec = Number(engine.getWaitingSec().toFixed(2));
   const taskMoney = engine.state.money;
   const surveyAction =
     state === "saving"
@@ -748,7 +749,7 @@ function showCompletionScreen(state: CompletionScreenState): void {
     <h1>任务完成</h1>
     <div class="completion-card-body">
       ${statusBlock}
-      <p>在决策任务中，初始酬金 ${formatMoney(engine.config.startMoney)}，您从起点到终点耗时 ${baseTravelSec} 秒，在红绿灯处等待了 ${waitSec} 秒。按照任务规则，每等待 1 秒扣除酬金 ${formatMoney(engine.config.moneyLossPerSec)}。因此，您在该部分总计获得酬金 ${formatMoney(taskMoney)}；</p>
+      <p>在决策任务中，初始酬金 ${formatMoney(engine.config.startMoney)}，圆点行进耗时 ${baseTravelSec} 秒，在红绿灯处等待了 ${waitSec} 秒，全程耗时 ${Number(engine.state.elapsedSec.toFixed(2))} 秒。按照任务规则，每耗时 1 秒扣除酬金 ${formatMoney(engine.config.moneyLossPerSec)}。因此，您在该部分总计获得酬金 ${formatMoney(taskMoney)}；</p>
       <p class="completion-close-note">后续填写完成简短问卷后，除固定参与费用外，您将在见数平台通过额外奖励渠道领取此部分收益。</p>
       ${surveyAction}
     </div>

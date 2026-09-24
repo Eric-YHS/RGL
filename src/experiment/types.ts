@@ -26,7 +26,7 @@ export type ExperimentState = {
   waitingSinceSec: number | null; // waiting_red 时有效
   greenAtSec: number | null; // waiting_red 时有效
   autoPassAtSec: number | null; // 绿灯后自动通行的时间点
-  waitingForWalkSec: number | null; // 绿灯后等待参与者点击"移动"的起始时间
+  moveToFinishStartedAtSec: number | null;
   currentLightColor: LightColor;
 };
 

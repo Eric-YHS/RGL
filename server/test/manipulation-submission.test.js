@@ -43,7 +43,7 @@ test('old database migration preserves rows and stores manipulation answers with
       runKind: 'formal', revealMode: 'full', comprehensionAnswer: 'q1=less;q2=wait',
       treatment: 'C1', interventionMs: 15000, manipulationAnswers: answers,
       manipulationQuestions: questions,
-      summary: { elapsedSec: 8, money: 84, violations: 1 },
+      summary: { elapsedSec: 9, waitingSec: 1, money: 16, violations: 1, ruleFollowed: false },
       device: { screenWidth: 1280, screenHeight: 720, viewportWidth: 1280, viewportHeight: 720 }, events: []
     };
     const submit = body => fetch(`http://127.0.0.1:${port}/api/submissions`, {
@@ -56,20 +56,31 @@ test('old database migration preserves rows and stores manipulation answers with
     const saved = fixture.db.prepare('SELECT * FROM sessions WHERE client_session_id=?').get(body.clientSessionId);
     assert.equal(saved.treatment, 'C1');
     assert.equal(saved.manipulation_questions, questions);
+    assert.equal(saved.waiting_sec, 1);
+    assert.equal(saved.rule_followed, 0);
     const exported = transformExportRows(loadExportRows(fixture.db, [saved.id]), {}).sessions.rows[0];
     assert.equal(exported['操纵检验1_选项A'], '干扰项一');
     assert.equal(exported['操纵检验1_所选字母'], 'B');
     assert.equal(exported['操纵检验2_所选字母'], 'C');
     assert.equal(exported['操纵检验2_答案文本'], '关键信息');
+    assert.equal(exported['红灯等待秒数'], 1);
+    assert.equal(exported['遵守规则'], '否');
     const workbook = XLSX.read(buildWorkbookBuffer(transformExportRows(loadExportRows(fixture.db, [saved.id]), {}), { sheets: ['sessions'] }), { type: 'buffer' });
     const excelRow = XLSX.utils.sheet_to_json(workbook.Sheets['会话数据'])[0];
     assert.equal(excelRow['干预材料'], 'C1');
     assert.equal(excelRow['操纵检验1_选项B'], '材料主旨');
     assert.equal(excelRow['操纵检验2_所选字母'], 'C');
+    assert.equal(excelRow['遵守规则'], '否');
     const oldExport = transformExportRows(loadExportRows(fixture.db, [42]), {}).sessions.rows[0];
     assert.equal(oldExport['操纵检验1_选项A'], '');
+    assert.equal(oldExport['遵守规则'], undefined);
     assert.equal((await submit(body)).status, 200);
-    assert.equal(fixture.db.prepare('SELECT count(*) AS n FROM sessions').get().n, originalCount + 1);
+    assert.equal((await submit({ ...body, clientSessionId: 'compliant', summary: { elapsedSec: 20, waitingSec: 12, money: 5, violations: 0, ruleFollowed: true } })).status, 200);
+    const compliant = fixture.db.prepare('SELECT waiting_sec, rule_followed, money FROM sessions WHERE client_session_id=?').get('compliant');
+    assert.deepEqual(compliant, { waiting_sec: 12, rule_followed: 1, money: 5 });
+    assert.equal(fixture.db.prepare('SELECT count(*) AS n FROM sessions').get().n, originalCount + 2);
+    assert.equal((await submit({ ...body, clientSessionId: 'bad-wait', summary: { ...body.summary, waitingSec: 13 } })).status, 400);
+    assert.equal((await submit({ ...body, clientSessionId: 'bad-rule', summary: { ...body.summary, ruleFollowed: true } })).status, 400);
     assert.equal((await submit({ ...body, clientSessionId: 'invalid', manipulationAnswers: '[""]' })).status, 400);
     assert.equal((await submit({ ...body, clientSessionId: 'mismatch', manipulationAnswers: '["不在选项中","关键信息"]' })).status, 400);
     assert.equal((await submit({ ...body, clientSessionId: 'bad-order', manipulationQuestions: '[{},{}]' })).status, 400);

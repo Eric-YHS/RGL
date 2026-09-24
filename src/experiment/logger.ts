@@ -42,8 +42,10 @@ export type ClientDeviceInfo = {
 
 export type SubmissionSummary = {
   elapsedSec: number;
+  waitingSec: number;
   money: number;
   violations: number;
+  ruleFollowed: boolean;
 };
 
 export type SessionSubmission = {
@@ -244,8 +246,10 @@ export class ExperimentLogger {
       postRuleAttitudeText: this.postRuleAttitudeText,
       summary: {
         elapsedSec: Number(args.summary.elapsedSec.toFixed(3)),
+        waitingSec: Math.min(this.config.redWaitSec, Math.max(0, Number(args.summary.waitingSec.toFixed(3)))),
         money: Number(args.summary.money.toFixed(2)),
-        violations: Math.max(0, Math.floor(args.summary.violations))
+        violations: Math.max(0, Math.floor(args.summary.violations)),
+        ruleFollowed: args.summary.ruleFollowed
       },
       device: args.device,
       events: this.events.map((e) => ({ ...e }))

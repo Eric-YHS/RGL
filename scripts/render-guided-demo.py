@@ -1,7 +1,7 @@
-"""Build the narrated tutorial from our recorded task, with timed vector callouts.
+"""Build the narrated tutorial from the current task, with timed vector callouts.
 
 Requires ffmpeg (libass), ffprobe, edge-tts, and Microsoft YaHei on Windows.
-The source video is our existing demo-guided-0921.mp4. Its task clock is untouched.
+The source is a 940x640 crop of the real task recorded by record-auto-green-demo.mjs.
 """
 import argparse
 import asyncio
@@ -12,18 +12,20 @@ import subprocess
 import sys
 
 SEGMENTS = [
-    (0.4, 5.9, "route", "两段路程", "起点到红绿灯、红绿灯到终点，各需四秒。"),
-    (6.3, 9.2, "initial", "初始报酬", "初始报酬，二十五元。"),
-    (9.6, 13.8, "cost", "计时扣费", "点击开始后，每耗时一秒，扣除一元。"),
-    (14.3, 19.3, "rule", "任务规则", "红灯等待十二秒。规则是，等绿灯后通行。"),
-    (19.8, 23.8, "start", "点击开始", "准备好后，点击开始。"),
-    (24.5, 27.9, "approach", "自动移动", "圆点自动向红绿灯靠近。"),
-    (28.3, 31.0, "stop", "自动停下", "圆点自动停下等待。"),
-    (31.4, 34.7, "count", "红灯倒计时", "红灯十二秒后，自动变绿。"),
-    (35.0, 38.0, "money", "报酬变化", "等待时，报酬持续减少。"),
-    (38.2, 41.9, "move", "移动按钮", "等待中，随时可以点击移动按钮。"),
-    (42.2, 46.0, "pass", "通过红绿灯", "点击后，圆点立刻通过红绿灯。"),
-    (46.6, 50.7, "finish", "任务完成", "越过终点线，本轮任务完成。"),
+    (0.4, 5.9, "route", "两段路程", "从起点到红绿灯、红绿灯到终点，各需四秒。"),
+    (6.2, 9.1, "initial", "初始报酬", "初始报酬二十五元。"),
+    (9.4, 13.8, "cost", "计时扣费", "点击开始后，每耗时一秒，扣除一元。"),
+    (14.1, 19.3, "formula", "最终报酬", "最终报酬为二十五元减去全程耗时的秒数。"),
+    (19.6, 25.0, "rule", "任务规则", "绿灯亮起后方可通行。红灯等待十二秒。"),
+    (25.2, 30.5, "minimum", "遵守规则", "等待绿灯时，全程二十秒，最终报酬五元。"),
+    (31.4, 34.8, "start", "点击开始", "准备好后，点击开始。"),
+    (35.2, 39.0, "approach", "自动移动", "圆点自动靠近红绿灯。"),
+    (39.1, 42.0, "stop", "自动停下", "并在红灯前停下等待。"),
+    (42.2, 45.2, "money", "报酬变化", "红灯时，报酬持续扣除。"),
+    (45.3, 48.3, "move", "移动按钮", "等待中，移动按钮仍有效。"),
+    (48.3, 51.0, "early", "提前通行", "点击就会提前通过红灯。"),
+    (51.1, 55.2, "green", "自动通行", "红灯满十二秒变绿，圆点自动前行。"),
+    (55.4, 60.0, "finish", "任务完成", "越过终点线，本轮完成，结算报酬。"),
 ]
 
 
@@ -81,23 +83,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     label(.6, 5.9, 265, 289, "起点 → 红绿灯：4秒")
     arrow(2.5, 5.9, 476, 784, 320)
     label(2.5, 5.9, 631, 289, "红绿灯 → 终点：4秒")
-    box(6.3, 13.8, 346, 37, 247, 34)
-    label(6.3, 9.2, 660, 235, "初始报酬  ￥25")
-    label(9.6, 13.8, 660, 235, "开始计时后，每秒 −￥1")
-    box(14.3, 19.3, 431, 94, 38, 95)
-    label(14.3, 16.8, 650, 235, "红灯等待 12秒")
-    label(16.8, 19.3, 650, 235, "任务规则：绿灯后通行")
-    box(19.8, 24.1, 407, 543, 125, 55)
-    label(19.8, 23.8, 655, 573, "准备好后点击")
-    label(24.5, 27.9, 650, 300, "自动靠近红绿灯")
-    label(28.3, 31, 640, 330, "到达后自动停下")
-    box(31.4, 34.7, 431, 94, 38, 95)
-    label(31.4, 34.7, 660, 235, "红灯倒计时")
-    box(35, 37.9, 346, 37, 247, 34)
-    label(35, 37.9, 660, 235, "等待期间仍在计时扣费")
-    box(38.2, 42.2, 407, 543, 125, 55)
-    label(38.2, 41.9, 680, 573, "等待中随时可按")
-    label(42.2, 46, 635, 300, "按下后立即通行")
+    box(6.2, 19.3, 346, 37, 247, 34)
+    label(6.2, 9.1, 660, 235, "初始报酬  ￥25")
+    label(9.4, 13.8, 660, 235, "开始计时后，每秒 −￥1")
+    label(14.1, 19.3, 660, 235, "￥25 − 全程耗时")
+    box(19.6, 25.0, 431, 94, 38, 95)
+    label(19.6, 25.0, 650, 235, "红灯 12秒 → 绿灯通行")
+    label(25.2, 30.5, 640, 290, "行进 8秒 + 等待 12秒 = 20秒 → ￥5")
+    box(31.4, 35.1, 407, 543, 125, 55)
+    label(31.4, 34.8, 655, 573, "准备好后点击")
+    label(35.2, 39.0, 650, 300, "自动靠近红绿灯")
+    label(39.1, 42.0, 640, 330, "红灯前自动停下")
+    box(42.2, 45.1, 346, 37, 247, 34)
+    label(42.2, 45.1, 660, 235, "红灯期间仍在计时扣费")
+    box(45.3, 51.0, 407, 543, 125, 55)
+    label(45.3, 51.0, 680, 573, "红灯期间可按")
+    box(51.1, 55.2, 431, 94, 38, 95)
+    label(51.1, 55.2, 660, 235, "绿灯亮起，自动通行")
     return "".join(out)
 
 
@@ -149,7 +151,7 @@ def main():
         cmd += ["-i", str(args.work / f"{key}.mp3")]
         filters.append(f"[{i}:a]adelay={round(start*1000)}:all=1[a{i}]")
     filters.append("".join(f"[a{i}]" for i in range(1, len(SEGMENTS)+1)) + f"amix=inputs={len(SEGMENTS)}:normalize=0,alimiter=limit=0.95,apad[a]")
-    cmd += ["-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", "51", "-r", "25", "-c:v", "libx264", "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(args.output)]
+    cmd += ["-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", "60", "-r", "25", "-c:v", "libx264", "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(args.output)]
     subprocess.run(cmd, cwd=args.work, check=True)
 
 

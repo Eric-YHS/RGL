@@ -72,6 +72,7 @@ function pad2(n) {
  */
 export function transformExportRows(raw, options) {
   const { includeChinaTime, includeSensitive } = options;
+  const hasNewOutcome = raw.sessions.some(row => row.waiting_sec != null || row.rule_followed != null);
 
   const sessionHeaders = buildHeaders(
     [
@@ -92,8 +93,10 @@ export function transformExportRows(raw, options) {
       "规则看法选项",
       "规则看法补充",
       "实验总用时_秒",
+      ...(hasNewOutcome ? ["红灯等待秒数"] : []),
       "最终金额_元",
       "闯红灯次数",
+      ...(hasNewOutcome ? ["遵守规则"] : []),
       "语言",
       "平台",
       "屏幕宽",
@@ -127,8 +130,10 @@ export function transformExportRows(raw, options) {
       规则看法选项: formatPostRuleAttitude(row.post_rule_attitude),
       规则看法补充: row.post_rule_attitude_text ?? "",
       实验总用时_秒: row.elapsed_sec,
+      红灯等待秒数: row.waiting_sec ?? "",
       最终金额_元: row.money,
       闯红灯次数: row.violations,
+      遵守规则: row.rule_followed == null ? "" : row.rule_followed === 1 ? "是" : "否",
       语言: formatLanguage(row.language),
       平台: formatPlatform(row.platform),
       屏幕宽: row.screen_width,
