@@ -158,7 +158,9 @@ def main():
     cmd = [args.ffmpeg, "-y", "-v", "warning", "-i", str(args.source)]
     # Hold the opening frame so the complete spoken explanation has natural pauses.
     # The actual red-light sequence remains real time: 12 seconds in the recording.
-    filters = ["[0:v]tpad=start_duration=21:start_mode=clone:stop_duration=1:stop_mode=clone,pad=940:720:0:0:color=0xf7f9fb,ass=tutorial.ass[v]"]
+    # The capture starts during page loading. Skip that second before freezing;
+    # add it back to the opening hold to preserve all action/narration timings.
+    filters = ["[0:v]trim=start=1,setpts=PTS-STARTPTS,tpad=start_duration=22:start_mode=clone:stop_duration=1:stop_mode=clone,pad=940:720:0:0:color=0xf7f9fb,ass=tutorial.ass[v]"]
     for i, (start, _, key, _, _) in enumerate(SEGMENTS, 1):
         cmd += ["-i", str(args.work / f"{key}.mp3")]
         filters.append(f"[{i}:a]adelay={round(start*1000)}:all=1[a{i}]")
