@@ -28,6 +28,28 @@ SEGMENTS = [
     (82.9, 88.3, "finish", "任务完成", "圆点越过终点线，本轮任务完成，结算最终报酬。"),
 ]
 
+# Pointer tip coordinates in the cropped task. These use the final speech clock,
+# not the original recording clock, so edits/holds cannot shift the pointer.
+POINTER_CUES = [
+    (0.4, 2.5, 100, 398, 420, 398),
+    (2.5, 5.1, 451, 398, 784, 398),
+    (7.1, 24.4, 525, 55, 525, 55),
+    (24.6, 30.7, 451, 160, 451, 160),
+    (30.9, 34.5, 451, 115, 451, 115),
+    (36.8, 38.5, 451, 160, 451, 160),
+    (38.5, 42.0, 100, 398, 784, 398),
+    (42.0, 46.1, 451, 115, 451, 115),
+    (46.3, 49.3, 525, 55, 525, 55),
+    (49.4, 50.0, 505, 604, 470, 570),
+    (50.0, 52.1, 470, 570, 470, 570),
+    (52.2, 56.0, 118, 416, 438, 416),
+    (56.0, 57.3, 423, 398, 423, 398),
+    (57.5, 61.5, 525, 55, 525, 55),
+    (68.0, 70.2, 451, 160, 451, 160),
+    (70.2, 72.3, 600, 415, 784, 415),
+    (72.9, 82.7, 470, 570, 470, 570),
+]
+
 
 def validate_transcript():
     approved = Path(__file__).with_name("demo-narration-approved-0925.txt").read_text(encoding="utf-8")
@@ -51,6 +73,7 @@ Style: Caption,Microsoft YaHei,25,&H00322A22,&H00322A22,&H00FFFFFF,&H00000000,0,
 Style: Chapter,Microsoft YaHei,15,&H00806040,&H00806040,&H00FFFFFF,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,20,20,0,1
 Style: Label,Microsoft YaHei,23,&H00906016,&H00906016,&H00FFFFFF,&H00000000,-1,0,0,0,100,100,0,0,1,3,0,5,0,0,0,1
 Style: Shape,Microsoft YaHei,20,&H00906016,&H00906016,&H00906016,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
+Style: Cursor,Microsoft YaHei,20,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1.5,1,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -82,6 +105,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     for start, end, key, chapter, text in SEGMENTS:
         event(start, end, "Caption", rf"{{\pos(470,693)\fad(100,120)}}{text}")
+    for start, end, x1, y1, x2, y2 in POINTER_CUES:
+        motion = rf"\pos({x1},{y1})" if (x1, y1) == (x2, y2) else rf"\move({x1},{y1},{x2},{y2})"
+        event(start, end, "Cursor", "{" + motion + r"\p1}m 0 0 l 0 27 7 20 13 33 18 31 12 18 23 18{\p0}", 4)
     # Build the two route labels in speech order, away from the actual trajectory.
     arrow(.6, 6.9, 100, 418, 320)
     arrow(2.5, 6.9, 476, 784, 320)
@@ -140,6 +166,7 @@ def main():
     p.add_argument("--voice-deps")
     p.add_argument("--work", type=Path, required=True)
     p.add_argument("--source", type=Path, required=True)
+    p.add_argument("--source-action-time", type=float, default=35.0)
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     args.work = args.work.resolve()
@@ -149,14 +176,18 @@ def main():
     asyncio.run(voices(args))
     (args.work / "tutorial.ass").write_text(build_ass(), encoding="utf-8-sig")
     (args.work / "timing.json").write_text(json.dumps(SEGMENTS, ensure_ascii=False, indent=2), encoding="utf-8")
+    (args.work / "pointer-timing.json").write_text(json.dumps(POINTER_CUES, indent=2), encoding="utf-8")
     cmd = [args.ffmpeg, "-y", "-v", "warning", "-i", str(args.source)]
     # Hold the opening frame so the complete spoken explanation has natural pauses.
     # The actual red-light sequence remains real time: 12 seconds in the recording.
-    # The capture starts during page loading. Skip that second before freezing;
-    # add it back to the opening hold to preserve all action/narration timings.
+    # Source is trimmed to the fully loaded task before rendering. It contains
+    # no pointer; the pointer is drawn by build_ass on the final speech clock.
     # After demonstrating automatic green passage, show a still of the
     # waiting-stage button while narrating the next approved sentence, then finish.
-    filters = ["[0:v]split=2[base][still];[base]trim=start=1,setpts=PTS-STARTPTS,tpad=start_duration=18:start_mode=clone:stop_duration=12:stop_mode=clone[scene];[still]trim=start=47:end=47.08,setpts=PTS-STARTPTS,tpad=stop_duration=90:stop_mode=clone[cutaway];[scene][cutaway]overlay=enable='between(t,72.9,82.7)',pad=940:720:0:0:color=0xf7f9fb,ass=tutorial.ass[v]"]
+    opening_hold = 52.0 - args.source_action_time
+    waiting_frame = args.source_action_time + 12.0
+    assert opening_hold >= 0
+    filters = [f"[0:v]split=2[base][still];[base]setpts=PTS-STARTPTS,tpad=start_duration={opening_hold}:start_mode=clone:stop_duration=12:stop_mode=clone[scene];[still]trim=start={waiting_frame}:end={waiting_frame + .08},setpts=PTS-STARTPTS,tpad=stop_duration=90:stop_mode=clone[cutaway];[scene][cutaway]overlay=enable='between(t,72.9,82.7)',pad=940:720:0:0:color=0xf7f9fb,ass=tutorial.ass[v]"]
     for i, (start, _, key, _, _) in enumerate(SEGMENTS, 1):
         cmd += ["-i", str(args.work / f"{key}.mp3")]
         filters.append(f"[{i}:a]adelay={round(start*1000)}:all=1[a{i}]")
