@@ -5,7 +5,8 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
-const outDir = path.resolve("output/playwright/cursor-free-capture");
+const early = process.argv.includes("--early");
+const outDir = path.resolve(early ? "output/playwright/early-pass-capture" : "output/playwright/cursor-free-capture");
 await fs.mkdir(outDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 const context = await browser.newContext({
@@ -25,15 +26,23 @@ try {
   const offsetSec = (Date.now() - pageCreatedAt) / 1000;
   // Pointer is composed later from the final narration timeline.
   await page.addStyleTag({ content: "* { cursor: none !important; }" });
-  await page.waitForTimeout(35000);
+  await page.waitForTimeout(early ? 2000 : 35000);
   await page.getByRole("button", { name: "开始" }).click();
-  await page.waitForTimeout(25000);
+  let earlyClickAtSec = null;
+  if (early) {
+    await page.waitForTimeout(10000);
+    earlyClickAtSec = (Date.now() - pageCreatedAt) / 1000;
+    await page.getByRole("button", { name: "移动", exact: true }).click();
+    await page.waitForTimeout(8000);
+  } else {
+    await page.waitForTimeout(25000);
+  }
   const practiceComplete = await page.getByRole("heading", { name: "练习完成" }).isVisible();
   if (!practiceComplete) throw new Error("Practice did not complete automatically after green");
   const videoPath = await page.video().path();
   await context.close();
   await fs.copyFile(videoPath, path.join(outDir, "recording.webm"));
-  await fs.writeFile(path.join(outDir, "timing.json"), JSON.stringify({ offsetSec, actionAtSec: offsetSec + 35, greenAtSec: offsetSec + 51, finishAtSec: offsetSec + 55 }, null, 2));
+  await fs.writeFile(path.join(outDir, "timing.json"), JSON.stringify({ offsetSec, earlyClickAtSec, actionAtSec: offsetSec + (early ? 2 : 35), greenAtSec: offsetSec + 51, finishAtSec: early ? earlyClickAtSec + 4 : offsetSec + 55 }, null, 2));
   console.log(JSON.stringify({ offsetSec, practiceComplete, videoPath }));
 } finally {
   await browser.close();

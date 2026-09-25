@@ -33,12 +33,15 @@ SEGMENTS = [
 POINTER_CUES = [
     (0.4, 2.5, 100, 398, 420, 398),
     (2.5, 5.1, 451, 398, 784, 398),
-    (7.1, 24.4, 525, 55, 525, 55),
+    (7.1, 10.8, 525, 55, 525, 55),
+    (11.0, 12.5, 470, 570, 470, 570),
+    (12.5, 12.9, 470, 570, 525, 55),
+    (12.9, 24.4, 525, 55, 525, 55),
     (24.6, 30.7, 451, 160, 451, 160),
-    (30.9, 34.5, 451, 115, 451, 115),
+    (30.9, 34.5, 481, 115, 481, 115),
     (36.8, 38.5, 451, 160, 451, 160),
     (38.5, 42.0, 100, 398, 784, 398),
-    (42.0, 46.1, 451, 115, 451, 115),
+    (42.0, 46.1, 481, 115, 481, 115),
     (46.3, 49.3, 525, 55, 525, 55),
     (49.4, 50.0, 505, 604, 470, 570),
     (50.0, 52.1, 470, 570, 470, 570),
@@ -47,7 +50,8 @@ POINTER_CUES = [
     (57.5, 61.5, 525, 55, 525, 55),
     (68.0, 70.2, 451, 160, 451, 160),
     (70.2, 72.3, 600, 415, 784, 415),
-    (72.9, 82.7, 470, 570, 470, 570),
+    (72.9, 77.6, 470, 570, 470, 570),
+    (77.6, 81.2, 465, 418, 784, 418),
 ]
 
 
@@ -111,12 +115,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     # Build the two route labels in speech order, away from the actual trajectory.
     arrow(.6, 6.9, 100, 418, 320)
     arrow(2.5, 6.9, 476, 784, 320)
-    box(7.1, 24.4, 346, 37, 247, 34)
+    box(7.1, 10.8, 346, 37, 247, 34)
+    box(11.0, 12.5, 407, 543, 125, 55)
+    box(12.9, 24.4, 346, 37, 247, 34)
     box(24.6, 36.6, 431, 94, 38, 95)
     box(49.4, 52.1, 407, 543, 125, 55)
     box(57.5, 61.5, 346, 37, 247, 34)
     box(68.0, 72.8, 431, 94, 38, 95)
-    box(72.9, 82.7, 407, 543, 125, 55)
+    box(72.9, 77.6, 407, 543, 125, 55)
+    # Brief press feedback at the actual early-pass click, without extra text.
+    box(77.3, 77.6, 401, 537, 137, 67)
     return "".join(out)
 
 
@@ -167,6 +175,8 @@ def main():
     p.add_argument("--work", type=Path, required=True)
     p.add_argument("--source", type=Path, required=True)
     p.add_argument("--source-action-time", type=float, default=35.0)
+    p.add_argument("--early-source", type=Path, required=True)
+    p.add_argument("--early-click-time", type=float, required=True)
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     args.work = args.work.resolve()
@@ -177,21 +187,21 @@ def main():
     (args.work / "tutorial.ass").write_text(build_ass(), encoding="utf-8-sig")
     (args.work / "timing.json").write_text(json.dumps(SEGMENTS, ensure_ascii=False, indent=2), encoding="utf-8")
     (args.work / "pointer-timing.json").write_text(json.dumps(POINTER_CUES, indent=2), encoding="utf-8")
-    cmd = [args.ffmpeg, "-y", "-v", "warning", "-i", str(args.source)]
+    cmd = [args.ffmpeg, "-y", "-v", "warning", "-i", str(args.source), "-i", str(args.early_source.resolve())]
     # Hold the opening frame so the complete spoken explanation has natural pauses.
     # The actual red-light sequence remains real time: 12 seconds in the recording.
     # Source is trimmed to the fully loaded task before rendering. It contains
     # no pointer; the pointer is drawn by build_ass on the final speech clock.
-    # After demonstrating automatic green passage, show a still of the
-    # waiting-stage button while narrating the next approved sentence, then finish.
+    # Demonstrate a real early red-light click at 77.3s for the next approved
+    # sentence, then let that recording cross the finish line and complete.
     opening_hold = 52.0 - args.source_action_time
-    waiting_frame = args.source_action_time + 12.0
+    early_trim = args.early_click_time - (77.3 - 72.9)
     assert opening_hold >= 0
-    filters = [f"[0:v]split=2[base][still];[base]setpts=PTS-STARTPTS,tpad=start_duration={opening_hold}:start_mode=clone:stop_duration=12:stop_mode=clone[scene];[still]trim=start={waiting_frame}:end={waiting_frame + .08},setpts=PTS-STARTPTS,tpad=stop_duration=90:stop_mode=clone[cutaway];[scene][cutaway]overlay=enable='between(t,72.9,82.7)',pad=940:720:0:0:color=0xf7f9fb,ass=tutorial.ass[v]"]
-    for i, (start, _, key, _, _) in enumerate(SEGMENTS, 1):
+    filters = [f"[0:v]setpts=PTS-STARTPTS,tpad=start_duration={opening_hold}:start_mode=clone:stop_duration=12:stop_mode=clone[scene];[1:v]trim=start={early_trim},setpts=PTS-STARTPTS+72.9/TB,tpad=stop_duration=12:stop_mode=clone[early];[scene][early]overlay=enable='gte(t,72.9)',pad=940:720:0:0:color=0xf7f9fb,ass=tutorial.ass[v]"]
+    for i, (start, _, key, _, _) in enumerate(SEGMENTS, 2):
         cmd += ["-i", str(args.work / f"{key}.mp3")]
         filters.append(f"[{i}:a]adelay={round(start*1000)}:all=1[a{i}]")
-    filters.append("".join(f"[a{i}]" for i in range(1, len(SEGMENTS)+1)) + f"amix=inputs={len(SEGMENTS)}:normalize=0,alimiter=limit=0.95,apad[a]")
+    filters.append("".join(f"[a{i}]" for i in range(2, len(SEGMENTS)+2)) + f"amix=inputs={len(SEGMENTS)}:normalize=0,alimiter=limit=0.95,apad[a]")
     cmd += ["-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", "89", "-r", "25", "-c:v", "libx264", "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(args.output)]
     subprocess.run(cmd, cwd=args.work, check=True)
 
