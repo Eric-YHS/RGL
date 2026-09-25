@@ -60,6 +60,13 @@ def validate_transcript():
     assert "".join(approved.splitlines()) == "".join(s[4] for s in SEGMENTS), "Narration must match the approved transcript exactly, in order"
 
 
+# Only measured silence in the opening explanation is removed. Cut picture,
+# subtitles and audio together, preserving the real-time task demonstrations.
+PAUSE_CUTS = [(4.7, 7.0), (9.1, 10.9), (14.6, 16.9),
+              (21.6, 24.5), (26.85, 27.75), (29.1, 30.9),
+              (33.95, 36.7), (43.4, 46.2), (48.1, 49.3)]
+
+
 def stamp(t):
     return f"0:{int(t)//60:02}:{t%60:05.2f}"
 
@@ -108,7 +115,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         event(start, end, "Shape", rf"{{\pos(0,0)\fad(180,180)\p1}}m {x2-10} {y-7} l {x2+2} {y+1} {x2-10} {y+9}{{\p0}}", 1)
 
     for start, end, key, chapter, text in SEGMENTS:
-        event(start, end, "Caption", rf"{{\pos(470,693)\fad(100,120)}}{text}")
+        caption = text.replace("。", "")
+        event(start, end, "Caption", rf"{{\pos(470,693)\fad(100,120)}}{caption}")
     for start, end, x1, y1, x2, y2 in POINTER_CUES:
         motion = rf"\pos({x1},{y1})" if (x1, y1) == (x2, y2) else rf"\move({x1},{y1},{x2},{y2})"
         event(start, end, "Cursor", "{" + motion + r"\p1}m 0 0 l 0 27 7 20 13 33 18 31 12 18 23 18{\p0}", 4)
@@ -202,8 +210,25 @@ def main():
         cmd += ["-i", str(args.work / f"{key}.mp3")]
         filters.append(f"[{i}:a]adelay={round(start*1000)}:all=1[a{i}]")
     filters.append("".join(f"[a{i}]" for i in range(2, len(SEGMENTS)+2)) + f"amix=inputs={len(SEGMENTS)}:normalize=0,alimiter=limit=0.95,apad[a]")
-    cmd += ["-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", "89", "-r", "25", "-c:v", "libx264", "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(args.output)]
+    uncut = args.work / "uncut.mp4"
+    cmd += ["-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-t", "89", "-r", "25", "-c:v", "libx264", "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(uncut)]
     subprocess.run(cmd, cwd=args.work, check=True)
+    ranges = []
+    previous = 0
+    for begin, end in PAUSE_CUTS:
+        ranges.append((previous, begin))
+        previous = end
+    ranges.append((previous, 89))
+    cuts = []
+    for i, (begin, end) in enumerate(ranges):
+        cuts += [f"[0:v]trim=start={begin}:end={end},setpts=PTS-STARTPTS[v{i}]",
+                 f"[0:a]atrim=start={begin}:end={end},asetpts=PTS-STARTPTS[a{i}]"]
+    cuts.append("".join(f"[v{i}][a{i}]" for i in range(len(ranges))) + f"concat=n={len(ranges)}:v=1:a=1[v][a]")
+    subprocess.run([args.ffmpeg, "-y", "-v", "error", "-i", str(uncut),
+                    "-filter_complex", ";".join(cuts), "-map", "[v]", "-map", "[a]",
+                    "-r", "25", "-c:v", "libx264", "-crf", "19", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(args.output)], check=True)
+    (args.work / "pause-cuts.json").write_text(json.dumps(PAUSE_CUTS), encoding="utf-8")
 
 
 if __name__ == "__main__":
