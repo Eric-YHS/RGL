@@ -16,7 +16,7 @@ SEGMENTS = [
     (7.1, 10.8, "initial", "初始报酬", "初始报酬二十五元。"),
     (11.0, 16.8, "cost", "计时扣费", "点击开始后，每耗时1秒扣除1元。"),
     (17.0, 24.4, "formula", "最终报酬", "您的最终报酬为25元减去全程等待的总秒数。"),
-    (24.6, 30.7, "rule", "任务规则", "规则是，绿灯亮起后通行。"),
+    (24.6, 30.7, "rule", "任务规则", "规则是，绿灯亮起后方可通行。"),
     (30.9, 36.6, "red_wait", "默认等待", "红绿灯默认等待时间为12秒。"),
     (36.8, 46.1, "duration", "遵守规则", "若等待绿灯通行，全程固定耗时20秒（即行进8秒加上等待12秒），"),
     (46.3, 49.3, "minimum", "最终报酬", "最终报酬为5元。"),
@@ -142,9 +142,10 @@ async def voices(args):
     import edge_tts
     for start, end, key, _, text in SEGMENTS:
         path = args.work / f"{key}.mp3"
-        voice_parts = [text]
+        # A real pause after 后 prevents TTS from sounding like 后方 ("behind").
+        voice_parts = ["规则是，绿灯亮起后", "方可通行。"] if key == "rule" else [text]
         assert "".join(voice_parts) == text
-        fingerprint = hashlib.sha256(("|".join(voice_parts) + '|zh-CN-XiaoxiaoNeural|+0%').encode()).hexdigest()
+        fingerprint = hashlib.sha256(("|".join(voice_parts) + '|zh-CN-XiaoxiaoNeural|+0%|rule-pause-400ms').encode()).hexdigest()
         cache_key = args.work / f"{key}.sha256"
         if not path.exists() or not cache_key.exists() or cache_key.read_text() != fingerprint:
             # Cache completed clips; retry transient service failures with capped waits.
@@ -159,14 +160,13 @@ async def voices(args):
                         print(f"Retry {key}: {exc}", flush=True)
                         await asyncio.sleep(delay)
                         delay = min(30, delay * 2)
-                    except Exception as exc:
-                        # edge-tts reports transient upstream failures as NoAudioReceived.
-                        # Keep deterministic parameter errors visible instead of retrying forever.
-                        if type(exc).__name__ != "NoAudioReceived":
-                            raise
-                        print(f"Retry {key}: {exc}", flush=True)
-                        await asyncio.sleep(delay)
-                        delay = min(30, delay * 2)
+            if key == "rule":
+                subprocess.run([
+                    args.ffmpeg, "-y", "-v", "error", "-i", str(args.work / "rule-part0.mp3"),
+                    "-i", str(args.work / "rule-part1.mp3"), "-filter_complex",
+                    "[0:a]apad=pad_dur=0.4[a0];[a0][1:a]concat=n=2:v=0:a=1[a]",
+                    "-map", "[a]", "-q:a", "2", str(path),
+                ], check=True)
             cache_key.write_text(fingerprint)
         duration = float(subprocess.check_output([args.ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(path)], text=True))
         if duration > end - start:
